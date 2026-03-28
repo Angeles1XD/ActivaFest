@@ -8,7 +8,7 @@ Aplicación web para eventos juveniles.
 - TafarelM
 
 ## Figma
-https://www.figma.com/make/ZGFf5Htik0bR154Dw4fZzn
+https://www.figma.com/make/ZGFf5Htik0bR154Dw4fZzn/Prototipo-de-p%C3%A1gina-web-juvenil?t=3FaBRexPzsqNmVtH-1
 
 ## Tecnologías
 - HTML
