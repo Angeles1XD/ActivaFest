@@ -2,13 +2,70 @@
 <html>
 <head>
   <title>ActivaFest</title>
+
+  <style>
+    body{
+      font-family: Arial;
+      background:#0f0f1a;
+      color:white;
+      padding:20px;
+    }
+
+    .evento{
+      background:#1e1e2f;
+      padding:10px;
+      margin:5px;
+      border-radius:10px;
+    }
+  </style>
+
 </head>
 <body>
 
-<h1>ActivaFest</h1>
-<p>Aplicación de eventos juveniles</p>
+<h1>ActivaFest 🎉</h1>
 
-<button>Explorar eventos</button>
+<!-- 🔍 BUSCADOR -->
+<input type="text" id="buscador" placeholder="Buscar evento...">
+
+<!-- 📋 LISTA -->
+<div id="listaEventos"></div>
+
+<script>
+
+let eventos = [
+  {titulo:"Concierto juvenil"},
+  {titulo:"Festival de danza"},
+  {titulo:"Feria tecnológica"}
+];
+
+// MOSTRAR
+function mostrarEventos(lista){
+  let contenedor = document.getElementById("listaEventos");
+  contenedor.innerHTML = "";
+
+  lista.forEach(e => {
+    let div = document.createElement("div");
+    div.className = "evento";
+    div.innerText = e.titulo;
+
+    contenedor.appendChild(div);
+  });
+}
+
+// BUSCADOR
+document.getElementById("buscador").addEventListener("keyup", function(){
+  let texto = this.value.toLowerCase();
+
+  let filtrados = eventos.filter(e =>
+    e.titulo.toLowerCase().includes(texto)
+  );
+
+  mostrarEventos(filtrados);
+});
+
+mostrarEventos(eventos);
+
+</script>
 
 </body>
 </html>
