@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouthEvents - Descubre eventos juveniles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Partículas de fondo -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Navegación -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">YouthEvents</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#inicio">Inicio</a></li>
+                <li><a href="#categorias">Categorías</a></li>
+                <li><a href="#recomendados">Recomendados</a></li>
+                <li><a href="#cercanos">Cerca de ti</a></li>
+            </ul>
+            <button class="menu-toggle" id="menuToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Principal -->
+    <section class="hero" id="inicio">
+        <div class="hero-content">
+            <h1 class="hero-title">Descubre los mejores eventos juveniles cerca de ti</h1>
+            <p class="hero-subtitle">Conciertos, ferias, hackatones, talleres y mucho más.</p>
+            <div class="hero-buttons">
+                <a href="#buscador" class="btn btn-primary">
+                    <i class="fas fa-compass"></i> Explorar eventos
+                </a>
+                <a href="#cercanos" class="btn btn-secondary">
+                    <i class="fas fa-map-marker-alt"></i> Ver eventos cercanos
+                </a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="floating-cards">
+                <div class="floating-card card-1">
+                    <i class="fas fa-music"></i>
+                </div>
+                <div class="floating-card card-2">
+                    <i class="fas fa-laptop-code"></i>
+                </div>
+                <div class="floating-card card-3">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <div class="floating-card card-4">
+                    <i class="fas fa-basketball-ball"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Estadísticas -->
+    <section class="stats">
+        <div class="stats-container">
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-number" data-target="500">0</div>
+                <div class="stat-label">+ eventos</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-number" data-target="50000">0</div>
+                <div class="stat-label">+ usuarios</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="fas fa-city"></i>
+                </div>
+                <div class="stat-number" data-target="20">0</div>
+                <div class="stat-label">+ ciudades</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Buscador Avanzado -->
+    <section class="search-section" id="buscador">
+        <div class="search-container">
+            <h2 class="section-title">Encuentra tu próximo evento</h2>
+            <div class="search-box">
+                <div class="search-input-group">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar eventos...">
+                </div>
+                <div class="search-filters">
+                    <select id="categoryFilter" class="filter-select">
+                        <option value="">Todas las categorías</option>
+                        <option value="musica">🎵 Música</option>
+                        <option value="tecnologia">💻 Tecnología</option>
+                        <option value="cultura">🎭 Cultura</option>
+                        <option value="deportes">⚽ Deportes</option>
+                        <option value="gaming">🎮 Gaming</option>
+                        <option value="emprendimiento">🚀 Emprendimiento</option>
+                    </select>
+                    <button class="btn btn-primary" id="searchBtn">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                    <button class="btn btn-location" id="locationBtn" title="Usar mi ubicación">
+                        <i class="fas fa-location-arrow"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="location-status" id="locationStatus"></div>
+        </div>
+    </section>
+
+    <!-- Categorías -->
+    <section class="categories" id="categorias">
+        <div class="container">
+            <h2 class="section-title">Explora por categoría</h2>
+            <div class="categories-grid">
+                <div class="category-card" data-category="musica">
+                    <div class="category-icon">
+                        <i class="fas fa-music"></i>
+                    </div>
+                    <h3>Música</h3>
+                    <p>Conciertos, festivales y sesiones</p>
+                </div>
+                <div class="category-card" data-category="tecnologia">
+                    <div class="category-icon">
+                        <i class="fas fa-laptop-code"></i>
+                    </div>
+                    <h3>Tecnología</h3>
+                    <p>Hackatones, talleres y meetups</p>
+                </div>
+                <div class="category-card" data-category="cultura">
+                    <div class="category-icon">
+                        <i class="fas fa-theater-masks"></i>
+                    </div>
+                    <h3>Cultura</h3>
+                    <p>Arte, teatro y exposiciones</p>
+                </div>
+                <div class="category-card" data-category="deportes">
+                    <div class="category-icon">
+                        <i class="fas fa-running"></i>
+                    </div>
+                    <h3>Deportes</h3>
+                    <p>Torneos y actividades al aire libre</p>
+                </div>
+                <div class="category-card" data-category="gaming">
+                    <div class="category-icon">
+                        <i class="fas fa-gamepad"></i>
+                    </div>
+                    <h3>Gaming</h3>
+                    <p>Torneos y eventos de esports</p>
+                </div>
+                <div class="category-card" data-category="emprendimiento">
+                    <div class="category-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h3>Emprendimiento</h3>
+                    <p>Startups y negocios</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recomendados para ti -->
+    <section class="recommended" id="recomendados">
+        <div class="container">
+            <h2 class="section-title">Recomendados para ti</h2>
+            <div class="events-grid" id="recommendedEvents">
+                <!-- Los eventos se cargan dinámicamente -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Eventos cerca de ti -->
+    <section class="nearby-events" id="cercanos">
+        <div class="container">
+            <h2 class="section-title">
+                <i class="fas fa-map-marker-alt"></i> Eventos cerca de ti
+            </h2>
+            <p class="section-subtitle">Basados en tu ubicación actual</p>
+            <div class="events-grid" id="nearbyEvents">
+                <!-- Los eventos se cargan dinámicamente -->
+            </div>
+            <div class="no-location" id="noLocation" style="display: none;">
+                <i class="fas fa-location-crosshairs"></i>
+                <p>Activa tu ubicación para ver eventos cercanos</p>
+                <button class="btn btn-primary" id="enableLocation">
+                    <i class="fas fa-location-arrow"></i> Activar ubicación
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Botón flotante para añadir eventos -->
+    <button class="fab-add" id="fabAdd" title="Añadir evento">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Modal para añadir evento -->
+    <div class="modal" id="addEventModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Añadir nuevo evento</h3>
+                <button class="modal-close" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="addEventForm">
+                <div class="form-group">
+                    <label for="eventTitle">Título del evento</label>
+                    <input type="text" id="eventTitle" required placeholder="Ej: Hackathon 2024">
+                </div>
+                <div class="form-group">
+                    <label for="eventCategory">Categoría</label>
+                    <select id="eventCategory" required>
+                        <option value="">Selecciona una categoría</option>
+                        <option value="musica">🎵 Música</option>
+                        <option value="tecnologia">💻 Tecnología</option>
+                        <option value="cultura">🎭 Cultura</option>
+                        <option value="deportes">⚽ Deportes</option>
+                        <option value="gaming">🎮 Gaming</option>
+                        <option value="emprendimiento">🚀 Emprendimiento</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="eventDate">Fecha</label>
+                    <input type="date" id="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventPrice">Precio (€)</label>
+                    <input type="number" id="eventPrice" min="0" placeholder="0 para gratuito">
+                </div>
+                <div class="form-group">
+                    <label for="eventLocation">Ubicación</label>
+                    <input type="text" id="eventLocation" required placeholder="Ciudad o dirección">
+                </div>
+                <div class="form-group">
+                    <label for="eventImage">URL de imagen</label>
+                    <input type="url" id="eventImage" placeholder="https://ejemplo.com/imagen.jpg">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">
+                    <i class="fas fa-plus"></i> Crear evento
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">YouthEvents</span>
+                <p>La plataforma líder para descubrir eventos juveniles</p>
+            </div>
+            <div class="footer-links">
+                <h4>Enlaces rápidos</h4>
+                <ul>
+                    <li><a href="#inicio">Inicio</a></li>
+                    <li><a href="#categorias">Categorías</a></li>
+                    <li><a href="#recomendados">Recomendados</a></li>
+                    <li><a href="#cercanos">Cerca de ti</a></li>
+                </ul>
+            </div>
+            <div class="footer-social">
+                <h4>Síguenos</h4>
+                <div class="social-icons">
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-tiktok"></i></a>
+                    <a href="#"><i class="fab fa-discord"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2024 YouthEvents. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
