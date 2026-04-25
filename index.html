@@ -17,18 +17,6 @@
       margin:5px;
       border-radius:10px;
     }
-
-    input, button{
-      padding:10px;
-      margin:5px;
-      border-radius:10px;
-      border:none;
-    }
-
-    button{
-      background:#ff4d8d;
-      color:white;
-    }
   </style>
 
 </head>
@@ -36,47 +24,26 @@
 
 <h1>ActivaFest 🎉</h1>
 
-<!-- ➕ PUBLICAR EVENTO -->
-<h2>Publicar evento</h2>
-
-<input type="text" id="titulo" placeholder="Título">
-<input type="text" id="descripcion" placeholder="Descripción">
-
-<button onclick="publicar()">Publicar evento</button>
+<!-- 🔍 BUSCADOR -->
+<input type="text" id="buscador" placeholder="Buscar evento...">
 
 <!-- 📋 LISTA -->
-<h2>Eventos publicados</h2>
 <div id="listaEventos"></div>
 
 <script>
 
-let eventos = [];
-
-// ➕ PUBLICAR
-function publicar(){
-  let titulo = document.getElementById("titulo").value;
-  let descripcion = document.getElementById("descripcion").value;
-
-  if(titulo === "" || descripcion === ""){
-    alert("Completa los campos");
-    return;
-  }
-
-  let evento = {titulo, descripcion};
-  eventos.push(evento);
-
-  mostrarEventos();
-
-  document.getElementById("titulo").value = "";
-  document.getElementById("descripcion").value = "";
-}
+let eventos = [
+  {titulo:"Concierto juvenil"},
+  {titulo:"Festival de danza"},
+  {titulo:"Feria tecnológica"}
+];
 
 // MOSTRAR
-function mostrarEventos(){
+function mostrarEventos(lista){
   let contenedor = document.getElementById("listaEventos");
   contenedor.innerHTML = "";
 
-  eventos.forEach(e => {
+  lista.forEach(e => {
     let div = document.createElement("div");
     div.className = "evento";
     div.innerText = e.titulo;
@@ -84,6 +51,19 @@ function mostrarEventos(){
     contenedor.appendChild(div);
   });
 }
+
+// BUSCADOR
+document.getElementById("buscador").addEventListener("keyup", function(){
+  let texto = this.value.toLowerCase();
+
+  let filtrados = eventos.filter(e =>
+    e.titulo.toLowerCase().includes(texto)
+  );
+
+  mostrarEventos(filtrados);
+});
+
+mostrarEventos(eventos);
 
 </script>
 
