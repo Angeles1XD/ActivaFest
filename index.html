@@ -16,6 +16,7 @@
       padding:10px;
       margin:5px;
       border-radius:10px;
+      cursor:pointer;
     }
   </style>
 
@@ -24,46 +25,41 @@
 
 <h1>ActivaFest 🎉</h1>
 
-<!-- 🔍 BUSCADOR -->
-<input type="text" id="buscador" placeholder="Buscar evento...">
-
-<!-- 📋 LISTA -->
+<h2>Lista de eventos</h2>
 <div id="listaEventos"></div>
+
+<h2>Información del evento</h2>
+<p id="detalle">Haz clic en un evento</p>
 
 <script>
 
 let eventos = [
-  {titulo:"Concierto juvenil"},
-  {titulo:"Festival de danza"},
-  {titulo:"Feria tecnológica"}
+  {titulo:"Concierto juvenil", descripcion:"Música en vivo"},
+  {titulo:"Festival de danza", descripcion:"Baile urbano"},
+  {titulo:"Feria tecnológica", descripcion:"Innovación tecnológica"}
 ];
 
-// MOSTRAR
-function mostrarEventos(lista){
+// MOSTRAR EVENTOS
+function mostrarEventos(){
   let contenedor = document.getElementById("listaEventos");
   contenedor.innerHTML = "";
 
-  lista.forEach(e => {
+  eventos.forEach((evento, index) => {
     let div = document.createElement("div");
     div.className = "evento";
-    div.innerText = e.titulo;
+    div.innerText = evento.titulo;
+
+    // 📄 MOSTRAR INFORMACIÓN
+    div.onclick = () => {
+      document.getElementById("detalle").innerText =
+        "Título: " + evento.titulo + " | Descripción: " + evento.descripcion;
+    };
 
     contenedor.appendChild(div);
   });
 }
 
-// BUSCADOR
-document.getElementById("buscador").addEventListener("keyup", function(){
-  let texto = this.value.toLowerCase();
-
-  let filtrados = eventos.filter(e =>
-    e.titulo.toLowerCase().includes(texto)
-  );
-
-  mostrarEventos(filtrados);
-});
-
-mostrarEventos(eventos);
+mostrarEventos();
 
 </script>
 
