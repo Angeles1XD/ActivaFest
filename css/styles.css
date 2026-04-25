@@ -1,0 +1,50 @@
+body {
+  font-family: Arial;
+  background: #0b0b1f;
+  color: white;
+  margin: 0;
+}
+
+header {
+  background: #111;
+  padding: 15px;
+  text-align: center;
+}
+
+.buscador {
+  text-align: center;
+  margin: 20px;
+}
+
+input {
+  padding: 10px;
+  width: 200px;
+}
+
+button {
+  padding: 10px;
+  background: #ff2e63;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.eventos {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #1a1a2e;
+  padding: 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  width: 200px;
+  transition: 0.3s;
+}
+
+.card:hover {
+  transform: scale(1.05);
+}

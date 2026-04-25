@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Detalle Evento</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+
+<body>
+
+<h1>Detalle del Evento</h1>
+
+<div id="detalle"></div>
+
+<script type="module">
+import { eventos } from "../models/evento.js";
+
+const id = localStorage.getItem("eventoId");
+const evento = eventos.find(e => e.id == id);
+
+const contenedor = document.getElementById("detalle");
+
+if (evento) {
+  contenedor.innerHTML = `
+    <h2>${evento.nombre}</h2>
+    <p>${evento.descripcion}</p>
+    <p>Precio: S/ ${evento.precio}</p>
+  `;
+}
+</script>
+
+</body>
+</html>
