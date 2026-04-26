@@ -1,0 +1,34 @@
+@model List<ActivaFest.Models.Evento>
+
+<h2 class="text-gradient">Eventos Juveniles</h2>
+
+<a href="/Eventos/Crear" class="btn-rosa">
+    + Crear Evento
+</a>
+
+<form method="get" class="buscador">
+    <input type="text" name="buscar" placeholder="Buscar eventos..." class="input-buscar" />
+    <button class="btn-rosa">Buscar</button>
+</form>
+
+<div class="grid-eventos">
+
+@foreach (var item in Model)
+{
+    <div class="card-evento">
+
+        <h3>@item.Titulo</h3>
+
+        <p>📍 @item.Ubicacion</p>
+        <p>📅 @item.Fecha</p>
+        <p>🏷 @item.Categoria</p>
+        <p>👥 @item.Asistentes interesados</p>
+
+        <a href="/Eventos/Detalle/@item.Id" class="btn-rosa">
+            Ver más →
+        </a>
+
+    </div>
+}
+
+</div>

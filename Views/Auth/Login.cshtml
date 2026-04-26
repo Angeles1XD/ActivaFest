@@ -1,0 +1,18 @@
+<h2 class="text-gradient">Login</h2>
+
+<form method="post" style="margin-top:20px;">
+    
+    <input type="text" name="usuario" placeholder="Usuario" class="input-buscar" />
+    <br /><br />
+
+    <input type="password" name="password" placeholder="Contraseña" class="input-buscar" />
+    <br /><br />
+
+    <button class="btn-rosa">Ingresar</button>
+
+</form>
+
+@if (ViewBag.Error != null)
+{
+    <p style="color:red;">@ViewBag.Error</p>
+}

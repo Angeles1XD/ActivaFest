@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using ActivaFest.Models;
 
 namespace ActivaFest.Models
 {
@@ -26,9 +25,8 @@ namespace ActivaFest.Models
 
         public int CategoriaId { get; set; }
 
-        // 🔥 RELACIÓN
-        public Categoria Categoria { get; set; }
+        public Categoria? Categoria { get; set; }
 
-        public ICollection<Compra> Compras { get; set; }
+        public ICollection<Compra>? Compras { get; set; }
     }
 }
