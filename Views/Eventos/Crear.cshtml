@@ -1,0 +1,19 @@
+@model ActivaFest.Models.Evento
+
+<h2>Crear Evento</h2>
+
+<form method="post">
+
+    <input asp-for="Titulo" placeholder="Título" class="form-control mb-2" />
+
+    <input asp-for="Categoria" placeholder="Categoría" class="form-control mb-2" />
+
+    <input asp-for="Ubicacion" placeholder="Ubicación" class="form-control mb-2" />
+
+    <input asp-for="Fecha" type="datetime-local" class="form-control mb-2" />
+
+    <input asp-for="Asistentes" type="number" class="form-control mb-2" />
+
+    <button class="btn btn-primary">Guardar</button>
+
+</form>

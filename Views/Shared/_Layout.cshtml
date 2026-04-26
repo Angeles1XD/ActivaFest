@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ActivaFest</title>
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+
+<body>
+
+    <!-- 🌌 FONDO -->
+    <div class="fondo"></div>
+
+    <!-- ✨ ESTRELLAS -->
+    <div class="stars"></div>
+
+    <!-- 🔝 NAVBAR -->
+    <header>
+        <nav class="navbar-custom">
+            <div class="nav-container">
+
+                <a asp-controller="Home" asp-action="Index" class="logo">
+                    ActivaFest
+                </a>
+
+                <div class="nav-links">
+                    <a asp-controller="Home" asp-action="Index">Inicio</a>
+                    <a asp-controller="Eventos" asp-action="Index">Eventos</a>
+
+                    @if (Context.Session.GetString("usuario") != null)
+                    {
+                        <span style="color:#ff4d6d;">
+                            👤 @Context.Session.GetString("usuario")
+                        </span>
+                        <a href="/Auth/Logout">Salir</a>
+                    }
+                    else
+                    {
+                        <a href="/Auth/Login">Login</a>
+                    }
+                </div>
+
+            </div>
+        </nav>
+    </header>
+
+    <!-- 🔥 SESIÓN -->
+    @if (Context.Session.GetString("UltimoEvento") != null)
+    {
+        <div style="
+            background: linear-gradient(90deg,#ff4d6d,#ff006e);
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        ">
+            Último evento creado: @Context.Session.GetString("UltimoEvento")
+        </div>
+    }
+
+    <!-- CONTENIDO -->
+    <main class="main-content">
+        @RenderBody()
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        © 2026 - ActivaFest
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+
+</body>
+</html>
