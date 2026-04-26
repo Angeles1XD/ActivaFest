@@ -1,0 +1,12 @@
+@model ActivaFest.Models.Evento
+
+<h2 class="text-gradient">@Model.Titulo</h2>
+
+<div class="card-evento">
+    <p>📍 @Model.Ubicacion</p>
+    <p>📅 @Model.Fecha</p>
+    <p>🏷 @Model.Categoria?.Nombre</p>
+    <p>👥 @Model.CuposDisponibles disponibles</p>
+</div>
+
+<a href="/Eventos" class="btn-rosa">← Volver</a>
