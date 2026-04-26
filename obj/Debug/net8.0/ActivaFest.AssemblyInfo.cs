@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6e801734ef01666e2dbe29c7643facba5fc594b4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b08277823d5f67ab1fb66cca2b13b5c83cae980f")]
 [assembly: System.Reflection.AssemblyProductAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

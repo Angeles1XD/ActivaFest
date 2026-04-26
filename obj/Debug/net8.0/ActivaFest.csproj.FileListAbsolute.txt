@@ -142,3 +142,9 @@ E:\ActivaFest\ActivaFest\obj\Debug\net8.0\refint\ActivaFest.dll
 E:\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.pdb
 E:\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.genruntimeconfig.cache
 E:\ActivaFest\ActivaFest\obj\Debug\net8.0\ref\ActivaFest.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\Microsoft.Extensions.Caching.Abstractions.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\Microsoft.Extensions.Caching.StackExchangeRedis.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\Microsoft.Extensions.Primitives.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\Pipelines.Sockets.Unofficial.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\StackExchange.Redis.dll
+E:\ActivaFest\ActivaFest\bin\Debug\net8.0\System.Diagnostics.DiagnosticSource.dll
