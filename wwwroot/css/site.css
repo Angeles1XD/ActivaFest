@@ -1,0 +1,249 @@
+/* =========================================
+   1. VARIABLES Y CONFIGURACIÓN BASE
+   ========================================= */
+:root {
+    --pink: #ff0066;
+    --blue: #3300ff;
+    --purple: #6600ff;
+    --dark-bg: #0b0e14;
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --neon-shadow: 0 0 25px rgba(255, 0, 102, 0.5);
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    background-color: var(--dark-bg);
+    color: #ffffff !important;
+    font-family: 'Inter', -apple-system, sans-serif;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* =========================================
+   2. FONDO ANIMADO "CYBER-ATMOSPHERE"
+   ========================================= */
+.light-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0b0e14 100%);
+}
+
+.light {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.4;
+    animation: flowLight 12s infinite alternate ease-in-out;
+}
+
+.light-1 {
+    width: 500px; height: 500px;
+    background: var(--pink);
+    top: -100px;
+    right: -100px;
+}
+
+.light-2 {
+    width: 600px; height: 600px;
+    background: var(--blue);
+    bottom: -150px;
+    left: -150px;
+    animation-delay: -4s;
+}
+
+.light-3 {
+    width: 450px; height: 450px;
+    background: var(--purple);
+    top: 40%;
+    left: 15%;
+    animation-duration: 18s;
+}
+
+@keyframes flowLight {
+    0% { transform: scale(1) translate(0, 0); opacity: 0.3; }
+    50% { opacity: 0.6; }
+    100% { transform: scale(1.4) translate(40px, 80px); opacity: 0.4; }
+}
+
+/* =========================================
+   3. NAVEGACIÓN (GLASSMORPHISM)
+   ========================================= */
+.navbar-glass {
+    background: rgba(11, 14, 20, 0.75) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 15px 0;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    letter-spacing: -0.5px;
+}
+
+.text-pink {
+    color: var(--pink) !important;
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.7) !important;
+    font-weight: 500;
+    transition: 0.3s;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: white !important;
+}
+
+/* =========================================
+   4. COMPONENTES DEL HERO
+   ========================================= */
+.main-wrapper {
+    flex: 1;
+    padding-top: 120px; /* Espacio para la navbar fija */
+}
+
+.text-gradient {
+    background: linear-gradient(90deg, #ff4d94, #ff8c42);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+}
+
+.badge-neon {
+    display: inline-block;
+    background: rgba(255, 77, 148, 0.15);
+    color: #ff4d94;
+    padding: 8px 18px;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 77, 148, 0.3);
+}
+
+.btn-register-neon {
+    background: var(--pink);
+    color: white !important;
+    padding: 10px 28px;
+    border-radius: 50px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: var(--neon-shadow);
+    transition: 0.3s ease;
+}
+
+.btn-register-neon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 35px rgba(255, 0, 102, 0.7);
+}
+
+.login-link {
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.login-link:hover { color: white; }
+
+/* =========================================
+   5. BUSCADOR ESTILO PREMIUM
+   ========================================= */
+.search-glass-container {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 100px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    max-width: 850px;
+    margin: 2.5rem auto;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+}
+
+.search-glass-container input {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 10px 25px;
+    flex-grow: 1;
+    outline: none;
+    font-size: 1rem;
+}
+
+.search-glass-container input::placeholder {
+    color: rgba(255,255,255,0.4);
+}
+
+.v-line {
+    width: 1px;
+    height: 30px;
+    background: rgba(255,255,255,0.2);
+    margin: 0 10px;
+}
+
+.btn-search-glow {
+    background: var(--pink);
+    border: none;
+    color: white;
+    padding: 12px 40px;
+    border-radius: 50px;
+    font-weight: 800;
+    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-search-glow:hover {
+    transform: scale(1.05);
+    box-shadow: var(--neon-shadow);
+}
+
+/* =========================================
+   6. CAJAS DE ESTADÍSTICAS (CARDS)
+   ========================================= */
+.stat-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 30px;
+    backdrop-filter: blur(10px);
+    transition: 0.4s ease;
+    text-align: center;
+}
+
+.stat-box:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--pink);
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+.stat-box h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+
+/* =========================================
+   7. FOOTER
+   ========================================= */
+.footer-glass {
+    margin-top: 80px;
+    background: rgba(11, 14, 20, 0.8);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--glass-border);
+}
+
+.text-white-50 a {
+    text-decoration: none;
+    font-weight: 600;
+}

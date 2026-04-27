@@ -1,0 +1,33 @@
+@model IEnumerable<ActivaFest.Models.Evento>
+
+<h2 class="text-gradient">Eventos Juveniles - Eventos</h2>
+
+<a href="/Eventos/Create" class="btn btn-primary">Crear Evento</a>
+
+<hr />
+
+@if (!Model.Any())
+{
+    <p>No hay eventos registrados</p>
+}
+else
+{
+    @foreach (var item in Model)
+    {
+        <div style="border:1px solid #ccc; padding:10px; margin:10px;">
+            <h3>@item.Titulo</h3>
+
+            <p><strong>Categoría:</strong> @item.Categoria?.Nombre</p>
+
+            <p>@item.Descripcion</p>
+            <p><strong>Fecha:</strong> @item.Fecha</p>
+            <p><strong>Precio:</strong> S/. @item.Precio</p>
+            <p><strong>Cupos:</strong> @item.CuposDisponibles</p>
+
+            <a href="/Eventos/Details/@item.Id">Ver</a> |
+            <a href="/Eventos/Edit/@item.Id">Editar</a> |
+            <a href="/Eventos/Delete/@item.Id">Eliminar</a> |
+            <a href="/Eventos/Comprar/@item.Id">Comprar</a>
+        </div>
+    }
+}

@@ -1,0 +1,102 @@
+﻿@{
+    ViewData["Title"] = "Explora Eventos";
+}
+
+<div class="container text-center">
+    <span class="badge-neon mb-3" style="background: rgba(255,0,102,0.1); color: #ff0066; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem;">
+        ✨ Plataforma de Eventos #1
+    </span>
+    
+    <h1 class="display-3 fw-bold text-white mb-4">
+        Descubre los mejores <br><span class="text-gradient">eventos juveniles</span> cerca de ti
+    </h1>
+    
+    <p class="fs-5 text-light opacity-75 mb-5">
+        Conciertos, hackatones, ferias culturales y mucho más. Tu próxima aventura está a un clic de distancia.
+    </p>
+
+    <div class="search-glass-container">
+        <input type="text" placeholder="🔍 Buscar eventos, conciertos, hackatones...">
+        <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.2); margin: 0 15px;"></div>
+        <button style="background:transparent; border:none; color:white; margin-right:15px;">📍 Tu ubicación</button>
+        <button class="btn-search-glow">Buscar</button>
+    </div>
+    <p class="text-white-50"><small>🟢 342 eventos activos ahora</small></p>
+
+    <div class="row g-4 justify-content-center mt-5">
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <h2 class="fw-bold">500+</h2>
+                <p class="text-white-50 mb-0">Eventos</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <h2 class="fw-bold">50k+</h2>
+                <p class="text-white-50 mb-0">Usuarios</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-box">
+                <h2 class="fw-bold">20+</h2>
+                <p class="text-white-50 mb-0">Ciudades</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    
+    <section class="mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="section-title">🚀 Eventos Destacados</h2>
+            <a href="#" class="view-all-link">Ver todos →</a>
+        </div>
+        <div class="row g-4">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="event-card-premium">
+                    <div class="img-container">
+                        <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500" alt="Evento">
+                        <span class="tag-status-live">Destacado</span>
+                    </div>
+                    <div class="card-content">
+                        <h5 class="event-name">Inti Raymi 2026</h5>
+                        <p class="event-date">📅 24 de Junio • 08:00 AM</p>
+                        <p class="event-loc">📍 Cusco, Perú</p>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <span class="rating">⭐ 4.9</span>
+                            <button class="btn-card-action">Ver más +</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+    </section>
+
+    <section class="mt-5 pt-5 text-center">
+        <h2 class="section-title">Explora por Categoría</h2>
+        <p class="text-white-50 mb-4">Encuentra eventos que se ajusten a tus intereses y pasiones</p>
+        <div class="row g-3">
+            <div class="col-6 col-lg-3">
+                <div class="cat-card glass-pink">🎵 <h6 class="mt-2">Conciertos</h6></div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="cat-card glass-blue">💻 <h6 class="mt-2">Hackatones</h6></div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="cat-card glass-purple">🎨 <h6 class="mt-2">Arte y Cultura</h6></div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="cat-card glass-green">⚽ <h6 class="mt-2">Deportes</h6></div>
+            </div>
+        </div>
+    </section>
+
+    <div class="organizer-banner-premium mt-5">
+        <div class="p-5 text-center">
+            <h3 class="fw-bold mb-3">¿Organizas eventos?</h3>
+            <p class="opacity-75 mb-4">Publica tus eventos en ActivaFest y alcanza a miles de personas de forma gratuita.</p>
+            <button class="btn-search-glow">Publicar mi evento</button>
+        </div>
+    </div>
+</div>
