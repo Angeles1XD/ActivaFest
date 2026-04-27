@@ -7,7 +7,10 @@
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5054",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "REDIS_HOST": "redis-14988.c262.us-east-1-3.ec2.cloud.redislabs.com",
+        "REDIS_PORT": "14988",
+        "REDIS_PASSWORD": "IhbQmAMem7iWDJnxeFm4IBAPyH9nh7hl"
       }
     },
     "https": {
@@ -16,7 +19,10 @@
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7094;http://localhost:5054",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "REDIS_HOST": "redis-14988.c262.us-east-1-3.ec2.cloud.redislabs.com",
+        "REDIS_PORT": "14988",
+        "REDIS_PASSWORD": "IhbQmAMem7iWDJnxeFm4IBAPyH9nh7hl"
       }
     }
   }

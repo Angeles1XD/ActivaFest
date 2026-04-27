@@ -4,16 +4,49 @@
 
 <form method="post">
 
-    <input asp-for="Titulo" placeholder="Título" class="form-control mb-2" />
+    <!-- Validación general -->
+    <div asp-validation-summary="All" class="text-danger"></div>
 
-    <input asp-for="Categoria" placeholder="Categoría" class="form-control mb-2" />
+    <!-- Título -->
+    <div class="mb-3">
+        <label asp-for="Titulo" class="form-label"></label>
+        <input asp-for="Titulo" class="form-control" />
+        <span asp-validation-for="Titulo" class="text-danger"></span>
+    </div>
 
-    <input asp-for="Ubicacion" placeholder="Ubicación" class="form-control mb-2" />
+    <!-- Categoría -->
+    <div class="mb-3">
+        <label asp-for="Categoria" class="form-label"></label>
+        <input asp-for="Categoria" class="form-control" />
+        <span asp-validation-for="Categoria" class="text-danger"></span>
+    </div>
 
-    <input asp-for="Fecha" type="datetime-local" class="form-control mb-2" />
+    <!-- Ubicación -->
+    <div class="mb-3">
+        <label asp-for="Ubicacion" class="form-label"></label>
+        <input asp-for="Ubicacion" class="form-control" />
+        <span asp-validation-for="Ubicacion" class="text-danger"></span>
+    </div>
 
-    <input asp-for="Asistentes" type="number" class="form-control mb-2" />
+    <!-- Fecha -->
+    <div class="mb-3">
+        <label asp-for="Fecha" class="form-label"></label>
+        <input asp-for="Fecha" type="datetime-local" class="form-control" />
+        <span asp-validation-for="Fecha" class="text-danger"></span>
+    </div>
 
-    <button class="btn btn-primary">Guardar</button>
+    <!-- Asistentes -->
+    <div class="mb-3">
+        <label asp-for="Asistentes" class="form-label"></label>
+        <input asp-for="Asistentes" type="number" class="form-control" />
+        <span asp-validation-for="Asistentes" class="text-danger"></span>
+    </div>
+
+    <!-- Botón -->
+    <button type="submit" class="btn btn-primary">Guardar</button>
 
 </form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

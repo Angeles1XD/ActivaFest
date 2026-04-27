@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,12 +40,25 @@ builder.Services.AddHttpContextAccessor();
 // =============================
 // Si NO tienes Redis local, deja esto comentado por ahora.
 // Lo activamos luego para Render.
-/*
-builder.Services.AddStackExchangeRedisCache(options =>
+var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST");
+var redisPort = Environment.GetEnvironmentVariable("REDIS_PORT");
+var redisPassword = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
+
+if (!string.IsNullOrEmpty(redisHost))
 {
-    options.Configuration = "localhost:6379";
-});
-*/
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = $"{redisHost}:{redisPort},password={redisPassword}";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache(); // local
+}
+
+
+
+
 
 var app = builder.Build();
 

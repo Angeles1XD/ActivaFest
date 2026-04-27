@@ -2,15 +2,17 @@ using Microsoft.AspNetCore.Mvc;
 using ActivaFest.Data;
 using ActivaFest.Models;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace ActivaFest.Controllers
 {
     public class EventosController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly IMemoryCache _cache;
+        private readonly IDistributedCache _cache;
 
-        public EventosController(ApplicationDbContext context, IMemoryCache cache)
+        public EventosController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
             _cache = cache;
@@ -19,7 +21,7 @@ namespace ActivaFest.Controllers
         // =============================
         // 🔍 LISTAR + BUSCAR EVENTOS
         // =============================
-        public IActionResult Index(string? buscar)
+        public async Task<IActionResult> Index(string? buscar)
         {
             if (!string.IsNullOrEmpty(buscar))
             {
@@ -33,10 +35,32 @@ namespace ActivaFest.Controllers
                 return View(eventosFiltrados);
             }
 
-            if (!_cache.TryGetValue("eventos", out List<Evento>? eventos))
+            string cacheKey = "eventos_lista";
+
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+
+            List<Evento> eventos;
+
+            if (!string.IsNullOrEmpty(cachedData))
             {
+                Console.WriteLine("🔥 CACHE HIT");
+                eventos = JsonSerializer.Deserialize<List<Evento>>(cachedData)!;
+            }
+            else
+            {
+                Console.WriteLine("💾 CACHE MISS");
+
                 eventos = _context.Eventos.ToList();
-                _cache.Set("eventos", eventos, TimeSpan.FromMinutes(5));
+
+                var options = new DistributedCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5))
+                    .SetSlidingExpiration(TimeSpan.FromMinutes(2));
+
+                await _cache.SetStringAsync(
+                    cacheKey,
+                    JsonSerializer.Serialize(eventos),
+                    options
+                );
             }
 
             return View(eventos);
@@ -60,7 +84,20 @@ namespace ActivaFest.Controllers
             await _context.SaveChangesAsync();
 
             HttpContext.Session.SetString("UltimoEvento", evento.Titulo ?? "");
-            _cache.Remove("eventos");
+
+            string cacheKey = "eventos_lista";
+
+            var eventos = _context.Eventos.ToList();
+
+            var options = new DistributedCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromMinutes(5))
+                .SetSlidingExpiration(TimeSpan.FromMinutes(2));
+
+            await _cache.SetStringAsync(
+                cacheKey,
+                JsonSerializer.Serialize(eventos),
+                options
+            );
 
             return RedirectToAction(nameof(Index));
         }
