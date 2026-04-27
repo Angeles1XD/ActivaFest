@@ -4,11 +4,13 @@
 
 <form method="post">
 
-    <input asp-for="Titulo" placeholder="Título" class="form-control mb-2" />
+    <input asp-for="Titulo" class="form-control mb-2" placeholder="Título" />
 
-    <select asp-for="CategoriaId" asp-items="ViewBag.Categorias" class="form-control mb-2"></select>
+    <select asp-for="CategoriaId" asp-items="ViewBag.Categorias" class="form-control mb-2">
+        <option value="">Seleccione categoría</option>
+    </select>
 
-    <input asp-for="Ubicacion" placeholder="Ubicación" class="form-control mb-2" />
+    <input asp-for="Ubicacion" class="form-control mb-2" placeholder="Ubicación" />
 
     <input asp-for="Fecha" type="datetime-local" class="form-control mb-2" />
 

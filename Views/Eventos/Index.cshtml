@@ -21,8 +21,11 @@
 
         <p>📍 @item.Ubicacion</p>
         <p>📅 @item.Fecha</p>
-        <p>🏷 @item.Categoria</p>
-        <p>👥 @item.Asistentes interesados</p>
+
+        <!-- 🔥 CORREGIDO -->
+        <p>🏷 @(item.Categoria != null ? item.Categoria.Nombre : "Sin categoría")</p>
+
+        <p>👥 @item.CuposDisponibles disponibles</p>
 
         <a href="/Eventos/Detalle/@item.Id" class="btn-rosa">
             Ver más →

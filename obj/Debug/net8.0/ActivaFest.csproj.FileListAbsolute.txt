@@ -131,3 +131,7 @@ C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\refint\ActivaFest
 C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.pdb
 C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.genruntimeconfig.cache
 C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\ref\ActivaFest.dll
+C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.sourcelink.json
+C:\Users\ACER\Documents\ActivaFest\ActivaFest\obj\Debug\net8.0\ActivaFest.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\ACER\Documents\ActivaFest\ActivaFest\bin\Debug\net8.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
+C:\Users\ACER\Documents\ActivaFest\ActivaFest\bin\Debug\net8.0\Microsoft.AspNetCore.Identity.UI.dll

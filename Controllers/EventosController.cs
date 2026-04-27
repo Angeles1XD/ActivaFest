@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using ActivaFest.Data;
 using ActivaFest.Models;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc.Rendering; // 🔥 IMPORTANTE
 
 namespace ActivaFest.Controllers
 {
@@ -24,10 +26,11 @@ namespace ActivaFest.Controllers
             if (!string.IsNullOrEmpty(buscar))
             {
                 var eventosFiltrados = _context.Eventos
+                    .Include(e => e.Categoria)
                     .Where(e =>
-                        e.Titulo!.Contains(buscar) ||
-                        e.Categoria!.Contains(buscar) ||
-                        e.Ubicacion!.Contains(buscar))
+                        e.Titulo.Contains(buscar) ||
+                        (e.Categoria != null && e.Categoria.Nombre.Contains(buscar)) ||
+                        e.Ubicacion.Contains(buscar))
                     .ToList();
 
                 return View(eventosFiltrados);
@@ -35,7 +38,10 @@ namespace ActivaFest.Controllers
 
             if (!_cache.TryGetValue("eventos", out List<Evento>? eventos))
             {
-                eventos = _context.Eventos.ToList();
+                eventos = _context.Eventos
+                    .Include(e => e.Categoria)
+                    .ToList();
+
                 _cache.Set("eventos", eventos, TimeSpan.FromMinutes(5));
             }
 
@@ -47,6 +53,13 @@ namespace ActivaFest.Controllers
         // =============================
         public IActionResult Crear()
         {
+            ViewBag.Categorias = _context.Categorias
+                .Select(c => new SelectListItem
+                {
+                    Value = c.Id.ToString(),
+                    Text = c.Nombre
+                }).ToList();
+
             return View();
         }
 
@@ -54,7 +67,17 @@ namespace ActivaFest.Controllers
         public async Task<IActionResult> Crear(Evento evento)
         {
             if (!ModelState.IsValid)
+            {
+                // 🔁 IMPORTANTE repetir esto si hay error
+                ViewBag.Categorias = _context.Categorias
+                    .Select(c => new SelectListItem
+                    {
+                        Value = c.Id.ToString(),
+                        Text = c.Nombre
+                    }).ToList();
+
                 return View(evento);
+            }
 
             _context.Add(evento);
             await _context.SaveChangesAsync();
@@ -70,7 +93,9 @@ namespace ActivaFest.Controllers
         // =============================
         public IActionResult Detalle(int id)
         {
-            var evento = _context.Eventos.FirstOrDefault(e => e.Id == id);
+            var evento = _context.Eventos
+                .Include(e => e.Categoria)
+                .FirstOrDefault(e => e.Id == id);
 
             if (evento == null)
                 return NotFound();

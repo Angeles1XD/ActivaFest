@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.AspNetCore.Identity.UI.UIFrameworkAttribute("Bootstrap5")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c9c125c853f2b328253d57080b5cf4e70a10f1a4")]
 [assembly: System.Reflection.AssemblyProductAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ActivaFest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

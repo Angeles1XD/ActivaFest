@@ -45,17 +45,16 @@ builder.Services.AddSession(options =>
 
 builder.Services.AddHttpContextAccessor();
 
-// =============================
-// 🔥 REDIS (LO ACTIVAMOS LUEGO)
-// =============================
-/*
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = "localhost:6379";
-});
-*/
-
 var app = builder.Build();
+
+// =============================
+// 🔥 CREAR BASE DE DATOS AUTOMÁTICAMENTE
+// =============================
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.EnsureCreated(); // 👈 ESTA LÍNEA SOLUCIONA TU ERROR
+}
 
 // =============================
 // 🔥 PIPELINE
