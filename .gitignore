@@ -79,3 +79,4 @@ TestResults/
 *.sqlite
 *.mdf
 *.ldf
+*.db*
