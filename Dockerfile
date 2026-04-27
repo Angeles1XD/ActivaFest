@@ -1,22 +1,23 @@
-
 # ===============================
 # 🔧 Etapa 1: Build
 # ===============================
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copiar archivos de proyecto
-COPY *.sln .
-COPY */*.csproj ./
+# Copiar solución
+COPY ActivaFest.sln ./
+
+# Copiar proyecto respetando la carpeta
+COPY ActivaFest/ActivaFest.csproj ./ActivaFest/
 
 # Restaurar dependencias
-RUN dotnet restore
+RUN dotnet restore ActivaFest/ActivaFest.csproj
 
-# Copiar todo el código
+# Copiar TODO el código
 COPY . .
 
-# Publicar la aplicación
-RUN dotnet publish -c Release -o /publish
+# Publicar
+RUN dotnet publish ActivaFest/ActivaFest.csproj -c Release -o /publish
 
 # ===============================
 # 🚀 Etapa 2: Runtime
@@ -24,11 +25,10 @@ RUN dotnet publish -c Release -o /publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Copiar archivos publicados desde build
+ENV ASPNETCORE_URLS=http://+:80
+
 COPY --from=build /publish .
 
-# Puerto de la app
 EXPOSE 80
 
-# Ejecutar la app
 ENTRYPOINT ["dotnet", "ActivaFest.dll"]

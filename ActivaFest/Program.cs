@@ -48,6 +48,13 @@ builder.Services.AddStackExchangeRedisCache(options =>
 
 var app = builder.Build();
 
+// Migraciones BD
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate();
+}
+
 // =============================
 // 🔥 PIPELINE
 // =============================
