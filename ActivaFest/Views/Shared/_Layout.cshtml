@@ -1,78 +1,293 @@
 ﻿<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>@ViewData["Title"] - ActivaFest</title>
 
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
 </head>
 
 <body>
 
-    <!-- 🌌 FONDO -->
-    <div class="fondo"></div>
+<!-- 🌌 FONDO -->
+<div class="fondo"></div>
 
-    <!-- ✨ ESTRELLAS -->
-    <div class="stars"></div>
+<!-- ✨ ESTRELLAS -->
+<div class="stars"></div>
 
-    <!-- 🔝 NAVBAR -->
-    <header>
-        <nav class="navbar-custom">
-            <div class="nav-container">
+<!-- 🔝 NAVBAR -->
+<header>
+    <nav class="navbar-custom">
+        <div class="nav-container">
 
-                <a asp-controller="Home" asp-action="Index" class="logo">
-                    ActivaFest
-                </a>
+            <a asp-controller="Home" asp-action="Index" class="logo">
+                ActivaFest
+            </a>
 
-                <div class="nav-links">
-                    <a asp-controller="Home" asp-action="Index">Inicio</a>
-                    <a asp-controller="Eventos" asp-action="Index">Eventos</a>
+            <div class="nav-links">
+                <a asp-controller="Home" asp-action="Index">Inicio</a>
+                <a asp-controller="Eventos" asp-action="Index">Eventos</a>
 
-                    @if (Context.Session.GetString("usuario") != null)
-                    {
-                        <span style="color:#ff4d6d;">
+                @if (Context.Session.GetString("usuario") != null)
+                {
+                    <span style="color:#ff4d6d;">
                             👤 @Context.Session.GetString("usuario")
                         </span>
-                        <a href="/Auth/Logout">Salir</a>
-                    }
-                    else
-                    {
-                        <a href="/Auth/Login">Login</a>
-                    }
-                </div>
-
+                    <a href="/Auth/Logout">Salir</a>
+                }
+                else
+                {
+                    <a href="/Auth/Login">Login</a>
+                }
             </div>
-        </nav>
-    </header>
 
-    <!-- 🔥 SESIÓN -->
-    @if (Context.Session.GetString("UltimoEvento") != null)
-    {
-        <div style="
+        </div>
+    </nav>
+</header>
+
+<!-- 🔥 SESIÓN -->
+@if (Context.Session.GetString("UltimoEvento") != null)
+{
+    <div style="
             background: linear-gradient(90deg,#ff4d6d,#ff006e);
             color: white;
             padding: 10px;
             text-align: center;
             font-weight: bold;
         ">
-            Último evento creado: @Context.Session.GetString("UltimoEvento")
-        </div>
+        Último evento creado: @Context.Session.GetString("UltimoEvento")
+    </div>
+}
+
+<!-- CONTENIDO -->
+<main class="main-content">
+    @RenderBody()
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    © 2026 - ActivaFest
+</footer>
+
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+@await RenderSectionAsync("Scripts", required: false)
+
+<style>
+    #chat-widget {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        font-family: system-ui, -apple-system, sans-serif;
     }
 
-    <!-- CONTENIDO -->
-    <main class="main-content">
-        @RenderBody()
-    </main>
+    #chat-window {
+        display: none;
+        width: 350px;
+        height: 450px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        flex-direction: column;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        margin-bottom: 15px;
+        overflow: hidden;
+    }
 
-    <!-- FOOTER -->
-    <footer class="footer">
-        © 2026 - ActivaFest
-    </footer>
+    #chat-header {
+        background: #2563eb;
+        color: white;
+        padding: 15px;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+    }
 
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+    #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #f8fafc;
+    }
+
+    .msg {
+        padding: 10px;
+        border-radius: 8px;
+        max-width: 85%;
+        line-height: 1.4;
+        font-size: 14px;
+    }
+
+    .msg-user {
+        background: #2563eb;
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 2px;
+    }
+
+    .msg-bot {
+        background: #e2e8f0;
+        color: #1e293b;
+        align-self: flex-start;
+        border-bottom-left-radius: 2px;
+    }
+
+    #chat-input-area {
+        padding: 10px;
+        border-top: 1px solid #ddd;
+        background: white;
+        display: flex;
+        gap: 8px;
+    }
+
+    #chat-input {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 20px;
+        outline: none;
+    }
+
+    #chat-send {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+    }
+
+    #chat-toggle {
+        float: right;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+        font-size: 24px;
+        transition: transform 0.2s;
+    }
+
+    #chat-toggle:hover {
+        transform: scale(1.05);
+    }
+
+    /* Loader animado */
+    .typing-indicator {
+        display: none;
+        padding: 10px;
+        background: #e2e8f0;
+        align-self: flex-start;
+        border-radius: 8px;
+        font-size: 12px;
+        color: #64748b;
+    }
+</style>
+
+<div id="chat-widget">
+    <div id="chat-window">
+        <div id="chat-header">
+            <span>🤖 Asistente ActivaFest</span>
+            <span style="cursor:pointer;" onclick="toggleChat()">✖</span>
+        </div>
+        <div id="chat-messages"></div>
+        <div class="typing-indicator" id="chat-typing">Escribiendo...</div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Pregunta sobre eventos..."
+                   onkeypress="handleEnter(event)">
+            <button id="chat-send" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+    <button id="chat-toggle" onclick="toggleChat()">💬</button>
+</div>
+
+<script>
+    const STORAGE_KEY = 'activafest_chat_history';
+    const chatWindow = document.getElementById('chat-window');
+    const messagesContainer = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const typingIndicator = document.getElementById('chat-typing');
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        history.forEach(msg => renderMessage(msg.text, msg.sender));
+
+        if (history.length === 0) {
+            renderMessage("¡Hola! Soy el asistente de ActivaFest. ¿En qué evento te puedo ayudar hoy?", 'bot');
+        }
+    });
+
+    function toggleChat() {
+        chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+        if (chatWindow.style.display === 'flex') {
+            chatInput.focus();
+            scrollToBottom();
+        }
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') sendMessage();
+    }
+
+    async function sendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        renderMessage(text, 'user');
+        saveToHistory(text, 'user');
+        chatInput.value = '';
+
+        typingIndicator.style.display = 'block';
+        scrollToBottom();
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: text})
+            });
+
+            if (!response.ok) throw new Error('Error en el servidor');
+
+            const data = await response.json();
+
+            typingIndicator.style.display = 'none';
+            renderMessage(data.reply, 'bot');
+            saveToHistory(data.reply, 'bot');
+
+        } catch (error) {
+            typingIndicator.style.display = 'none';
+            renderMessage("Ocurrió un error al conectar con el servidor local. ¿Ollama está encendido?", 'bot');
+        }
+    }
+
+    function renderMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `msg msg-${sender}`;
+        div.innerHTML = text.replace(/\n/g, '<br>');
+        messagesContainer.appendChild(div);
+        scrollToBottom();
+    }
+
+    function saveToHistory(text, sender) {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        history.push({text, sender});
+        if (history.length > 20) history.shift();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    }
+
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+</script>
 
 </body>
 </html>

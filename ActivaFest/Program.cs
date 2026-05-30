@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
+using ActivaFest.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 
@@ -34,6 +35,13 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 builder.Services.AddHttpContextAccessor();
+
+// =============================
+// 🔥 SERVICIOS DE IA
+// =============================
+builder.Services.AddScoped<ActivaFest.Services.AgentService>();
+
+builder.Services.AddSingleton<MachineLearningService>();
 
 // =============================
 // 🔥 REDIS (opcional, no romper en local)
@@ -94,5 +102,17 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Eventos}/{action=Index}/{id?}");
+
+// =============================
+// 🔥 ENDPOINT DEL AGENTE IA
+// =============================
+app.MapPost("/api/chat", async (ActivaFest.Services.ChatRequest request, ActivaFest.Services.AgentService agentService) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Message))
+        return Results.BadRequest("El mensaje no puede estar vacío.");
+
+    var response = await agentService.ProcessChatAsync(request.Message);
+    return Results.Ok(new { Reply = response });
+});
 
 app.Run();
