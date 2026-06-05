@@ -1,0 +1,22 @@
+@model ActivaFest.Models.Evento
+
+<h2>Comprar Ticket</h2>
+
+<h3>@Model.Titulo</h3>
+<p>Precio: S/. @Model.Precio</p>
+<p>Cupos disponibles: @Model.CuposDisponibles</p>
+
+<form method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+
+    <div>
+        <label>Cantidad</label>
+        <input type="number" name="cantidad" min="1" max="@Model.CuposDisponibles" required />
+    </div>
+
+    <br />
+
+    <button type="submit">Comprar</button>
+</form>
+
+<a href="/Eventos">Volver</a>
