@@ -1,10 +1,17 @@
 @model List<ActivaFest.Models.Evento>
 
-<h2 class="text-gradient">Eventos Juveniles</h2>
+@{
+    ViewData["Title"] = "Eventos";
+}
 
-<a href="/Eventos/Crear" class="btn-rosa">
-    + Crear Evento
-</a>
+<h2 class="text-gradient">Eventos</h2>
+
+@if (User.IsInRole(Roles.Organizador) || User.IsInRole(Roles.Administrador))
+{
+    <a asp-action="Crear" class="btn-rosa">
+        + Crear Evento
+    </a>
+}
 
 <form method="get" class="buscador">
     <input type="text" name="buscar" placeholder="Buscar eventos..." class="input-buscar" />

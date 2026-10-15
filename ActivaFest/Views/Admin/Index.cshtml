@@ -1,0 +1,64 @@
+@model List<Evento>
+@{
+    ViewData["Title"] = "Moderación de eventos";
+    var actual = (EstadoEvento)ViewBag.EstadoActual;
+    var conteos = (Dictionary<EstadoEvento, int>)ViewBag.Conteos;
+}
+
+<h2 class="text-gradient">Moderación de eventos</h2>
+<p class="texto-suave">Revisa los eventos enviados por los organizadores antes de publicarlos en el catálogo.</p>
+
+<div class="tabs-estado">
+    @foreach (var estado in Enum.GetValues<EstadoEvento>())
+    {
+        <a asp-action="Index" asp-route-estado="@estado" class="@(estado == actual ? "activo" : "")">
+            @estado (@conteos.GetValueOrDefault(estado))
+        </a>
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <p class="texto-suave">No hay eventos en estado <b>@actual</b>.</p>
+}
+
+<div class="grid-eventos">
+@foreach (var item in Model)
+{
+    <div class="card-evento">
+        <span class="badge-estado badge-@item.Estado">@item.Estado</span>
+        <h3 style="margin-top:10px;">@item.Titulo</h3>
+
+        <p>📍 @item.Ubicacion</p>
+        <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
+        <p>🏷 @item.Categoria</p>
+        <p>👥 Aforo: @item.Asistentes</p>
+        <p class="texto-suave">
+            Organizador: @(item.Organizador?.NombreCompleto ?? "—") (@(item.Organizador?.Email ?? "sin correo"))
+            · Enviado: @item.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+        </p>
+
+        @if (item.Estado == EstadoEvento.Rechazado && !string.IsNullOrEmpty(item.MotivoRechazo))
+        {
+            <p class="texto-suave">Motivo del rechazo: @item.MotivoRechazo</p>
+        }
+
+        <div class="acciones-moderacion">
+            @if (item.Estado != EstadoEvento.Aprobado)
+            {
+                <form asp-action="Aprobar" asp-route-id="@item.Id" method="post">
+                    <button type="submit" class="btn-rosa">✔ Aprobar</button>
+                </form>
+            }
+            @if (item.Estado != EstadoEvento.Rechazado)
+            {
+                <form asp-action="Rechazar" asp-route-id="@item.Id" method="post" class="form-rechazo">
+                    <input type="text" name="motivo" placeholder="Motivo del rechazo (obligatorio)" required maxlength="500" />
+                    <button type="submit" class="btn-gris">✖ Rechazar</button>
+                </form>
+            }
+            <a asp-controller="Eventos" asp-action="Detalle" asp-route-id="@item.Id" class="btn-gris" style="text-decoration:none;">Ver ficha</a>
+        </div>
+    </div>
+}
+</div>

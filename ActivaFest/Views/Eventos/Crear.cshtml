@@ -1,8 +1,13 @@
 @model ActivaFest.Models.Evento
 
-<h2>Crear Evento</h2>
+@{
+    ViewData["Title"] = "Crear evento";
+}
 
-<form method="post">
+<h2 class="text-gradient">Crear Evento</h2>
+<p class="texto-suave">El evento quedará pendiente hasta que un administrador lo apruebe.</p>
+
+<form asp-action="Crear" method="post">
 
     <!-- Validación general -->
     <div asp-validation-summary="All" class="text-danger"></div>

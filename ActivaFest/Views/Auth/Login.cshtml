@@ -1,18 +1,40 @@
-<h2 class="text-gradient">Login</h2>
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Iniciar sesión";
+}
 
-<form method="post" style="margin-top:20px;">
-    
-    <input type="text" name="usuario" placeholder="Usuario" class="input-buscar" />
-    <br /><br />
+<div class="auth-card">
+    <h2 class="text-gradient">Iniciar sesión</h2>
 
-    <input type="password" name="password" placeholder="Contraseña" class="input-buscar" />
-    <br /><br />
+    <form asp-action="Login" method="post">
+        <div asp-validation-summary="ModelOnly" class="validacion"></div>
+        <input type="hidden" asp-for="ReturnUrl" />
 
-    <button class="btn-rosa">Ingresar</button>
+        <div class="campo">
+            <label asp-for="Email"></label>
+            <input asp-for="Email" autocomplete="username" placeholder="tucorreo@ejemplo.com" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
 
-</form>
+        <div class="campo">
+            <label asp-for="Password"></label>
+            <input asp-for="Password" autocomplete="current-password" />
+            <span asp-validation-for="Password" class="text-danger"></span>
+        </div>
 
-@if (ViewBag.Error != null)
-{
-    <p style="color:red;">@ViewBag.Error</p>
+        <label class="campo-check">
+            <input asp-for="Recordarme" /> Recordarme
+        </label>
+
+        <button type="submit" class="btn-rosa">Ingresar</button>
+    </form>
+
+    <div class="auth-links">
+        <p><a asp-action="OlvideContrasena">¿Olvidaste tu contraseña?</a></p>
+        <p>¿No tienes cuenta? <a asp-action="Registro">Regístrate</a></p>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
 }

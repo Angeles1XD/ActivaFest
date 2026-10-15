@@ -1,6 +1,15 @@
 @model ActivaFest.Models.Evento
 
+@{
+    ViewData["Title"] = Model.Titulo;
+}
+
 <h2 class="text-gradient">@Model.Titulo</h2>
+
+@if (Model.Estado != EstadoEvento.Aprobado)
+{
+    <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>
+}
 
 <div class="card-evento">
     <p>📍 @Model.Ubicacion</p>

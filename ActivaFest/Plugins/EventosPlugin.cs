@@ -19,7 +19,7 @@ public class EventosPlugin
     [Description("Busca en la BD un máximo de 3 eventos filtrados por una palabra clave.")]
     public async Task<string> BuscarEventosAsync(string termino)
     {
-        var query = _db.Eventos.AsQueryable();
+        var query = _db.Eventos.Where(e => e.Estado == ActivaFest.Models.EstadoEvento.Aprobado);
 
         termino = termino?.Trim().ToLower() ?? "";
         

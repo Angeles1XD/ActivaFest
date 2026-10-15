@@ -1,18 +1,54 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
+using ActivaFest.Models;
 using ActivaFest.Services;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
+using ActivaFest.Services.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // =============================
 // 🔥 BASE DE DATOS SQLITE
 // =============================
-var connectionString = "Data Source=app.db";
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
+
+// =============================
+// 🔐 IDENTITY: USUARIOS Y ROLES (HU01)
+// =============================
+// Las contraseñas se guardan con hash PBKDF2 (PasswordHasher de ASP.NET Core Identity)
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 8;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireDigit = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
+        options.SignIn.RequireConfirmedAccount = false;
+    })
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Auth/Login";
+    options.LogoutPath = "/Auth/Logout";
+    options.AccessDeniedPath = "/Auth/AccesoDenegado";
+    options.Cookie.Name = "ActivaFest.Auth";
+    options.Cookie.HttpOnly = true;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
+});
+
+// =============================
+// ✉️ CORREO (HU15)
+// =============================
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 // =============================
 // 🔥 MVC
@@ -27,7 +63,6 @@ builder.Services.AddMemoryCache();
 // =============================
 // 🔥 SESIONES (necesitan cache distribuido)
 // =============================
-builder.Services.AddDistributedMemoryCache(); // 👈 IMPORTANTE
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(20); // tiempo de sesión
@@ -46,8 +81,6 @@ builder.Services.AddSingleton<MachineLearningService>();
 // =============================
 // 🔥 REDIS (opcional, no romper en local)
 // =============================
-// Si NO tienes Redis local, deja esto comentado por ahora.
-// Lo activamos luego para Render.
 var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST");
 var redisPort = Environment.GetEnvironmentVariable("REDIS_PORT");
 var redisPassword = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
@@ -64,17 +97,15 @@ else
     builder.Services.AddDistributedMemoryCache(); // local
 }
 
-
-
-
-
 var app = builder.Build();
 
-// Migraciones BD
+// Migraciones BD + roles y administrador inicial
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate();
+
+    await DbInitializer.SeedAsync(scope.ServiceProvider, app.Configuration, app.Logger);
 }
 
 // =============================
@@ -94,6 +125,7 @@ app.UseRouting();
 // 🔥 SESIÓN (antes de endpoints)
 app.UseSession();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // =============================

@@ -30,16 +30,25 @@
                 <a asp-controller="Home" asp-action="Index">Inicio</a>
                 <a asp-controller="Eventos" asp-action="Index">Eventos</a>
 
-                @if (Context.Session.GetString("usuario") != null)
+                @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <span style="color:#ff4d6d;">
-                            👤 @Context.Session.GetString("usuario")
-                        </span>
-                    <a href="/Auth/Logout">Salir</a>
+                    @if (User.IsInRole(ActivaFest.Models.Roles.Organizador) || User.IsInRole(ActivaFest.Models.Roles.Administrador))
+                    {
+                        <a asp-controller="Eventos" asp-action="MisEventos">Mis eventos</a>
+                    }
+                    @if (User.IsInRole(ActivaFest.Models.Roles.Administrador))
+                    {
+                        <a asp-controller="Admin" asp-action="Index">Moderación</a>
+                    }
+                    <span class="nav-usuario">👤 @User.Identity.Name</span>
+                    <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
+                        <button type="submit" class="nav-link-btn">Salir</button>
+                    </form>
                 }
                 else
                 {
-                    <a href="/Auth/Login">Login</a>
+                    <a asp-controller="Auth" asp-action="Login">Iniciar sesión</a>
+                    <a asp-controller="Auth" asp-action="Registro" class="btn-rosa">Registrarse</a>
                 }
             </div>
 
@@ -63,6 +72,14 @@
 
 <!-- CONTENIDO -->
 <main class="main-content">
+    @if (TempData["Mensaje"] is string mensaje)
+    {
+        <div class="alerta alerta-ok">@mensaje</div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alerta alerta-error">@error</div>
+    }
     @RenderBody()
 </main>
 
@@ -71,6 +88,7 @@
     © 2026 - ActivaFest
 </footer>
 
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 @await RenderSectionAsync("Scripts", required: false)
 

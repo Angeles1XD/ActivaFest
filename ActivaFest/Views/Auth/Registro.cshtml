@@ -1,0 +1,56 @@
+@model RegistroViewModel
+@{
+    ViewData["Title"] = "Crear cuenta";
+}
+
+<div class="auth-card">
+    <h2 class="text-gradient">Crear cuenta</h2>
+
+    <form asp-action="Registro" method="post">
+        <div asp-validation-summary="ModelOnly" class="validacion"></div>
+
+        <div class="campo">
+            <label asp-for="NombreCompleto"></label>
+            <input asp-for="NombreCompleto" autocomplete="name" />
+            <span asp-validation-for="NombreCompleto" class="text-danger"></span>
+        </div>
+
+        <div class="campo">
+            <label asp-for="Email"></label>
+            <input asp-for="Email" autocomplete="email" placeholder="tucorreo@ejemplo.com" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+
+        <div class="campo">
+            <label asp-for="Rol"></label>
+            <select asp-for="Rol">
+                <option value="@Roles.Asistente">Asistente — quiero descubrir y asistir a eventos</option>
+                <option value="@Roles.Organizador">Organizador — quiero publicar mis eventos</option>
+            </select>
+            <span asp-validation-for="Rol" class="text-danger"></span>
+        </div>
+
+        <div class="campo">
+            <label asp-for="Password"></label>
+            <input asp-for="Password" autocomplete="new-password" />
+            <span class="texto-suave">Mínimo 8 caracteres, una mayúscula y un número.</span><br />
+            <span asp-validation-for="Password" class="text-danger"></span>
+        </div>
+
+        <div class="campo">
+            <label asp-for="ConfirmarPassword"></label>
+            <input asp-for="ConfirmarPassword" autocomplete="new-password" />
+            <span asp-validation-for="ConfirmarPassword" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn-rosa">Registrarme</button>
+    </form>
+
+    <div class="auth-links">
+        <p>¿Ya tienes cuenta? <a asp-action="Login">Inicia sesión</a></p>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

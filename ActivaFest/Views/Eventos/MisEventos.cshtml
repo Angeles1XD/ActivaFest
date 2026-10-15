@@ -1,0 +1,38 @@
+@model List<Evento>
+@{
+    ViewData["Title"] = "Mis eventos";
+}
+
+<h2 class="text-gradient">Mis eventos</h2>
+
+<a asp-action="Crear" class="btn-rosa">+ Crear Evento</a>
+
+@if (!Model.Any())
+{
+    <p class="texto-suave" style="margin-top:25px;">Todavía no has publicado eventos.</p>
+}
+
+<div class="grid-eventos">
+@foreach (var item in Model)
+{
+    <div class="card-evento">
+        <span class="badge-estado badge-@item.Estado">@item.Estado</span>
+        <h3 style="margin-top:10px;">@item.Titulo</h3>
+
+        <p>📍 @item.Ubicacion</p>
+        <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
+        <p>🏷 @item.Categoria</p>
+
+        @if (item.Estado == EstadoEvento.Pendiente)
+        {
+            <p class="texto-suave">En revisión por el equipo de ActivaFest.</p>
+        }
+        else if (item.Estado == EstadoEvento.Rechazado)
+        {
+            <p class="texto-suave">Motivo: @item.MotivoRechazo</p>
+        }
+
+        <a asp-action="Detalle" asp-route-id="@item.Id" class="btn-rosa">Ver más →</a>
+    </div>
+}
+</div>
