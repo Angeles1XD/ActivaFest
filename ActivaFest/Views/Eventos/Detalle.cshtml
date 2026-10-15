@@ -86,23 +86,73 @@
             }
             else
             {
-                <table>
-                    <thead>
-                        <tr><th>Zona</th><th>Precio</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var t in tipos)
-                        {
-                            <tr>
-                                <td>@t.Nombre</td>
-                                <td class="precio">@Formato.Precio(t.Precio)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-                <button type="button" class="btn-rosa btn-bloque" disabled title="Disponible próximamente">
-                    🎟️ Comprar entradas (próximamente)
-                </button>
+                var enVenta = Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now;
+                var agotado = tipos.All(t => t.Disponibles == 0);
+
+                <!-- 🛒 SELECCIÓN DE ENTRADAS (HU06) -->
+                <form asp-controller="Compras" asp-action="Iniciar" method="post" id="comprar" class="form-compra">
+                    <input type="hidden" name="eventoId" value="@Model.Id" />
+                    <table>
+                        <thead>
+                            <tr><th>Zona</th><th>Precio</th>@if (enVenta) { <th class="col-cantidad">Cantidad</th> }</tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in tipos)
+                            {
+                                <tr>
+                                    <td>
+                                        @t.Nombre
+                                        @if (enVenta && t.Disponibles > 0 && t.Disponibles <= 10)
+                                        {
+                                            <span class="quedan">¡Quedan @t.Disponibles!</span>
+                                        }
+                                    </td>
+                                    <td class="precio">@Formato.Precio(t.Precio)</td>
+                                    @if (enVenta)
+                                    {
+                                        <td class="col-cantidad">
+                                            @if (t.Disponibles == 0)
+                                            {
+                                                <span class="agotado">Agotado</span>
+                                            }
+                                            else
+                                            {
+                                                <select name="cantidades[@t.Id]" class="selector-cantidad"
+                                                        data-precio="@t.Precio.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                                        aria-label="Cantidad de entradas @t.Nombre">
+                                                    @for (var n = 0; n <= Math.Min(10, t.Disponibles); n++)
+                                                    {
+                                                        <option value="@n">@n</option>
+                                                    }
+                                                </select>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (!enVenta)
+                    {
+                        <p class="texto-suave aviso-venta">La venta de entradas para este evento no está disponible.</p>
+                    }
+                    else if (agotado)
+                    {
+                        <p class="agotado aviso-venta">😔 Entradas agotadas</p>
+                    }
+                    else if (User.Identity?.IsAuthenticated != true)
+                    {
+                        <a asp-controller="Auth" asp-action="Login" asp-route-returnUrl="@($"/Eventos/Detalle/{Model.Id}#comprar")"
+                           class="btn-rosa btn-bloque enlace-boton">🎟️ Inicia sesión para comprar</a>
+                    }
+                    else
+                    {
+                        <p class="total-compra">Total: <b id="totalCompra">S/ 0.00</b></p>
+                        <button type="submit" class="btn-rosa btn-bloque" id="btnComprar" disabled>🎟️ Comprar entradas</button>
+                        <p class="texto-suave nota-reserva">Reservamos tus entradas por 15 minutos mientras pagas.</p>
+                    }
+                </form>
             }
         </div>
     </section>
@@ -144,6 +194,7 @@
 </section>
 
 @section Scripts {
+    <script src="~/js/compra.js" asp-append-version="true"></script>
     @if (Model.TieneUbicacion)
     {
         <partial name="_LeafletJs" />

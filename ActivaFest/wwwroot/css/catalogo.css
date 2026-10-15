@@ -532,3 +532,49 @@
     height: 300px;
   }
 }
+
+/* ============================= */
+/* SELECCIÓN DE ENTRADAS EN LA FICHA (SPRINT 3) */
+/* ============================= */
+.form-compra .col-cantidad {
+  text-align: right;
+  width: 90px;
+}
+
+.selector-cantidad {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #111;
+  color: white;
+  color-scheme: dark;
+}
+
+.quedan {
+  display: block;
+  font-size: 12px;
+  color: #fbbf24;
+}
+
+.agotado {
+  color: #ff8fa3;
+  font-weight: bold;
+}
+
+.aviso-venta {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.total-compra {
+  display: flex;
+  justify-content: space-between;
+  margin: 18px 0 0;
+  font-size: 18px;
+}
+
+.nota-reserva {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+}

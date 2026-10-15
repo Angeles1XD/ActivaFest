@@ -6,8 +6,12 @@ using ActivaFest.Data;
 using ActivaFest.Models;
 using ActivaFest.Services;
 using ActivaFest.Services.Catalogo;
+using ActivaFest.Services.Compras;
 using ActivaFest.Services.Email;
+using ActivaFest.Services.Entradas;
 using ActivaFest.Services.Imagenes;
+using ActivaFest.Services.Pagos;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +63,35 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 // =============================
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 builder.Services.AddSingleton<IAlmacenamientoImagenes, AlmacenamientoLocalImagenes>();
+
+// =============================
+// 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
+// =============================
+builder.Services.Configure<ComprasOptions>(builder.Configuration.GetSection("Compras"));
+builder.Services.Configure<PagosOptions>(builder.Configuration.GetSection("Pagos"));
+builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
+
+builder.Services.AddSingleton<IQrEntradaService, QrEntradaService>();
+builder.Services.AddScoped<ICompraService, CompraService>();
+builder.Services.AddHostedService<ExpiracionReservasService>();
+
+builder.Services.AddHttpClient<MercadoPagoPasarela>(c => c.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddScoped<PasarelaSimulada>();
+builder.Services.AddScoped<IPasarelaPago>(sp =>
+{
+    var pagos = sp.GetRequiredService<IOptions<PagosOptions>>().Value;
+
+    if (pagos.Proveedor == MercadoPagoPasarela.NombreProveedor)
+    {
+        var mercadoPago = sp.GetRequiredService<MercadoPagoPasarela>();
+        if (mercadoPago.Disponible)
+            return mercadoPago;
+    }
+
+    // La simulada nunca queda activa en producción por accidente
+    var permitirSimulado = sp.GetRequiredService<IWebHostEnvironment>().IsDevelopment() || pagos.PermitirSimuladoFueraDeDesarrollo;
+    return permitirSimulado ? sp.GetRequiredService<PasarelaSimulada>() : new PasarelaNoDisponible();
+});
 
 // =============================
 // 🔥 MVC
@@ -116,6 +149,12 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 
     await DbInitializer.SeedAsync(scope.ServiceProvider, app.Configuration, app.Logger);
+
+    // Falla al arrancar (y no al primer pago) si falta la clave para firmar los QR en producción
+    scope.ServiceProvider.GetRequiredService<IQrEntradaService>();
+
+    var pasarela = scope.ServiceProvider.GetRequiredService<IPasarelaPago>();
+    app.Logger.LogInformation("💳 Pasarela de pago activa: {Pasarela}", pasarela.Nombre);
 }
 
 // =============================

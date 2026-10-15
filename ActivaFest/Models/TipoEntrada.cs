@@ -20,5 +20,16 @@ namespace ActivaFest.Models
 
         [Range(1, 1000000)]
         public int Capacidad { get; set; }
+
+        // =============================
+        // 📊 CONTROL DE AFORO (HU11)
+        // =============================
+        // Se modifican solo con UPDATE condicionales atómicos (ver ReservaService), nunca leyendo y escribiendo.
+        public int Vendidas { get; set; }
+
+        // Entradas apartadas por órdenes pendientes de pago
+        public int Reservadas { get; set; }
+
+        public int Disponibles => Math.Max(0, Capacidad - Vendidas - Reservadas);
     }
 }

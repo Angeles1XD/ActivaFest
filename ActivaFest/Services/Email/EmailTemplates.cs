@@ -63,6 +63,23 @@ public static class EmailTemplates
             "<p>Puedes corregir la información y volver a enviarlo.</p>",
             "Ir a mis eventos", urlMisEventos);
 
+    public static string EntradasCompradas(string nombre, Orden orden, Evento evento, string urlMisEntradas)
+    {
+        var filas = string.Join("", orden.Items.Select(i =>
+            $"<tr><td style=\"padding:6px 0;\">{i.Cantidad} × {E(i.TipoEntrada?.Nombre)}</td>" +
+            $"<td style=\"padding:6px 0;text-align:right;\">{Formato.Precio(i.Subtotal)}</td></tr>"));
+
+        return Layout("¡Tus entradas están listas! 🎟️",
+            $"<p>Hola {E(nombre)}, tu compra para <b>{E(evento.Titulo)}</b> fue confirmada.</p>" +
+            $"<p>📅 {Formato.Fecha(evento.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm")}<br/>📍 {E(evento.Ubicacion)}</p>" +
+            $"<table width=\"100%\" style=\"border-top:1px solid #eee;border-bottom:1px solid #eee;margin:15px 0;\">{filas}" +
+            $"<tr><td style=\"padding:8px 0;\"><b>Total</b></td><td style=\"padding:8px 0;text-align:right;\"><b>{Formato.Precio(orden.Total)}</b></td></tr></table>" +
+            $"<p>Adjuntamos <b>{orden.Entradas.Count}</b> {(orden.Entradas.Count == 1 ? "código QR" : "códigos QR")}, uno por persona. " +
+            "Preséntalo en la puerta desde tu celular o impreso. Cada QR solo se puede usar una vez.</p>" +
+            $"<p style=\"color:#888;font-size:13px;\">N.° de orden: {E(orden.Codigo)}</p>",
+            "Ver mis entradas", urlMisEntradas);
+    }
+
     public static string RecuperarContrasena(string nombre, string urlReset) =>
         Layout("Restablecer contraseña",
             $"<p>Hola {E(nombre)}, recibimos una solicitud para restablecer tu contraseña.</p>" +

@@ -1,0 +1,46 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace ActivaFest.Models
+{
+    public enum EstadoEntrada
+    {
+        Activa = 0,
+        Usada = 1,
+        Anulada = 2
+    }
+
+    // =============================
+    // 🎟️ ENTRADA DIGITAL CON QR (HU07)
+    // =============================
+    // Una por persona. El QR lleva el Codigo firmado; la validación en puerta (HU08) lo marcará como Usada.
+    public class Entrada
+    {
+        public int Id { get; set; }
+
+        // Token aleatorio de 128 bits en base64url: imposible de adivinar
+        [Required]
+        [StringLength(32)]
+        public string Codigo { get; set; } = "";
+
+        public int OrdenId { get; set; }
+
+        public Orden? Orden { get; set; }
+
+        public int EventoId { get; set; }
+
+        public Evento? Evento { get; set; }
+
+        public int TipoEntradaId { get; set; }
+
+        public TipoEntrada? TipoEntrada { get; set; }
+
+        [Required]
+        public string UsuarioId { get; set; } = "";
+
+        public EstadoEntrada Estado { get; set; } = EstadoEntrada.Activa;
+
+        public DateTime FechaEmision { get; set; } = DateTime.UtcNow;
+
+        public DateTime? FechaUso { get; set; }
+    }
+}

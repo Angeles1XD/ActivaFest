@@ -1,0 +1,82 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace ActivaFest.Models
+{
+    public enum EstadoOrden
+    {
+        PendientePago = 0,
+        Pagada = 1,
+        Rechazada = 2,
+        Expirada = 3,
+        Cancelada = 4,
+        // Pago aprobado después de que la reserva caducó y ya no quedaba aforo: el organizador gestiona la devolución
+        RequiereReembolso = 5
+    }
+
+    // =============================
+    // 🧾 ORDEN DE COMPRA (HU06)
+    // =============================
+    // Mientras está PendientePago mantiene reservadas sus entradas durante unos minutos (HU11).
+    public class Orden
+    {
+        public int Id { get; set; }
+
+        // Referencia pública (va a la pasarela y a la URL); no expone el Id interno
+        [Required]
+        [StringLength(32)]
+        public string Codigo { get; set; } = "";
+
+        [Required]
+        public string UsuarioId { get; set; } = "";
+
+        public ApplicationUser? Usuario { get; set; }
+
+        public int EventoId { get; set; }
+
+        public Evento? Evento { get; set; }
+
+        public EstadoOrden Estado { get; set; } = EstadoOrden.PendientePago;
+
+        public decimal Total { get; set; }
+
+        public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+
+        // Hasta cuándo se mantienen reservadas las entradas
+        public DateTime FechaExpiracion { get; set; }
+
+        public DateTime? FechaPago { get; set; }
+
+        [StringLength(30)]
+        public string? ProveedorPago { get; set; }
+
+        // Id del pago en la pasarela (Mercado Pago payment id, etc.)
+        [StringLength(100)]
+        public string? ReferenciaPago { get; set; }
+
+        public ICollection<OrdenItem> Items { get; set; } = new List<OrdenItem>();
+
+        public ICollection<Entrada> Entradas { get; set; } = new List<Entrada>();
+
+        public int CantidadEntradas => Items.Sum(i => i.Cantidad);
+    }
+
+    public class OrdenItem
+    {
+        public int Id { get; set; }
+
+        public int OrdenId { get; set; }
+
+        public Orden? Orden { get; set; }
+
+        public int TipoEntradaId { get; set; }
+
+        public TipoEntrada? TipoEntrada { get; set; }
+
+        public int Cantidad { get; set; }
+
+        // Precio congelado al momento de la compra
+        public decimal PrecioUnitario { get; set; }
+
+        public decimal Subtotal => PrecioUnitario * Cantidad;
+    }
+}

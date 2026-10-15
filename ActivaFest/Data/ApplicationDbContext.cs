@@ -15,6 +15,9 @@ namespace ActivaFest.Data
         public DbSet<Categoria> Categorias { get; set; }
         public DbSet<TipoEntrada> TiposEntrada { get; set; }
         public DbSet<EventoImagen> EventoImagenes { get; set; }
+        public DbSet<Orden> Ordenes { get; set; }
+        public DbSet<OrdenItem> OrdenItems { get; set; }
+        public DbSet<Entrada> Entradas { get; set; }
 
         // Categorías iniciales del catálogo (RF02)
         public static readonly Categoria[] CategoriasIniciales =
@@ -63,10 +66,6 @@ namespace ActivaFest.Data
             {
                 t.Property(x => x.Precio).HasPrecision(10, 2);
 
-                // SQLite no ordena ni agrega columnas decimal: se guarda como REAL solo en ese proveedor
-                if (Database.IsSqlite())
-                    t.Property(x => x.Precio).HasConversion<double>();
-
                 t.HasOne(x => x.Evento)
                     .WithMany(e => e.TiposEntrada)
                     .HasForeignKey(x => x.EventoId)
@@ -80,6 +79,49 @@ namespace ActivaFest.Data
                     .HasForeignKey(x => x.EventoId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
+            // =============================
+            // 🧾 COMPRAS Y ENTRADAS (SPRINT 3)
+            // =============================
+            builder.Entity<Orden>(o =>
+            {
+                o.HasIndex(x => x.Codigo).IsUnique();
+                o.HasIndex(x => new { x.Estado, x.FechaExpiracion });
+                o.HasIndex(x => x.UsuarioId);
+                o.Property(x => x.Total).HasPrecision(10, 2);
+
+                o.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+                // Un evento con ventas no se puede borrar en cascada
+                o.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<OrdenItem>(i =>
+            {
+                i.Property(x => x.PrecioUnitario).HasPrecision(10, 2);
+                i.HasOne(x => x.Orden).WithMany(o => o.Items).HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.Cascade);
+                i.HasOne(x => x.TipoEntrada).WithMany().HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<Entrada>(e =>
+            {
+                e.HasIndex(x => x.Codigo).IsUnique();
+                e.HasIndex(x => x.UsuarioId);
+                e.HasOne(x => x.Orden).WithMany(o => o.Entradas).HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.TipoEntrada).WithMany().HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // SQLite no ordena ni agrega columnas decimal: en ese proveedor todos los montos se guardan como REAL
+            if (Database.IsSqlite())
+            {
+                foreach (var propiedad in builder.Model.GetEntityTypes()
+                             .SelectMany(t => t.GetProperties())
+                             .Where(p => p.ClrType == typeof(decimal)))
+                {
+                    propiedad.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<decimal, double>(
+                        v => (double)v, v => (decimal)v));
+                }
+            }
         }
     }
 }

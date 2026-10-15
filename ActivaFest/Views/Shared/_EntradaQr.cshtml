@@ -1,0 +1,26 @@
+@model (Entrada Entrada, Evento Evento, int Numero)
+@{
+    var e = Model.Entrada;
+}
+
+<article class="entrada-qr estado-@e.Estado">
+    <div class="entrada-cabecera">
+        <span class="entrada-zona">@e.TipoEntrada?.Nombre</span>
+        <span class="entrada-numero">#@Model.Numero</span>
+    </div>
+
+    <img src="@Url.Action("Qr", "Entradas", new { id = e.Id })" alt="Código QR de la entrada @Model.Numero" width="220" height="220" loading="lazy" />
+
+    <p class="entrada-evento">@Model.Evento.Titulo</p>
+    <p class="entrada-fecha">@Formato.Fecha(Model.Evento.Fecha, "ddd dd MMM yyyy · HH:mm")</p>
+
+    @if (e.Estado == EstadoEntrada.Activa)
+    {
+        <span class="entrada-estado">Activa</span>
+        <a href="@Url.Action("Qr", "Entradas", new { id = e.Id })" download class="entrada-descargar">Descargar QR</a>
+    }
+    else
+    {
+        <span class="entrada-estado">@(e.Estado == EstadoEntrada.Usada ? "Usada" : "Anulada")</span>
+    }
+</article>

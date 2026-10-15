@@ -18,9 +18,11 @@ public class EmailSettings
     public bool Configurado => !string.IsNullOrWhiteSpace(Host);
 }
 
+public record AdjuntoCorreo(string NombreArchivo, byte[] Contenido, string TipoContenido = "image/png");
+
 public interface IEmailService
 {
-    Task EnviarAsync(string destinatario, string asunto, string html);
+    Task EnviarAsync(string destinatario, string asunto, string html, IReadOnlyList<AdjuntoCorreo>? adjuntos = null);
 }
 
 // =============================
@@ -39,12 +41,12 @@ public class SmtpEmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task EnviarAsync(string destinatario, string asunto, string html)
+    public async Task EnviarAsync(string destinatario, string asunto, string html, IReadOnlyList<AdjuntoCorreo>? adjuntos = null)
     {
         if (!_settings.Configurado)
         {
-            _logger.LogWarning("📧 SMTP no configurado. Correo NO enviado → Para: {Para} | Asunto: {Asunto}\n{Html}",
-                destinatario, asunto, html);
+            _logger.LogWarning("📧 SMTP no configurado. Correo NO enviado → Para: {Para} | Asunto: {Asunto} | Adjuntos: {Adjuntos}\n{Html}",
+                destinatario, asunto, adjuntos?.Count ?? 0, html);
             return;
         }
 
@@ -52,7 +54,12 @@ public class SmtpEmailService : IEmailService
         mensaje.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
         mensaje.To.Add(MailboxAddress.Parse(destinatario));
         mensaje.Subject = asunto;
-        mensaje.Body = new BodyBuilder { HtmlBody = html }.ToMessageBody();
+
+        var cuerpo = new BodyBuilder { HtmlBody = html };
+        foreach (var adjunto in adjuntos ?? Array.Empty<AdjuntoCorreo>())
+            cuerpo.Attachments.Add(adjunto.NombreArchivo, adjunto.Contenido, ContentType.Parse(adjunto.TipoContenido));
+
+        mensaje.Body = cuerpo.ToMessageBody();
 
         try
         {

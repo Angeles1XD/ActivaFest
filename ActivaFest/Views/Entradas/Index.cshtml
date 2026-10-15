@@ -1,0 +1,48 @@
+@model List<List<Entrada>>
+@{
+    ViewData["Title"] = "Mis entradas";
+    var hoy = DateTime.Today;
+}
+
+@section Styles {
+    <partial name="_EstilosCompra" />
+}
+
+<div class="pagina-categorias pagina-compra pagina-entradas">
+    <header class="cat-encabezado">
+        <p class="cat-migas">Activa-Fest / Mi cuenta</p>
+        <h1>Mis <span class="degradado">entradas</span></h1>
+        <p class="cat-subtitulo">Presenta el código QR en la puerta. Cada código es personal y solo se puede usar una vez.</p>
+    </header>
+
+    @if (Model.Count == 0)
+    {
+        <div class="cat-vacio">
+            <p>Todavía no tienes entradas. 🎟️</p>
+            <a asp-controller="Eventos" asp-action="Index" class="cat-boton">Explorar eventos</a>
+        </div>
+    }
+
+    @foreach (var grupo in Model)
+    {
+        var evento = grupo[0].Evento!;
+        var pasado = evento.Fecha < hoy;
+
+        <section class="grupo-entradas @(pasado ? "pasado" : "")">
+            <div class="grupo-titulo">
+                <div>
+                    <h2><a asp-controller="Eventos" asp-action="Detalle" asp-route-id="@evento.Id">@evento.Titulo</a></h2>
+                    <p>📅 @Formato.Fecha(evento.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm") · 📍 @evento.Ubicacion</p>
+                </div>
+                <span class="cat-total">@(pasado ? "Evento finalizado" : $"{grupo.Count} {(grupo.Count == 1 ? "entrada" : "entradas")}")</span>
+            </div>
+
+            <div class="grid-entradas">
+                @for (var i = 0; i < grupo.Count; i++)
+                {
+                    <partial name="_EntradaQr" model="(grupo[i], evento, i + 1)" />
+                }
+            </div>
+        </section>
+    }
+</div>

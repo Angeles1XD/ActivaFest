@@ -35,6 +35,7 @@
 
                 @if (User.Identity?.IsAuthenticated == true)
                 {
+                    <a asp-controller="Entradas" asp-action="Index">Mis entradas</a>
                     @if (User.IsInRole(ActivaFest.Models.Roles.Organizador) || User.IsInRole(ActivaFest.Models.Roles.Administrador))
                     {
                         <a asp-controller="Eventos" asp-action="MisEventos">Mis eventos</a>

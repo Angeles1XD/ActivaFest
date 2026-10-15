@@ -1,0 +1,31 @@
+@model Orden
+
+<div class="resumen-evento">
+    @if (Model.Evento?.Imagenes.FirstOrDefault() is { } portada)
+    {
+        <img src="@portada.Ruta" alt="" />
+    }
+    <div>
+        <h2>@Model.Evento?.Titulo</h2>
+        <p>📅 @Formato.Fecha(Model.Evento!.Fecha, "dddd dd 'de' MMMM, HH:mm")</p>
+        <p>📍 @Model.Evento.Ubicacion</p>
+    </div>
+</div>
+
+<table class="resumen-items">
+    <tbody>
+        @foreach (var item in Model.Items)
+        {
+            <tr>
+                <td>@item.Cantidad × @item.TipoEntrada?.Nombre</td>
+                <td class="monto">@Formato.Precio(item.Subtotal)</td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <td>Total</td>
+            <td class="monto">@Formato.Precio(Model.Total)</td>
+        </tr>
+    </tfoot>
+</table>
