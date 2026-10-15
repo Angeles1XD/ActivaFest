@@ -88,18 +88,136 @@ namespace ActivaFest.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.Categoria", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Icono")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Imagen")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Categorias");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Color = "#a855f7",
+                            Icono = "🎵",
+                            Imagen = "/img/categorias/conciertos.jpg",
+                            Nombre = "Conciertos"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Color = "#ec4899",
+                            Icono = "🎭",
+                            Imagen = "/img/categorias/teatro.jpg",
+                            Nombre = "Teatro"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Color = "#f97316",
+                            Icono = "🎉",
+                            Imagen = "/img/categorias/festivales.jpg",
+                            Nombre = "Festivales"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Color = "#f59e0b",
+                            Icono = "🎪",
+                            Imagen = "/img/categorias/ferias.jpg",
+                            Nombre = "Ferias"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Color = "#06b6d4",
+                            Icono = "🖼️",
+                            Imagen = "/img/categorias/exposiciones.jpg",
+                            Nombre = "Exposiciones"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Color = "#22c55e",
+                            Icono = "⚽",
+                            Imagen = "/img/categorias/deportes.jpg",
+                            Nombre = "Deportes"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Color = "#ef4444",
+                            Icono = "🍽️",
+                            Imagen = "/img/categorias/gastronomia.jpg",
+                            Nombre = "Gastronomía"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Color = "#14b8a6",
+                            Icono = "👨‍👩‍👧",
+                            Imagen = "/img/categorias/familiar.jpg",
+                            Nombre = "Familiar"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Color = "#3b82f6",
+                            Icono = "🏛️",
+                            Imagen = "/img/categorias/cultura.jpg",
+                            Nombre = "Cultura"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Color = "#8b5cf6",
+                            Icono = "🎫",
+                            Imagen = "/img/categorias/otros.jpg",
+                            Nombre = "Otros"
+                        });
+                });
+
             modelBuilder.Entity("ActivaFest.Models.Evento", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Asistentes")
+                    b.Property<int>("Aforo")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Categoria")
+                    b.Property<int>("CategoriaId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Descripcion")
                         .IsRequired()
-                        .HasMaxLength(80)
+                        .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Estado")
@@ -113,6 +231,12 @@ namespace ActivaFest.Migrations
 
                     b.Property<DateTime?>("FechaModeracion")
                         .HasColumnType("TEXT");
+
+                    b.Property<double?>("Latitud")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Longitud")
+                        .HasColumnType("REAL");
 
                     b.Property<string>("MotivoRechazo")
                         .HasMaxLength(500)
@@ -133,11 +257,67 @@ namespace ActivaFest.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoriaId");
+
                     b.HasIndex("Estado");
+
+                    b.HasIndex("Fecha");
 
                     b.HasIndex("OrganizadorId");
 
                     b.ToTable("Eventos");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.EventoImagen", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Ruta")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.ToTable("EventoImagenes");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.TipoEntrada", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Capacidad")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Precio")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.ToTable("TiposEntrada");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -270,12 +450,42 @@ namespace ActivaFest.Migrations
 
             modelBuilder.Entity("ActivaFest.Models.Evento", b =>
                 {
+                    b.HasOne("ActivaFest.Models.Categoria", "Categoria")
+                        .WithMany("Eventos")
+                        .HasForeignKey("CategoriaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ActivaFest.Models.ApplicationUser", "Organizador")
                         .WithMany()
                         .HasForeignKey("OrganizadorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.Navigation("Categoria");
+
                     b.Navigation("Organizador");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.EventoImagen", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany("Imagenes")
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.TipoEntrada", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany("TiposEntrada")
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -327,6 +537,18 @@ namespace ActivaFest.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.Categoria", b =>
+                {
+                    b.Navigation("Eventos");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.Evento", b =>
+                {
+                    b.Navigation("Imagenes");
+
+                    b.Navigation("TiposEntrada");
                 });
 #pragma warning restore 612, 618
         }

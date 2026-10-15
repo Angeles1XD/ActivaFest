@@ -80,3 +80,8 @@ TestResults/
 *.mdf
 *.ldf
 *.db*
+
+## =========================
+## 🖼️ Imágenes subidas por usuarios
+## =========================
+**/wwwroot/uploads/

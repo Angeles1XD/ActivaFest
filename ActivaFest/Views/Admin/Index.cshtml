@@ -31,8 +31,8 @@
 
         <p>📍 @item.Ubicacion</p>
         <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
-        <p>🏷 @item.Categoria</p>
-        <p>👥 Aforo: @item.Asistentes</p>
+        <p>@item.Categoria?.Icono @item.Categoria?.Nombre</p>
+        <p>👥 Aforo: @item.Aforo</p>
         <p class="texto-suave">
             Organizador: @(item.Organizador?.NombreCompleto ?? "—") (@(item.Organizador?.Email ?? "sin correo"))
             · Enviado: @item.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")

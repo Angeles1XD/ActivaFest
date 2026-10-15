@@ -27,15 +27,22 @@ public class EventosPlugin
         {
             query = query.Where(e =>
                 e.Titulo.ToLower().Contains(termino) ||
-                e.Categoria.ToLower().Contains(termino) ||
+                e.Categoria!.Nombre.ToLower().Contains(termino) ||
                 e.Ubicacion.ToLower().Contains(termino));
         }
-        
+
         var eventos = await query
             .Where(e => e.Fecha >= DateTime.Now)
             .OrderBy(e => e.Fecha)
             .Take(3)
-            .Select(e => new { e.Titulo, e.Categoria, e.Ubicacion, e.Fecha })
+            .Select(e => new
+            {
+                e.Titulo,
+                Categoria = e.Categoria!.Nombre,
+                e.Ubicacion,
+                e.Fecha,
+                PrecioDesde = e.TiposEntrada.Min(t => (decimal?)t.Precio)
+            })
             .ToListAsync();
 
         return JsonSerializer.Serialize(eventos);

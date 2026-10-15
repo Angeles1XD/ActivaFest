@@ -1,9 +1,13 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
 using ActivaFest.Models;
 using ActivaFest.Services;
+using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
+using ActivaFest.Services.Imagenes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +53,12 @@ builder.Services.ConfigureApplicationCookie(options =>
 // =============================
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
+// =============================
+// 📚 CATÁLOGO E IMÁGENES (HU02, HU03, HU05)
+// =============================
+builder.Services.AddScoped<ICatalogoService, CatalogoService>();
+builder.Services.AddSingleton<IAlmacenamientoImagenes, AlmacenamientoLocalImagenes>();
 
 // =============================
 // 🔥 MVC
@@ -116,6 +126,15 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+// Fechas en español y montos en soles (es-PE)
+var culturaPeru = new CultureInfo("es-PE");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(culturaPeru),
+    SupportedCultures = new[] { culturaPeru },
+    SupportedUICultures = new[] { culturaPeru }
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

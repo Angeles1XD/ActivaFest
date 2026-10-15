@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using ActivaFest.Data;
 using ActivaFest.Models;
+using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
 
 namespace ActivaFest.Controllers
@@ -15,13 +15,13 @@ namespace ActivaFest.Controllers
     public class AdminController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly IDistributedCache _cache;
+        private readonly ICatalogoService _catalogo;
         private readonly IEmailService _email;
 
-        public AdminController(ApplicationDbContext context, IDistributedCache cache, IEmailService email)
+        public AdminController(ApplicationDbContext context, ICatalogoService catalogo, IEmailService email)
         {
             _context = context;
-            _cache = cache;
+            _catalogo = catalogo;
             _email = email;
         }
 
@@ -29,6 +29,7 @@ namespace ActivaFest.Controllers
         {
             var eventos = await _context.Eventos
                 .Include(e => e.Organizador)
+                .Include(e => e.Categoria)
                 .Where(e => e.Estado == estado)
                 .OrderBy(e => e.FechaCreacion)
                 .ToListAsync();
@@ -54,7 +55,7 @@ namespace ActivaFest.Controllers
             evento.FechaModeracion = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            await _cache.RemoveAsync(EventosController.CacheKey);
+            await _catalogo.InvalidarAsync();
 
             if (evento.Organizador?.Email != null)
             {
@@ -89,7 +90,7 @@ namespace ActivaFest.Controllers
             await _context.SaveChangesAsync();
 
             if (estabaPublicado)
-                await _cache.RemoveAsync(EventosController.CacheKey);
+                await _catalogo.InvalidarAsync();
 
             if (evento.Organizador?.Email != null)
             {

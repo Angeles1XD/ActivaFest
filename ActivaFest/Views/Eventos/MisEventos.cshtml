@@ -16,12 +16,16 @@
 @foreach (var item in Model)
 {
     <div class="card-evento">
+        @if (item.Imagenes.FirstOrDefault() is { } portada)
+        {
+            <img src="@portada.Ruta" alt="" class="miniatura-evento" loading="lazy" />
+        }
         <span class="badge-estado badge-@item.Estado">@item.Estado</span>
         <h3 style="margin-top:10px;">@item.Titulo</h3>
 
         <p>📍 @item.Ubicacion</p>
         <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
-        <p>🏷 @item.Categoria</p>
+        <p>@item.Categoria?.Icono @item.Categoria?.Nombre</p>
 
         @if (item.Estado == EstadoEvento.Pendiente)
         {

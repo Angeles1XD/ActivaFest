@@ -19,22 +19,38 @@ namespace ActivaFest.Models
         [Display(Name = "Título")]
         public string Titulo { get; set; } = "";
 
-        [Required(ErrorMessage = "La categoría es obligatoria.")]
-        [StringLength(80)]
+        [StringLength(4000)]
+        [Display(Name = "Descripción")]
+        public string Descripcion { get; set; } = "";
+
         [Display(Name = "Categoría")]
-        public string Categoria { get; set; } = "";
+        public int CategoriaId { get; set; }
+
+        public Categoria? Categoria { get; set; }
 
         [Required(ErrorMessage = "La ubicación es obligatoria.")]
         [StringLength(200)]
         [Display(Name = "Ubicación")]
         public string Ubicacion { get; set; } = "";
 
+        // =============================
+        // 🗺️ GEOLOCALIZACIÓN (HU04)
+        // =============================
+        public double? Latitud { get; set; }
+
+        public double? Longitud { get; set; }
+
         [Display(Name = "Fecha")]
         public DateTime Fecha { get; set; }
 
+        // Aforo total = suma de la capacidad de los tipos de entrada
         [Range(0, int.MaxValue)]
-        [Display(Name = "Aforo / asistentes")]
-        public int Asistentes { get; set; }
+        [Display(Name = "Aforo")]
+        public int Aforo { get; set; }
+
+        public ICollection<TipoEntrada> TiposEntrada { get; set; } = new List<TipoEntrada>();
+
+        public ICollection<EventoImagen> Imagenes { get; set; } = new List<EventoImagen>();
 
         // =============================
         // 🛡️ MODERACIÓN (HU10)
@@ -52,5 +68,7 @@ namespace ActivaFest.Models
         public string? OrganizadorId { get; set; }
 
         public ApplicationUser? Organizador { get; set; }
+
+        public bool TieneUbicacion => Latitud.HasValue && Longitud.HasValue;
     }
 }

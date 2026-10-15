@@ -4,106 +4,166 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
 using ActivaFest.Models;
+using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
-using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
+using ActivaFest.Services.Imagenes;
 
 namespace ActivaFest.Controllers
 {
     public class EventosController : Controller
     {
-        public const string CacheKey = "eventos_lista";
+        private const string RolesPublicadores = Roles.Organizador + "," + Roles.Administrador;
+        private const long LimiteSubida = 60 * 1024 * 1024; // 10 fotos x 5 MB + formulario
 
         private readonly ApplicationDbContext _context;
-        private readonly IDistributedCache _cache;
+        private readonly ICatalogoService _catalogo;
+        private readonly IAlmacenamientoImagenes _imagenes;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _email;
+        private readonly ILogger<EventosController> _logger;
 
         public EventosController(
             ApplicationDbContext context,
-            IDistributedCache cache,
+            ICatalogoService catalogo,
+            IAlmacenamientoImagenes imagenes,
             UserManager<ApplicationUser> userManager,
-            IEmailService email)
+            IEmailService email,
+            ILogger<EventosController> logger)
         {
             _context = context;
-            _cache = cache;
+            _catalogo = catalogo;
+            _imagenes = imagenes;
             _userManager = userManager;
             _email = email;
+            _logger = logger;
         }
 
         // =============================
-        // 🔍 LISTAR + BUSCAR EVENTOS (solo aprobados)
+        // 📚 CATÁLOGO + BÚSQUEDA + FILTROS + PAGINACIÓN (HU02, HU05)
         // =============================
-        public async Task<IActionResult> Index(string? buscar)
+        public async Task<IActionResult> Index([FromQuery] CatalogoFiltro filtro, CancellationToken ct)
         {
-            var aprobados = _context.Eventos.Where(e => e.Estado == EstadoEvento.Aprobado);
+            if (!ModelState.IsValid)
+                filtro = new CatalogoFiltro();
 
-            if (!string.IsNullOrEmpty(buscar))
+            var modelo = new CatalogoViewModel
             {
-                var eventosFiltrados = await aprobados
-                    .Where(e =>
-                        e.Titulo.Contains(buscar) ||
-                        e.Categoria.Contains(buscar) ||
-                        e.Ubicacion.Contains(buscar))
-                    .ToListAsync();
+                Filtro = filtro,
+                Resultado = await _catalogo.BuscarAsync(filtro, ct),
+                Categorias = await _catalogo.ObtenerCategoriasAsync(ct)
+            };
 
-                return View(eventosFiltrados);
-            }
+            return View(modelo);
+        }
 
-            var cachedData = await _cache.GetStringAsync(CacheKey);
+        // =============================
+        // 🔥 FICHA DEL EVENTO: GALERÍA, PRECIOS Y MAPA (HU03, HU04)
+        // =============================
+        public async Task<IActionResult> Detalle(int id, CancellationToken ct)
+        {
+            var evento = await _context.Eventos
+                .AsNoTracking()
+                .Include(e => e.Categoria)
+                .Include(e => e.TiposEntrada)
+                .Include(e => e.Imagenes.OrderBy(i => i.Orden))
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(e => e.Id == id, ct);
 
-            List<Evento> eventos;
+            if (evento == null)
+                return NotFound();
 
-            if (!string.IsNullOrEmpty(cachedData))
-            {
-                Console.WriteLine("🔥 CACHE HIT");
-                eventos = JsonSerializer.Deserialize<List<Evento>>(cachedData)!;
-            }
-            else
-            {
-                Console.WriteLine("💾 CACHE MISS");
+            // Los eventos no aprobados solo los ve su organizador o un administrador
+            if (evento.Estado != EstadoEvento.Aprobado
+                && !User.IsInRole(Roles.Administrador)
+                && evento.OrganizadorId != _userManager.GetUserId(User))
+                return NotFound();
 
-                eventos = await aprobados.ToListAsync();
-
-                var options = new DistributedCacheEntryOptions()
-                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5))
-                    .SetSlidingExpiration(TimeSpan.FromMinutes(2));
-
-                await _cache.SetStringAsync(
-                    CacheKey,
-                    JsonSerializer.Serialize(eventos),
-                    options
-                );
-            }
-
-            return View(eventos);
+            return View(evento);
         }
 
         // =============================
         // 📝 CREAR EVENTO (queda pendiente de moderación)
         // =============================
-        [Authorize(Roles = Roles.Organizador + "," + Roles.Administrador)]
-        public IActionResult Crear()
+        [Authorize(Roles = RolesPublicadores)]
+        public async Task<IActionResult> Crear(CancellationToken ct)
         {
-            return View(new Evento { Fecha = DateTime.Today.AddDays(7).AddHours(20) });
+            await CargarCategoriasAsync(ct);
+            return View(new EventoFormViewModel { Fecha = DateTime.Today.AddDays(7).AddHours(20) });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = Roles.Organizador + "," + Roles.Administrador)]
-        public async Task<IActionResult> Crear([Bind("Titulo,Categoria,Ubicacion,Fecha,Asistentes")] Evento evento)
+        [Authorize(Roles = RolesPublicadores)]
+        [RequestSizeLimit(LimiteSubida)]
+        [RequestFormLimits(MultipartBodyLengthLimit = LimiteSubida)]
+        public async Task<IActionResult> Crear(EventoFormViewModel model, CancellationToken ct)
         {
+            var fotos = model.Fotos.Where(f => f.Length > 0).ToList();
+
+            foreach (var foto in fotos)
+            {
+                var error = ValidadorImagenes.Validar(foto);
+                if (error != null)
+                    ModelState.AddModelError(nameof(model.Fotos), error);
+            }
+
+            if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
+                ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
+
             if (!ModelState.IsValid)
-                return View(evento);
+            {
+                await CargarCategoriasAsync(ct);
+                return View(model);
+            }
 
             var usuario = await _userManager.GetUserAsync(User);
 
-            evento.OrganizadorId = usuario?.Id;
-            evento.Estado = EstadoEvento.Pendiente;
-            evento.FechaCreacion = DateTime.UtcNow;
+            var evento = new Evento
+            {
+                Titulo = model.Titulo.Trim(),
+                Descripcion = model.Descripcion.Trim(),
+                CategoriaId = model.CategoriaId!.Value,
+                Fecha = model.Fecha!.Value,
+                Ubicacion = model.Ubicacion.Trim(),
+                Latitud = Math.Round(model.Latitud!.Value, 6),
+                Longitud = Math.Round(model.Longitud!.Value, 6),
+                OrganizadorId = usuario?.Id,
+                Estado = EstadoEvento.Pendiente,
+                FechaCreacion = DateTime.UtcNow,
+                TiposEntrada = model.TiposEntrada.Select(t => new TipoEntrada
+                {
+                    Nombre = t.Nombre.Trim(),
+                    Precio = Math.Round(t.Precio, 2),
+                    Capacidad = t.Capacidad
+                }).ToList()
+            };
+            evento.Aforo = evento.TiposEntrada.Sum(t => t.Capacidad);
 
-            _context.Add(evento);
-            await _context.SaveChangesAsync();
+            // Primero se guardan las fotos; si la BD falla, se eliminan para no dejar archivos huérfanos
+            var rutasGuardadas = new List<string>();
+            try
+            {
+                for (var i = 0; i < fotos.Count; i++)
+                {
+                    var ruta = await _imagenes.GuardarAsync(fotos[i], "eventos", ct);
+                    rutasGuardadas.Add(ruta);
+                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = i });
+                }
+
+                _context.Eventos.Add(evento);
+                await _context.SaveChangesAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear el evento {Titulo}", model.Titulo);
+
+                foreach (var ruta in rutasGuardadas)
+                    await _imagenes.EliminarAsync(ruta, CancellationToken.None);
+
+                ModelState.AddModelError(string.Empty, "No se pudo guardar el evento. Inténtalo de nuevo.");
+                await CargarCategoriasAsync(ct);
+                return View(model);
+            }
 
             HttpContext.Session.SetString("UltimoEvento", evento.Titulo);
 
@@ -120,36 +180,25 @@ namespace ActivaFest.Controllers
         // =============================
         // 📋 MIS EVENTOS (estado de moderación del organizador)
         // =============================
-        [Authorize(Roles = Roles.Organizador + "," + Roles.Administrador)]
-        public async Task<IActionResult> MisEventos()
+        [Authorize(Roles = RolesPublicadores)]
+        public async Task<IActionResult> MisEventos(CancellationToken ct)
         {
             var userId = _userManager.GetUserId(User);
 
             var eventos = await _context.Eventos
+                .AsNoTracking()
+                .Include(e => e.Categoria)
+                .Include(e => e.Imagenes.OrderBy(i => i.Orden).Take(1))
                 .Where(e => e.OrganizadorId == userId)
                 .OrderByDescending(e => e.FechaCreacion)
-                .ToListAsync();
+                .ToListAsync(ct);
 
             return View(eventos);
         }
 
-        // =============================
-        // 🔥 DETALLE (VER MÁS)
-        // =============================
-        public async Task<IActionResult> Detalle(int id)
+        private async Task CargarCategoriasAsync(CancellationToken ct)
         {
-            var evento = await _context.Eventos.FirstOrDefaultAsync(e => e.Id == id);
-
-            if (evento == null)
-                return NotFound();
-
-            // Los eventos no aprobados solo los ve su organizador o un administrador
-            if (evento.Estado != EstadoEvento.Aprobado
-                && !User.IsInRole(Roles.Administrador)
-                && evento.OrganizadorId != _userManager.GetUserId(User))
-                return NotFound();
-
-            return View(evento);
+            ViewBag.Categorias = await _catalogo.ObtenerCategoriasAsync(ct);
         }
     }
 }

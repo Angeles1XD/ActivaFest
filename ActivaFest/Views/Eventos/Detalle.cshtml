@@ -1,21 +1,152 @@
-@model ActivaFest.Models.Evento
-
+@model Evento
 @{
     ViewData["Title"] = Model.Titulo;
+    var imagenes = Model.Imagenes.OrderBy(i => i.Orden).ToList();
+    var tipos = Model.TiposEntrada.OrderBy(t => t.Precio).ToList();
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
 }
 
-<h2 class="text-gradient">@Model.Titulo</h2>
-
-@if (Model.Estado != EstadoEvento.Aprobado)
-{
-    <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>
+@section Styles {
+    <partial name="_LeafletCss" />
 }
 
-<div class="card-evento">
-    <p>📍 @Model.Ubicacion</p>
-    <p>📅 @Model.Fecha</p>
-    <p>🏷 @Model.Categoria</p>
-    <p>👥 @Model.Asistentes interesados</p>
+<a asp-action="Index" class="enlace-volver">← Volver al catálogo</a>
+
+<div class="ficha">
+    <!-- 📸 GALERÍA (HU03) -->
+    <section class="ficha-galeria">
+        @if (imagenes.Count > 0)
+        {
+            <div id="galeriaEvento" class="carousel slide" data-bs-ride="carousel">
+                @if (imagenes.Count > 1)
+                {
+                    <div class="carousel-indicators">
+                        @for (var i = 0; i < imagenes.Count; i++)
+                        {
+                            <button type="button" data-bs-target="#galeriaEvento" data-bs-slide-to="@i"
+                                    class="@(i == 0 ? "active" : "")" aria-current="@(i == 0 ? "true" : null)"
+                                    aria-label="Foto @(i + 1)"></button>
+                        }
+                    </div>
+                }
+                <div class="carousel-inner">
+                    @for (var i = 0; i < imagenes.Count; i++)
+                    {
+                        <div class="carousel-item @(i == 0 ? "active" : "")">
+                            <img src="@imagenes[i].Ruta" class="d-block w-100" alt="Foto @(i + 1) de @Model.Titulo"
+                                 loading="@(i == 0 ? "eager" : "lazy")" />
+                        </div>
+                    }
+                </div>
+                @if (imagenes.Count > 1)
+                {
+                    <button class="carousel-control-prev" type="button" data-bs-target="#galeriaEvento" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Anterior</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#galeriaEvento" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Siguiente</span>
+                    </button>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="sin-imagen sin-imagen-grande">@Model.Categoria?.Icono</div>
+        }
+    </section>
+
+    <!-- ℹ️ INFORMACIÓN -->
+    <section class="ficha-info">
+        @if (Model.Estado != EstadoEvento.Aprobado)
+        {
+            <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>
+        }
+
+        <span class="card-categoria estatica">@Model.Categoria?.Icono @Model.Categoria?.Nombre</span>
+        <h2 class="text-gradient">@Model.Titulo</h2>
+
+        <ul class="ficha-datos">
+            <li>📅 @Formato.Fecha(Model.Fecha, "dddd dd 'de' MMMM 'de' yyyy")</li>
+            <li>🕗 @Model.Fecha.ToString("HH:mm") horas</li>
+            <li>📍 @Model.Ubicacion</li>
+            @if (Model.Aforo > 0)
+            {
+                <li>👥 Aforo: @Model.Aforo.ToString("N0") personas</li>
+            }
+        </ul>
+
+        <!-- 💲 PRECIOS -->
+        <div class="ficha-precios">
+            <h3>Entradas</h3>
+            @if (tipos.Count == 0)
+            {
+                <p class="texto-suave">El organizador aún no publicó los precios.</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr><th>Zona</th><th>Precio</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in tipos)
+                        {
+                            <tr>
+                                <td>@t.Nombre</td>
+                                <td class="precio">@Formato.Precio(t.Precio)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button type="button" class="btn-rosa btn-bloque" disabled title="Disponible próximamente">
+                    🎟️ Comprar entradas (próximamente)
+                </button>
+            }
+        </div>
+    </section>
 </div>
 
-<a href="/Eventos" class="btn-rosa">← Volver</a>
+@if (!string.IsNullOrWhiteSpace(Model.Descripcion))
+{
+    <section class="ficha-seccion">
+        <h3>Acerca del evento</h3>
+        <p class="descripcion">@Model.Descripcion</p>
+    </section>
+}
+
+<!-- 🗺️ MAPA Y RUTA (HU04) -->
+<section class="ficha-seccion">
+    <h3>Cómo llegar</h3>
+
+    @if (Model.TieneUbicacion)
+    {
+        <div class="ruta-acciones">
+            <button type="button" id="btnRuta" class="btn-rosa">🧭 Trazar ruta desde mi ubicación</button>
+            <a class="btn-gris enlace-boton" target="_blank" rel="noopener"
+               href="https://www.google.com/maps/dir/?api=1&destination=@Model.Latitud!.Value.ToString(inv),@Model.Longitud!.Value.ToString(inv)">
+                Abrir en Google Maps ↗
+            </a>
+        </div>
+        <p id="rutaInfo" class="ruta-info" role="status" aria-live="polite"></p>
+
+        <div id="mapaEvento" class="mapa"
+             data-lat="@Model.Latitud!.Value.ToString(inv)"
+             data-lng="@Model.Longitud!.Value.ToString(inv)"
+             data-titulo="@Model.Titulo"
+             data-direccion="@Model.Ubicacion"></div>
+    }
+    else
+    {
+        <p class="texto-suave">📍 @Model.Ubicacion — el organizador aún no marcó la ubicación exacta en el mapa.</p>
+    }
+</section>
+
+@section Scripts {
+    @if (Model.TieneUbicacion)
+    {
+        <partial name="_LeafletJs" />
+        <script src="~/js/mapa-evento.js" asp-append-version="true"></script>
+    }
+}
