@@ -15,19 +15,33 @@
 <div class="grid-eventos">
 @foreach (var item in Model)
 {
-    <div class="card-evento">
+    var finalizado = item.YaOcurrio(DateTime.Now);
+
+    <div class="card-evento @(finalizado ? "evento-finalizado" : "")">
         @if (item.Imagenes.FirstOrDefault() is { } portada)
         {
             <img src="@portada.Ruta" alt="" class="miniatura-evento" loading="lazy" />
         }
         <span class="badge-estado badge-@item.Estado">@item.Estado</span>
+        @if (finalizado)
+        {
+            <span class="badge-estado badge-Finalizado">Finalizado</span>
+        }
         <h3 style="margin-top:10px;">@item.Titulo</h3>
 
         <p>📍 @item.Ubicacion</p>
         <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
         <p>@item.Categoria?.Icono @item.Categoria?.Nombre</p>
 
-        @if (item.Estado == EstadoEvento.Pendiente)
+        @if (finalizado && item.Estado == EstadoEvento.Pendiente)
+        {
+            <p class="aviso-vencido">⚠ La fecha pasó antes de la revisión, por eso ya no se publicará. Crea el evento de nuevo con una fecha futura.</p>
+        }
+        else if (finalizado)
+        {
+            <p class="texto-suave">Este evento ya se realizó. Ya no aparece en el catálogo y su venta está cerrada.</p>
+        }
+        else if (item.Estado == EstadoEvento.Pendiente)
         {
             <p class="texto-suave">En revisión por el equipo de ActivaFest.</p>
         }

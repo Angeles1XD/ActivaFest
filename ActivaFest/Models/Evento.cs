@@ -70,5 +70,15 @@ namespace ActivaFest.Models
         public ApplicationUser? Organizador { get; set; }
 
         public bool TieneUbicacion => Latitud.HasValue && Longitud.HasValue;
+
+        // =============================
+        // ⏱️ EVENTOS PASADOS
+        // =============================
+        // Las entradas sirven para ingresar hasta unas horas después del inicio (eventos largos, ferias, rezagados)
+        public const int HorasValidezEntradas = 12;
+
+        public DateTime FinValidezEntradas => Fecha.AddHours(HorasValidezEntradas);
+
+        public bool YaOcurrio(DateTime ahora) => Fecha <= ahora;
     }
 }

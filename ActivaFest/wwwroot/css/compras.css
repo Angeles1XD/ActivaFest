@@ -392,12 +392,14 @@
 }
 
 .estado-Usada .entrada-estado,
+.estado-Finalizada .entrada-estado,
 .estado-Anulada .entrada-estado {
   background: rgba(255, 255, 255, 0.08);
   color: var(--texto-2);
 }
 
 .estado-Usada img,
+.estado-Finalizada img,
 .estado-Anulada img {
   opacity: 0.3;
 }

@@ -25,8 +25,14 @@
 <div class="grid-eventos">
 @foreach (var item in Model)
 {
+    var finalizado = item.YaOcurrio(DateTime.Now);
+
     <div class="card-evento">
         <span class="badge-estado badge-@item.Estado">@item.Estado</span>
+        @if (finalizado)
+        {
+            <span class="badge-estado badge-Finalizado">Finalizado</span>
+        }
         <h3 style="margin-top:10px;">@item.Titulo</h3>
 
         <p>📍 @item.Ubicacion</p>
@@ -43,8 +49,13 @@
             <p class="texto-suave">Motivo del rechazo: @item.MotivoRechazo</p>
         }
 
+        @if (finalizado && item.Estado == EstadoEvento.Pendiente)
+        {
+            <p class="aviso-vencido">⚠ La fecha de este evento ya pasó: no se puede aprobar. Recházalo indicando el motivo.</p>
+        }
+
         <div class="acciones-moderacion">
-            @if (item.Estado != EstadoEvento.Aprobado)
+            @if (item.Estado != EstadoEvento.Aprobado && !finalizado)
             {
                 <form asp-action="Aprobar" asp-route-id="@item.Id" method="post">
                     <button type="submit" class="btn-rosa">✔ Aprobar</button>

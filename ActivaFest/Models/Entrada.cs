@@ -42,5 +42,9 @@ namespace ActivaFest.Models
         public DateTime FechaEmision { get; set; } = DateTime.UtcNow;
 
         public DateTime? FechaUso { get; set; }
+
+        // Regla para la validación en puerta (HU08): activa y dentro del plazo del evento
+        public bool VigenteParaIngreso(Evento evento, DateTime ahora) =>
+            Estado == EstadoEntrada.Activa && ahora <= evento.FinValidezEntradas;
     }
 }

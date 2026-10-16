@@ -63,6 +63,10 @@
         {
             <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>
         }
+        @if (Model.YaOcurrio(DateTime.Now))
+        {
+            <p class="aviso-vencido">Este evento ya se realizó.</p>
+        }
 
         <span class="card-categoria estatica">@Model.Categoria?.Icono @Model.Categoria?.Nombre</span>
         <h2 class="text-gradient">@Model.Titulo</h2>

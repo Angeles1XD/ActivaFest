@@ -1,9 +1,12 @@
 @model (Entrada Entrada, Evento Evento, int Numero)
 @{
     var e = Model.Entrada;
+    var vigente = e.VigenteParaIngreso(Model.Evento, DateTime.Now);
+    // Una entrada activa de un evento que ya terminó se muestra como finalizada
+    var claseEstado = e.Estado == EstadoEntrada.Activa && !vigente ? "Finalizada" : e.Estado.ToString();
 }
 
-<article class="entrada-qr estado-@e.Estado">
+<article class="entrada-qr estado-@claseEstado">
     <div class="entrada-cabecera">
         <span class="entrada-zona">@e.TipoEntrada?.Nombre</span>
         <span class="entrada-numero">#@Model.Numero</span>
@@ -14,13 +17,13 @@
     <p class="entrada-evento">@Model.Evento.Titulo</p>
     <p class="entrada-fecha">@Formato.Fecha(Model.Evento.Fecha, "ddd dd MMM yyyy · HH:mm")</p>
 
-    @if (e.Estado == EstadoEntrada.Activa)
+    @if (vigente)
     {
         <span class="entrada-estado">Activa</span>
         <a href="@Url.Action("Qr", "Entradas", new { id = e.Id })" download class="entrada-descargar">Descargar QR</a>
     }
     else
     {
-        <span class="entrada-estado">@(e.Estado == EstadoEntrada.Usada ? "Usada" : "Anulada")</span>
+        <span class="entrada-estado">@(claseEstado switch { "Usada" => "Usada", "Anulada" => "Anulada", _ => "Evento finalizado" })</span>
     }
 </article>

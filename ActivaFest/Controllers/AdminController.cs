@@ -50,6 +50,13 @@ namespace ActivaFest.Controllers
             if (evento == null)
                 return NotFound();
 
+            // Publicar un evento cuya fecha ya pasó no tiene sentido: se debe rechazar o pedir otra fecha
+            if (evento.YaOcurrio(DateTime.Now))
+            {
+                TempData["Error"] = $"No se puede aprobar \"{evento.Titulo}\": su fecha ya pasó.";
+                return RedirectToAction(nameof(Index), new { estado = evento.Estado });
+            }
+
             evento.Estado = EstadoEvento.Aprobado;
             evento.MotivoRechazo = null;
             evento.FechaModeracion = DateTime.UtcNow;
