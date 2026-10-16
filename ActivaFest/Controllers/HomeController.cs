@@ -32,6 +32,7 @@ public class HomeController : Controller
         var modelo = new InicioViewModel
         {
             Proximos = proximos.Eventos.Take(EventosEnPortada).ToList(),
+            Destacados = await _catalogo.DestacadosAsync(EventosEnPortada, ct),
             TotalEventos = conteo.Values.Sum(),
             // Primero las categorías con más eventos; con la base vacía se mantiene el orden alfabético
             Categorias = categorias

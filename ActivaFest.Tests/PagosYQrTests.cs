@@ -122,7 +122,7 @@ public class MercadoPagoTests
             Content = new StringContent("""{"id":"pref1","init_point":"https://real","sandbox_init_point":"https://sandbox"}""")
         };
 
-        var inicio = await pasarela.IniciarAsync(OrdenDePrueba(), "Rock Fest", "ana@test.pe",
+        var inicio = await pasarela.IniciarAsync(SolicitudCobro.DesdeOrden(OrdenDePrueba(), "Rock Fest"), "ana@test.pe",
             new UrlsRetorno("http://localhost/ok", "http://localhost/ko", "http://localhost/pend", "http://localhost/hook"));
 
         Assert.Equal("https://sandbox", inicio.UrlRedireccion);
@@ -141,7 +141,7 @@ public class MercadoPagoTests
         var (pasarela, http) = Crear();
         http.Responder = _ => new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("""{"init_point":"https://real"}""") };
 
-        await pasarela.IniciarAsync(OrdenDePrueba(), "Rock Fest", null,
+        await pasarela.IniciarAsync(SolicitudCobro.DesdeOrden(OrdenDePrueba(), "Rock Fest"), null,
             new UrlsRetorno("https://af.pe/ok", "https://af.pe/ko", "https://af.pe/pend", "https://af.pe/hook"));
 
         Assert.Contains("\"auto_return\":\"approved\"", http.CuerpoEnviado);

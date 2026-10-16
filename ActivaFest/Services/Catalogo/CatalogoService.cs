@@ -15,6 +15,9 @@ public interface ICatalogoService
     // Eventos próximos publicados por categoría (CategoriaId -> cantidad)
     Task<Dictionary<int, int>> ContarPorCategoriaAsync(CancellationToken ct = default);
 
+    // Eventos con un paquete publicitario vigente, para la portada (HU12)
+    Task<List<EventoCardViewModel>> DestacadosAsync(int maximo = 8, CancellationToken ct = default);
+
     // Se llama cuando cambia la oferta publicada (aprobación, rechazo, edición)
     Task InvalidarAsync(CancellationToken ct = default);
 }
@@ -62,6 +65,61 @@ public class CatalogoService : ICatalogoService
 
         await _cache.SetStringAsync(clave, JsonSerializer.Serialize(resultado), OpcionesCache, ct);
         return resultado;
+    }
+
+    // =============================
+    // ⭐ DESTACADOS DE LA PORTADA (HU12)
+    // =============================
+    public async Task<List<EventoCardViewModel>> DestacadosAsync(int maximo = 8, CancellationToken ct = default)
+    {
+        var version = await _cache.GetStringAsync(ClaveVersion, ct) ?? "0";
+        var clave = $"catalogo:{version}:destacados:{maximo}";
+
+        var enCache = await _cache.GetStringAsync(clave, ct);
+        if (enCache != null)
+            return JsonSerializer.Deserialize<List<EventoCardViewModel>>(enCache)!;
+
+        var ahora = DateTime.Now;
+        var vigentes = _context.ContratosDestacado
+            .Where(c => c.Estado == EstadoContrato.Activo && c.FechaInicio <= ahora && c.FechaFin > ahora);
+
+        // Mayor prioridad de paquete primero; a igual prioridad, el que contrató antes
+        var orden = await vigentes
+            .Where(c => c.Evento!.Estado == EstadoEvento.Aprobado && c.Evento.Fecha >= ahora)
+            .GroupBy(c => c.EventoId)
+            .Select(g => new { EventoId = g.Key, Prioridad = g.Max(c => c.Prioridad), Desde = g.Min(c => c.FechaInicio) })
+            .OrderByDescending(x => x.Prioridad).ThenBy(x => x.Desde)
+            .Take(maximo)
+            .ToListAsync(ct);
+
+        var ids = orden.Select(o => o.EventoId).ToList();
+        var tarjetas = await ProyectarTarjetas(_context.Eventos.AsNoTracking().Where(e => ids.Contains(e.Id))).ToListAsync(ct);
+        var resultado = ids.Select(id => tarjetas.First(t => t.Id == id)).ToList();
+
+        // Caché corta: la vigencia de un destacado vence por hora, no por un cambio en la BD
+        await _cache.SetStringAsync(clave, JsonSerializer.Serialize(resultado),
+            new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(2)), ct);
+        return resultado;
+    }
+
+    // Proyección común de las tarjetas del catálogo, la portada y los destacados
+    private IQueryable<EventoCardViewModel> ProyectarTarjetas(IQueryable<Evento> query)
+    {
+        var ahora = DateTime.Now;
+        return query.Select(e => new EventoCardViewModel
+        {
+            Id = e.Id,
+            Titulo = e.Titulo,
+            Categoria = e.Categoria!.Nombre,
+            CategoriaIcono = e.Categoria.Icono,
+            CategoriaColor = e.Categoria.Color,
+            Ubicacion = e.Ubicacion,
+            Fecha = e.Fecha,
+            PrecioDesde = e.TiposEntrada.Min(t => (decimal?)t.Precio),
+            ImagenPortada = e.Imagenes.OrderBy(i => i.Orden).Select(i => i.Ruta).FirstOrDefault(),
+            Destacado = _context.ContratosDestacado.Any(c =>
+                c.EventoId == e.Id && c.Estado == EstadoContrato.Activo && c.FechaInicio <= ahora && c.FechaFin > ahora)
+        });
     }
 
     public async Task<Dictionary<int, int>> ContarPorCategoriaAsync(CancellationToken ct = default)
@@ -122,18 +180,7 @@ public class CatalogoService : ICatalogoService
                 (precioMax == null || t.Precio <= precioMax)));
         }
 
-        var proyeccion = query.Select(e => new EventoCardViewModel
-        {
-            Id = e.Id,
-            Titulo = e.Titulo,
-            Categoria = e.Categoria!.Nombre,
-            CategoriaIcono = e.Categoria.Icono,
-            CategoriaColor = e.Categoria.Color,
-            Ubicacion = e.Ubicacion,
-            Fecha = e.Fecha,
-            PrecioDesde = e.TiposEntrada.Min(t => (decimal?)t.Precio),
-            ImagenPortada = e.Imagenes.OrderBy(i => i.Orden).Select(i => i.Ruta).FirstOrDefault()
-        });
+        var proyeccion = ProyectarTarjetas(query);
 
         var total = await proyeccion.CountAsync(ct);
         var totalPaginas = Math.Max(1, (int)Math.Ceiling(total / (double)CatalogoFiltro.TamanoPagina));

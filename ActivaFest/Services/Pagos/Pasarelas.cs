@@ -32,6 +32,30 @@ public record UrlsRetorno(string Exito, string Fallo, string Pendiente, string N
 
 public record InicioPago(string UrlRedireccion);
 
+// Lo que se cobra en la pasarela: entradas (Orden) o un paquete publicitario (ContratoDestacado)
+public record ItemCobro(string Id, string Titulo, int Cantidad, decimal PrecioUnitario);
+
+public record SolicitudCobro(string Codigo, IReadOnlyList<ItemCobro> Items, DateTime ExpiracionUtc)
+{
+    public decimal Total => Items.Sum(i => i.PrecioUnitario * i.Cantidad);
+
+    public bool EsDestacado => Codigo.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal);
+
+    public static SolicitudCobro DesdeOrden(Orden orden, string tituloEvento) => new(
+        orden.Codigo,
+        orden.Items.Select(i => new ItemCobro(
+            i.TipoEntradaId.ToString(CultureInfo.InvariantCulture),
+            $"{tituloEvento} - {i.TipoEntrada?.Nombre ?? "Entrada"}",
+            i.Cantidad,
+            i.PrecioUnitario)).ToList(),
+        orden.FechaExpiracion);
+
+    public static SolicitudCobro DesdeContrato(ContratoDestacado contrato, string tituloEvento, string nombrePaquete) => new(
+        contrato.Codigo,
+        new[] { new ItemCobro($"paquete-{contrato.PaqueteId}", $"Destacado {nombrePaquete} ({contrato.Dias} días) - {tituloEvento}", 1, contrato.Precio) },
+        DateTime.UtcNow.AddHours(1));
+}
+
 public record PagoExterno(string Referencia, string Estado, string? CodigoOrden, decimal Monto)
 {
     public bool Aprobado => Estado == "approved";
@@ -43,7 +67,7 @@ public interface IPasarelaPago
 
     bool Disponible { get; }
 
-    Task<InicioPago> IniciarAsync(Orden orden, string titulo, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default);
+    Task<InicioPago> IniciarAsync(SolicitudCobro cobro, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default);
 
     // Consulta el pago directamente a la pasarela: nunca se confía en los parámetros que trae el navegador
     Task<PagoExterno?> ConsultarPagoAsync(string referencia, CancellationToken ct = default);
@@ -69,9 +93,11 @@ public class PasarelaSimulada : IPasarelaPago
 
     public bool Disponible => true;
 
-    public Task<InicioPago> IniciarAsync(Orden orden, string titulo, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default)
+    public Task<InicioPago> IniciarAsync(SolicitudCobro cobro, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default)
     {
-        var url = _links.GetPathByAction(_http.HttpContext!, "PasarelaSimulada", "Compras", new { codigo = orden.Codigo })!;
+        // Cada tipo de cobro tiene su propia pantalla de prueba
+        var controlador = cobro.EsDestacado ? "Destacados" : "Compras";
+        var url = _links.GetPathByAction(_http.HttpContext!, "PasarelaSimulada", controlador, new { codigo = cobro.Codigo })!;
         return Task.FromResult(new InicioPago(url));
     }
 
@@ -86,7 +112,7 @@ public class PasarelaNoDisponible : IPasarelaPago
 
     public bool Disponible => false;
 
-    public Task<InicioPago> IniciarAsync(Orden orden, string titulo, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default) =>
+    public Task<InicioPago> IniciarAsync(SolicitudCobro cobro, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default) =>
         throw new InvalidOperationException("No hay una pasarela de pago configurada.");
 
     public Task<PagoExterno?> ConsultarPagoAsync(string referencia, CancellationToken ct = default) =>
@@ -128,28 +154,28 @@ public class MercadoPagoPasarela : IPasarelaPago
     // Las credenciales de prueba empiezan con TEST-
     private bool EsSandbox => _opciones.AccessToken.StartsWith("TEST-", StringComparison.Ordinal);
 
-    public async Task<InicioPago> IniciarAsync(Orden orden, string titulo, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default)
+    public async Task<InicioPago> IniciarAsync(SolicitudCobro cobro, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default)
     {
         var esHttps = urls.Exito.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
         var preferencia = new
         {
-            Items = orden.Items.Select(i => new
+            Items = cobro.Items.Select(i => new
             {
-                Id = i.TipoEntradaId.ToString(CultureInfo.InvariantCulture),
-                Title = $"{titulo} - {i.TipoEntrada?.Nombre ?? "Entrada"}",
+                i.Id,
+                Title = i.Titulo,
                 Quantity = i.Cantidad,
                 UnitPrice = i.PrecioUnitario,
                 CurrencyId = "PEN"
             }),
-            ExternalReference = orden.Codigo,
+            ExternalReference = cobro.Codigo,
             Payer = emailPagador == null ? null : new { Email = emailPagador },
             BackUrls = new { Success = urls.Exito, Failure = urls.Fallo, Pending = urls.Pendiente },
             // Mercado Pago solo acepta retorno automático y notificaciones hacia URLs públicas HTTPS
             AutoReturn = esHttps ? "approved" : null,
             NotificationUrl = urls.Notificacion.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? urls.Notificacion : null,
             Expires = true,
-            ExpirationDateTo = orden.FechaExpiracion.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture),
+            ExpirationDateTo = cobro.ExpiracionUtc.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture),
             StatementDescriptor = "ACTIVAFEST"
         };
 
@@ -158,7 +184,7 @@ public class MercadoPagoPasarela : IPasarelaPago
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            _logger.LogError("Mercado Pago rechazó la preferencia de {Codigo}: {Estado} {Cuerpo}", orden.Codigo, (int)respuesta.StatusCode, cuerpo);
+            _logger.LogError("Mercado Pago rechazó la preferencia de {Codigo}: {Estado} {Cuerpo}", cobro.Codigo, (int)respuesta.StatusCode, cuerpo);
             throw new InvalidOperationException("No se pudo iniciar el pago con Mercado Pago.");
         }
 

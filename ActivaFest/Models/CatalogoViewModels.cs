@@ -87,6 +87,9 @@ namespace ActivaFest.Models
         public DateTime Fecha { get; set; }
         public decimal? PrecioDesde { get; set; }
         public string? ImagenPortada { get; set; }
+
+        // Tiene un paquete publicitario vigente (HU12)
+        public bool Destacado { get; set; }
     }
 
     public class ResultadoCatalogo
@@ -118,6 +121,7 @@ namespace ActivaFest.Models
         public string? NombreUsuario { get; set; }
         public int TotalEventos { get; set; }
         public List<EventoCardViewModel> Proximos { get; set; } = new();
+        public List<EventoCardViewModel> Destacados { get; set; } = new();
         public List<CategoriaResumen> Categorias { get; set; } = new();
 
         // Solo el primer nombre para el saludo

@@ -84,6 +84,25 @@
         <button type="submit" class="cat-boton">Buscar</button>
     </form>
 
+    <!-- ⭐ DESTACADOS (paquetes publicitarios, HU12) -->
+    @if (Model.Destacados.Count > 0)
+    {
+        <section class="inicio-seccion">
+            <div class="inicio-seccion-titulo">
+                <div>
+                    <h2>⭐ Eventos destacados</h2>
+                    <p>Los más recomendados de la temporada</p>
+                </div>
+            </div>
+            <div class="cat-eventos-grid">
+                @foreach (var evento in Model.Destacados)
+                {
+                    <partial name="_EventoCardModerno" model="evento" />
+                }
+            </div>
+        </section>
+    }
+
     <!-- 🗂️ CATEGORÍAS -->
     <section class="inicio-seccion">
         <div class="inicio-seccion-titulo">

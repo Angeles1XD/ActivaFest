@@ -82,6 +82,13 @@ builder.Services.AddScoped<ActivaFest.Services.Acceso.IAccesoService, ActivaFest
 builder.Services.AddScoped<ActivaFest.Services.Panel.IPanelService, ActivaFest.Services.Panel.PanelService>();
 
 // =============================
+// ⭐ PUBLICIDAD Y 💰 COMISIONES (HU12, HU16)
+// =============================
+builder.Services.Configure<ComisionesOptions>(builder.Configuration.GetSection("Comisiones"));
+builder.Services.AddScoped<ActivaFest.Services.Publicidad.IDestacadoService, ActivaFest.Services.Publicidad.DestacadoService>();
+builder.Services.AddScoped<ActivaFest.Services.Comisiones.IComisionService, ActivaFest.Services.Comisiones.ComisionService>();
+
+// =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
 // =============================
 builder.Services.Configure<ComprasOptions>(builder.Configuration.GetSection("Compras"));
@@ -147,10 +154,18 @@ var redisPassword = Environment.GetEnvironmentVariable("REDIS_PASSWORD");
 
 if (!string.IsNullOrEmpty(redisHost))
 {
-    builder.Services.AddStackExchangeRedisCache(options =>
+    // Redis con respaldo en memoria: si Redis cae, el sitio sigue funcionando (ver CacheResiliente)
+    var redisOptions = new Microsoft.Extensions.Caching.StackExchangeRedis.RedisCacheOptions
     {
-        options.Configuration = $"{redisHost}:{redisPort},password={redisPassword}";
-    });
+        // abortConnect=false: no bloquea el arranque; timeouts cortos para no colgar las páginas si Redis no responde
+        Configuration = $"{redisHost}:{redisPort},password={redisPassword},abortConnect=false,connectTimeout=3000,syncTimeout=3000,asyncTimeout=3000",
+        InstanceName = "activafest:"
+    };
+
+    builder.Services.AddSingleton<Microsoft.Extensions.Caching.Distributed.IDistributedCache>(sp => new CacheResiliente(
+        new Microsoft.Extensions.Caching.StackExchangeRedis.RedisCache(Options.Create(redisOptions)),
+        new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(Options.Create(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions())),
+        sp.GetRequiredService<ILogger<CacheResiliente>>()));
 }
 else
 {

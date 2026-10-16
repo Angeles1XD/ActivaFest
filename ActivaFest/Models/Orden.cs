@@ -39,6 +39,17 @@ namespace ActivaFest.Models
 
         public decimal Total { get; set; }
 
+        // =============================
+        // 💰 COMISIÓN DE LA PLATAFORMA (HU16 / RF14)
+        // =============================
+        // Se calcula y congela al confirmar el pago: un cambio de tarifa posterior no altera el historial.
+        public decimal PorcentajeComision { get; set; }
+
+        public decimal Comision { get; set; }
+
+        // Lo que corresponde al organizador
+        public decimal Neto => Total - Comision;
+
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
         // Hasta cuándo se mantienen reservadas las entradas

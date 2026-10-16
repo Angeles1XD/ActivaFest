@@ -44,10 +44,10 @@ public static class Fabrica
     public static QrEntradaService Qr(string secreto = "secreto-de-pruebas") =>
         new(Options.Create(new QrOptions { Secreto = secreto }), new EntornoFalso(), NullLogger<QrEntradaService>.Instance);
 
-    public static CompraService Compras(ApplicationDbContext db, IEmailService email, IDistributedCache? cache = null) =>
+    public static CompraService Compras(ApplicationDbContext db, IEmailService email, IDistributedCache? cache = null, decimal comision = 8m) =>
         new(db,
             new CatalogoService(db, cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<CatalogoService>.Instance),
-            Qr(), email, Options.Create(new ComprasOptions()), NullLogger<CompraService>.Instance);
+            Qr(), email, Options.Create(new ComprasOptions()), Options.Create(new ComisionesOptions { Porcentaje = comision }), NullLogger<CompraService>.Instance);
 }
 
 // =============================

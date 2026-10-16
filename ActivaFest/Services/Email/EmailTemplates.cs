@@ -50,6 +50,14 @@ public static class EmailTemplates
             $"<p>Tu evento <b>{E(ev.Titulo)}</b> fue registrado y está <b>pendiente de revisión</b> por nuestro equipo.</p>" +
             "<p>Te avisaremos por correo cuando sea aprobado o si necesita cambios.</p>");
 
+    // Confirmación de la compra de un paquete publicitario (HU12)
+    public static string DestacadoActivado(ContratoDestacado c) =>
+        Layout("¡Tu evento ya está destacado! ⭐",
+            $"<p>Contrataste el paquete <b>{E(c.Paquete?.Nombre)}</b> para <b>{E(c.Evento?.Titulo)}</b>.</p>" +
+            $"<p>Aparecerá en la sección <b>Destacados</b> de la portada del " +
+            $"{c.FechaInicio:dd/MM/yyyy HH:mm} al {c.FechaFin:dd/MM/yyyy HH:mm}.</p>" +
+            $"<p>Monto pagado: <b>{Formato.Monto(c.Precio)}</b> · N.° de operación: {E(c.Codigo)}</p>");
+
     // Aviso a quienes ya compraron cuando cambia la fecha o el lugar (RF13)
     public static string EventoActualizado(Evento ev, DateTime fechaAnterior, string ubicacionAnterior, string urlEvento)
     {

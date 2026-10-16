@@ -40,6 +40,12 @@ public class PanelEvento
     public int Vendidas { get; set; }
     public decimal Ingresos { get; set; }
     public int OrdenesPagadas { get; set; }
+
+    // Estado de cuenta del organizador (HU16 / OE5)
+    public decimal Comision { get; set; }
+    public decimal Liquidado { get; set; }
+    public decimal Neto => Ingresos - Comision;
+    public decimal SaldoPorCobrar => Neto - Liquidado;
     public int Ingresados { get; set; }
     public int Reservadas { get; set; }
     public int Aforo { get; set; }
@@ -155,6 +161,8 @@ public class PanelService : IPanelService
             Evento = evento,
             Vendidas = entradas.Count,
             Ingresos = ordenes.Sum(o => o.Total),
+            Comision = ordenes.Sum(o => o.Comision),
+            Liquidado = await _db.Liquidaciones.Where(l => l.EventoId == eventoId).SumAsync(l => l.Monto, ct),
             OrdenesPagadas = ordenes.Count,
             Ingresados = entradas.Count(e => e.Estado == EstadoEntrada.Usada),
             Reservadas = evento.TiposEntrada.Sum(t => t.Reservadas),

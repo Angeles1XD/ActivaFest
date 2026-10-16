@@ -18,6 +18,17 @@ namespace ActivaFest.Data
         public DbSet<Orden> Ordenes { get; set; }
         public DbSet<OrdenItem> OrdenItems { get; set; }
         public DbSet<Entrada> Entradas { get; set; }
+        public DbSet<PaqueteDestacado> PaquetesDestacado { get; set; }
+        public DbSet<ContratoDestacado> ContratosDestacado { get; set; }
+        public DbSet<Liquidacion> Liquidaciones { get; set; }
+
+        // Paquetes publicitarios iniciales (el administrador puede editarlos)
+        public static readonly PaqueteDestacado[] PaquetesIniciales =
+        {
+            new() { Id = 1, Nombre = "Impulso", Descripcion = "Tu evento en la sección Destacados de la portada durante 3 días.", Dias = 3, Precio = 29.90m, Prioridad = 1 },
+            new() { Id = 2, Nombre = "Plus", Descripcion = "Una semana en Destacados, por delante de los paquetes Impulso.", Dias = 7, Precio = 59.90m, Prioridad = 2 },
+            new() { Id = 3, Nombre = "Premium", Descripcion = "Dos semanas en los primeros lugares de Destacados.", Dias = 15, Precio = 109.90m, Prioridad = 3 }
+        };
 
         // Categorías iniciales del catálogo (RF02)
         public static readonly Categoria[] CategoriasIniciales =
@@ -109,6 +120,39 @@ namespace ActivaFest.Data
                 e.HasOne(x => x.Orden).WithMany(o => o.Entradas).HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.TipoEntrada).WithMany().HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // =============================
+            // ⭐ PUBLICIDAD Y 💸 LIQUIDACIONES (SPRINT 5)
+            // =============================
+            builder.Entity<Orden>(o =>
+            {
+                o.Property(x => x.Comision).HasPrecision(10, 2);
+                o.Property(x => x.PorcentajeComision).HasPrecision(5, 2);
+            });
+
+            builder.Entity<PaqueteDestacado>(p =>
+            {
+                p.Property(x => x.Precio).HasPrecision(10, 2);
+                p.HasData(PaquetesIniciales);
+            });
+
+            builder.Entity<ContratoDestacado>(c =>
+            {
+                c.HasIndex(x => x.Codigo).IsUnique();
+                c.HasIndex(x => new { x.Estado, x.FechaFin });
+                c.Property(x => x.Precio).HasPrecision(10, 2);
+                c.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
+                c.HasOne(x => x.Paquete).WithMany().HasForeignKey(x => x.PaqueteId).OnDelete(DeleteBehavior.Restrict);
+                c.HasOne(x => x.Organizador).WithMany().HasForeignKey(x => x.OrganizadorId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<Liquidacion>(l =>
+            {
+                l.HasIndex(x => new { x.OrganizadorId, x.EventoId });
+                l.Property(x => x.Monto).HasPrecision(10, 2);
+                l.HasOne(x => x.Organizador).WithMany().HasForeignKey(x => x.OrganizadorId).OnDelete(DeleteBehavior.Restrict);
+                l.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
             });
 
             // SQLite no ordena ni agrega columnas decimal: en ese proveedor todos los montos se guardan como REAL

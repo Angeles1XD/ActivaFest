@@ -128,3 +128,46 @@ public class RolesTests
         Assert.Equal(esperado, Roles.NombreVisible(rol));
     }
 }
+
+// =============================
+// 🛟 RNF03: una caída de Redis no tumba el sitio
+// =============================
+public class CacheResilienteTests
+{
+    private class CacheCaida : Microsoft.Extensions.Caching.Distributed.IDistributedCache
+    {
+        public int Llamadas { get; private set; }
+        private Exception Falla() { Llamadas++; return new InvalidOperationException("Redis no responde"); }
+        public byte[]? Get(string key) => throw Falla();
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) => throw Falla();
+        public void Set(string key, byte[] value, Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions options) => throw Falla();
+        public Task SetAsync(string key, byte[] value, Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions options, CancellationToken token = default) => throw Falla();
+        public void Refresh(string key) => throw Falla();
+        public Task RefreshAsync(string key, CancellationToken token = default) => throw Falla();
+        public void Remove(string key) => throw Falla();
+        public Task RemoveAsync(string key, CancellationToken token = default) => throw Falla();
+    }
+
+    [Fact]
+    public async Task Si_redis_falla_usa_la_memoria_y_no_reintenta_hasta_pasado_un_minuto()
+    {
+        var ahora = new DateTime(2026, 10, 16, 12, 0, 0);
+        var caida = new CacheCaida();
+        var memoria = new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(
+            Microsoft.Extensions.Options.Options.Create(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions()));
+        var cache = new ActivaFest.Services.CacheResiliente(caida, memoria,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ActivaFest.Services.CacheResiliente>.Instance, () => ahora);
+
+        await Microsoft.Extensions.Caching.Distributed.DistributedCacheExtensions.SetStringAsync(cache, "clave", "valor");
+        var leido = await Microsoft.Extensions.Caching.Distributed.DistributedCacheExtensions.GetStringAsync(cache, "clave");
+
+        Assert.Equal("valor", leido);
+        Assert.Equal(1, caida.Llamadas);          // solo el primer intento fue a Redis
+        Assert.True(cache.UsandoRespaldo);
+
+        ahora = ahora.AddMinutes(2);
+        Assert.False(cache.UsandoRespaldo);       // pasado el minuto vuelve a intentar con Redis
+        Assert.Equal("valor", await Microsoft.Extensions.Caching.Distributed.DistributedCacheExtensions.GetStringAsync(cache, "clave"));
+        Assert.Equal(2, caida.Llamadas);
+    }
+}

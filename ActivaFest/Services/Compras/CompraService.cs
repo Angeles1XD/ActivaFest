@@ -14,6 +14,12 @@ public class ComprasOptions
     public int MaxEntradasPorOrden { get; set; } = 10;
 }
 
+public class ComisionesOptions
+{
+    // Porcentaje que cobra la plataforma sobre cada venta de entradas (RF14)
+    public decimal Porcentaje { get; set; } = 8m;
+}
+
 public record ResultadoOrden(Orden? Orden, string? Error)
 {
     public static ResultadoOrden Fallo(string error) => new(null, error);
@@ -52,16 +58,18 @@ public class CompraService : ICompraService
     private readonly IQrEntradaService _qr;
     private readonly IEmailService _email;
     private readonly ComprasOptions _opciones;
+    private readonly ComisionesOptions _comisiones;
     private readonly ILogger<CompraService> _logger;
 
     public CompraService(ApplicationDbContext db, ICatalogoService catalogo, IQrEntradaService qr, IEmailService email,
-        IOptions<ComprasOptions> opciones, ILogger<CompraService> logger)
+        IOptions<ComprasOptions> opciones, IOptions<ComisionesOptions> comisiones, ILogger<CompraService> logger)
     {
         _db = db;
         _catalogo = catalogo;
         _qr = qr;
         _email = email;
         _opciones = opciones.Value;
+        _comisiones = comisiones.Value;
         _logger = logger;
     }
 
@@ -332,16 +340,28 @@ public class CompraService : ICompraService
     private async Task<bool> MarcarPagadaAsync(string codigo, EstadoOrden desde, string proveedor, string referencia, CancellationToken ct)
     {
         DateTime? ahora = DateTime.UtcNow;
+        var total = await _db.Ordenes.Where(o => o.Codigo == codigo).Select(o => o.Total).FirstAsync(ct);
+
+        // La comisión se congela en el mismo UPDATE que confirma el pago (OE5: trazable y sin recalcular después)
+        var porcentaje = _comisiones.Porcentaje;
+        var comision = CalcularComision(total, porcentaje);
+
         var filas = await _db.Ordenes
             .Where(o => o.Codigo == codigo && o.Estado == desde)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.Estado, EstadoOrden.Pagada)
                 .SetProperty(o => o.FechaPago, ahora)
                 .SetProperty(o => o.ProveedorPago, proveedor)
-                .SetProperty(o => o.ReferenciaPago, referencia), ct);
+                .SetProperty(o => o.ReferenciaPago, referencia)
+                .SetProperty(o => o.PorcentajeComision, porcentaje)
+                .SetProperty(o => o.Comision, comision), ct);
 
         return filas == 1;
     }
+
+    // Redondeo comercial a céntimos
+    public static decimal CalcularComision(decimal total, decimal porcentaje) =>
+        Math.Round(total * porcentaje / 100m, 2, MidpointRounding.AwayFromZero);
 
     // Correo con un QR adjunto por entrada (HU07)
     private async Task EnviarEntradasAsync(int ordenId, string urlMisEntradas, CancellationToken ct)

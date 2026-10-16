@@ -58,7 +58,7 @@
                     }
                     @if (User.IsInRole(ActivaFest.Models.Roles.Administrador))
                     {
-                        <a asp-controller="Admin" asp-action="Index" class="@Activo("Admin")@Activo("Usuarios")">Moderación</a>
+                        <a asp-controller="Admin" asp-action="Index" class="@Activo("Admin")@Activo("Usuarios")@Activo("Comisiones")@Activo("Paquetes")">Administración</a>
                     }
                 }
             </div>

@@ -475,3 +475,19 @@
 .bloque-texto b {
   color: var(--texto);
 }
+
+/* Etiqueta de evento destacado en las tarjetas (HU12) */
+.ev-destacado {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #1a1206;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+}

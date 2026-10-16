@@ -110,7 +110,7 @@ namespace ActivaFest.Controllers
             try
             {
                 var email = (await _userManager.GetUserAsync(User))?.Email;
-                var inicio = await _pasarela.IniciarAsync(orden, orden.Evento!.Titulo, email, urls, ct);
+                var inicio = await _pasarela.IniciarAsync(SolicitudCobro.DesdeOrden(orden, orden.Evento!.Titulo), email, urls, ct);
                 return Redirect(inicio.UrlRedireccion);
             }
             catch (Exception ex)
@@ -223,8 +223,17 @@ namespace ActivaFest.Controllers
             var pago = await _pasarela.ConsultarPagoAsync(dataId, ct);
             if (pago is { Aprobado: true, CodigoOrden: not null })
             {
-                var urlEntradas = $"{Request.Scheme}://{Request.Host}{Url.Action("Index", "Entradas")}";
-                await _compras.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, urlEntradas, ct);
+                // El prefijo del código indica si se pagó un paquete publicitario o entradas
+                if (pago.CodigoOrden.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal))
+                {
+                    var destacados = HttpContext.RequestServices.GetRequiredService<Services.Publicidad.IDestacadoService>();
+                    await destacados.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, ct);
+                }
+                else
+                {
+                    var urlEntradas = $"{Request.Scheme}://{Request.Host}{Url.Action("Index", "Entradas")}";
+                    await _compras.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, urlEntradas, ct);
+                }
             }
 
             return Ok();

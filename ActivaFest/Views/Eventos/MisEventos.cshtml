@@ -67,6 +67,10 @@
             @if (item.Estado == EstadoEvento.Aprobado)
             {
                 <a asp-controller="Panel" asp-action="Evento" asp-route-id="@item.Id" class="btn-gris enlace-boton">📊 Panel</a>
+                @if (!finalizado)
+                {
+                    <a asp-controller="Destacados" asp-action="Contratar" asp-route-id="@item.Id" class="btn-gris enlace-boton">⭐ Destacar</a>
+                }
             }
         </div>
     </div>

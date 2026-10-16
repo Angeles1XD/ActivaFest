@@ -11,6 +11,10 @@
             <span class="ev-sin-imagen">@Model.CategoriaIcono</span>
         }
         <span class="ev-chip">@Model.Categoria</span>
+        @if (Model.Destacado)
+        {
+            <span class="ev-destacado">⭐ Destacado</span>
+        }
     </a>
 
     <div class="ev-cuerpo">

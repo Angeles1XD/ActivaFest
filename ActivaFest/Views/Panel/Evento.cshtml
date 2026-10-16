@@ -64,6 +64,7 @@
             @if (ev.Estado == EstadoEvento.Aprobado && DateTime.Now <= ev.FinValidezEntradas)
             {
                 <a asp-controller="Acceso" asp-action="Escanear" asp-route-id="@ev.Id" class="cat-boton boton-chico">Escanear entradas</a>
+                <a asp-controller="Destacados" asp-action="Contratar" asp-route-id="@ev.Id" class="boton-secundario boton-chico">⭐ Destacar</a>
             }
         </div>
     </header>
@@ -174,6 +175,23 @@
                 </tbody>
             </table>
         </details>
+    </section>
+
+    <!-- ===== Estado de cuenta del organizador (HU16 / OE5) ===== -->
+    <section class="tarjeta-panel">
+        <h2>Tu liquidación</h2>
+        <p class="texto-tenue">La comisión de la plataforma se fija en cada venta al confirmarse el pago.</p>
+        <div class="tabla-contenedor">
+            <table class="tabla-datos tabla-cuenta">
+                <tbody>
+                    <tr><td>Ventas brutas</td><td class="derecha num">@Formato.Monto(Model.Ingresos)</td></tr>
+                    <tr><td>Comisión ActivaFest</td><td class="derecha num">− @Formato.Monto(Model.Comision)</td></tr>
+                    <tr><td><strong>Neto para ti</strong></td><td class="derecha num"><strong>@Formato.Monto(Model.Neto)</strong></td></tr>
+                    <tr><td>Ya pagado</td><td class="derecha num">− @Formato.Monto(Model.Liquidado)</td></tr>
+                    <tr class="fila-total"><td><strong>Saldo por cobrar</strong></td><td class="derecha num"><strong>@Formato.Monto(Model.SaldoPorCobrar)</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <!-- ===== Ocupación por zona (medidores) ===== -->

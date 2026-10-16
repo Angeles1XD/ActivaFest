@@ -11,7 +11,11 @@
         <h1>Moderación de <span class="degradado">eventos</span></h1>
         <p class="cat-subtitulo">Revisa los eventos enviados por los organizadores antes de publicarlos en el catálogo.</p>
     </div>
-    <a asp-controller="Usuarios" asp-action="Index" class="btn-gris enlace-boton">👥 Usuarios y personal de acceso</a>
+    <div class="panel-acciones">
+        <a asp-controller="Comisiones" asp-action="Index" class="btn-gris enlace-boton">💰 Comisiones</a>
+        <a asp-controller="Paquetes" asp-action="Index" class="btn-gris enlace-boton">⭐ Paquetes</a>
+        <a asp-controller="Usuarios" asp-action="Index" class="btn-gris enlace-boton">👥 Usuarios</a>
+    </div>
 </header>
 
 <div class="tabs-estado">
