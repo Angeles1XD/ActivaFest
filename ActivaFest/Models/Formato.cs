@@ -8,7 +8,10 @@ namespace ActivaFest.Models
         private static readonly CultureInfo Peru = CultureInfo.GetCultureInfo("es-PE");
 
         public static string Precio(decimal precio) =>
-            precio == 0 ? "Gratis" : "S/ " + precio.ToString("#,0.00", Peru);
+            precio == 0 ? "Gratis" : Monto(precio);
+
+        // Para importes contables (ingresos, totales): siempre en soles, también el cero
+        public static string Monto(decimal monto) => "S/ " + monto.ToString("#,0.00", Peru);
 
         // Solo deja pasar colores #rrggbb para usarlos en estilos en línea sin riesgo de inyección CSS
         public static string Color(string? color) =>

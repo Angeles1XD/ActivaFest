@@ -59,6 +59,16 @@
 
     <!-- ℹ️ INFORMACIÓN -->
     <section class="ficha-info">
+        @if (ViewBag.PuedeEditar == true && !Model.YaOcurrio(DateTime.Now))
+        {
+            <p class="acciones-evento">
+                <a asp-action="Editar" asp-route-id="@Model.Id" class="btn-gris enlace-boton">✏️ Editar evento</a>
+                @if (Model.Estado == EstadoEvento.Aprobado)
+                {
+                    <a asp-controller="Panel" asp-action="Evento" asp-route-id="@Model.Id" class="btn-gris enlace-boton">📊 Panel de ventas</a>
+                }
+            </p>
+        }
         @if (Model.Estado != EstadoEvento.Aprobado)
         {
             <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>

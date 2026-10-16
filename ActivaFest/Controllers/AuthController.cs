@@ -35,7 +35,7 @@ namespace ActivaFest.Controllers
         public IActionResult Registro()
         {
             if (User.Identity?.IsAuthenticated == true)
-                return RedirectToAction("Index", "Eventos");
+                return RedirectToAction("Index", "Home");
 
             return View(new RegistroViewModel());
         }
@@ -71,12 +71,12 @@ namespace ActivaFest.Controllers
 
             var urlLogin = Url.Action(nameof(Login), "Auth", null, Request.Scheme)!;
             await _email.EnviarAsync(usuario.Email!, "Bienvenido a ActivaFest",
-                EmailTemplates.Bienvenida(usuario.NombreCompleto, model.Rol, urlLogin));
+                EmailTemplates.Bienvenida(usuario.NombreCompleto, Roles.NombreVisible(model.Rol), urlLogin));
 
             await _signInManager.SignInAsync(usuario, isPersistent: false);
             TempData["Mensaje"] = $"¡Bienvenido/a, {usuario.NombreCompleto}! Tu cuenta fue creada.";
 
-            return RedirectToAction("Index", "Eventos");
+            return RedirectToAction("Index", "Home");
         }
 
         // =============================
@@ -86,7 +86,7 @@ namespace ActivaFest.Controllers
         public IActionResult Login(string? returnUrl = null)
         {
             if (User.Identity?.IsAuthenticated == true)
-                return RedirectToAction("Index", "Eventos");
+                return RedirectToAction("Index", "Home");
 
             return View(new LoginViewModel { ReturnUrl = returnUrl });
         }
@@ -110,7 +110,7 @@ namespace ActivaFest.Controllers
                 if (usuario != null && await _userManager.IsInRoleAsync(usuario, Roles.Administrador))
                     return RedirectToAction("Index", "Admin");
 
-                return RedirectToAction("Index", "Eventos");
+                return RedirectToAction("Index", "Home");
             }
 
             ModelState.AddModelError(string.Empty, result.IsLockedOut
@@ -129,7 +129,7 @@ namespace ActivaFest.Controllers
         {
             await _signInManager.SignOutAsync();
             HttpContext.Session.Clear();
-            return RedirectToAction("Index", "Eventos");
+            return RedirectToAction("Index", "Home");
         }
 
         // =============================

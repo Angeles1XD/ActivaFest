@@ -24,8 +24,8 @@
         <div class="campo">
             <label asp-for="Rol"></label>
             <select asp-for="Rol">
-                <option value="@Roles.Asistente">Asistente — quiero descubrir y asistir a eventos</option>
-                <option value="@Roles.Organizador">Organizador — quiero publicar mis eventos</option>
+                <option value="@Roles.Asistente">Usuario — quiero descubrir eventos y comprar entradas</option>
+                <option value="@Roles.Organizador">Organizador — quiero publicar y vender mis eventos</option>
             </select>
             <span asp-validation-for="Rol" class="text-danger"></span>
         </div>

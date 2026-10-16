@@ -43,6 +43,9 @@ namespace ActivaFest.Models
 
         public DateTime? FechaUso { get; set; }
 
+        // Personal de control de acceso que la escaneó (HU08)
+        public string? ValidadoPorId { get; set; }
+
         // Regla para la validación en puerta (HU08): activa y dentro del plazo del evento
         public bool VigenteParaIngreso(Evento evento, DateTime ahora) =>
             Estado == EstadoEntrada.Activa && ahora <= evento.FinValidezEntradas;

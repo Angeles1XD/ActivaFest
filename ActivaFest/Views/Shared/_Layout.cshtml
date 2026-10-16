@@ -3,313 +3,142 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="theme-color" content="#0a0a12"/>
     <title>@ViewData["Title"] - ActivaFest</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"/>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
     <link rel="stylesheet" href="~/css/catalogo.css" asp-append-version="true"/>
+    <link rel="stylesheet" href="~/css/categorias.css" asp-append-version="true"/>
     @await RenderSectionAsync("Styles", required: false)
 </head>
-
+@{
+    var controlador = ViewContext.RouteData.Values["controller"]?.ToString();
+    var accion = ViewContext.RouteData.Values["action"]?.ToString();
+    string Activo(string c, string? a = null) => controlador == c && (a == null || accion == a) ? "activo" : "";
+    var autenticado = User.Identity?.IsAuthenticated == true;
+}
 <body>
 
-<!-- 🌌 FONDO -->
-<div class="fondo"></div>
-
-<!-- ✨ ESTRELLAS -->
-<div class="stars"></div>
+<!-- Fondo con brillos suaves -->
+<div class="fondo" aria-hidden="true"></div>
 
 <!-- 🔝 NAVBAR -->
-<header>
-    <nav class="navbar-custom">
-        <div class="nav-container">
+<header class="cabecera">
+    <nav class="nav" aria-label="Principal">
+        <a asp-controller="Home" asp-action="Index" class="marca">
+            <span class="marca-icono" aria-hidden="true">A</span>
+            <span class="marca-texto">ACTIVA-FEST</span>
+        </a>
 
-            <a asp-controller="Home" asp-action="Index" class="logo">
-                ActivaFest
-            </a>
+        <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+            <span></span><span></span><span></span>
+        </button>
 
+        <div class="nav-menu" id="navMenu">
             <div class="nav-links">
-                <a asp-controller="Home" asp-action="Index">Inicio</a>
-                <a asp-controller="Eventos" asp-action="Index">Eventos</a>
-                <a asp-controller="Categorias" asp-action="Index">Categorías</a>
+                <a asp-controller="Home" asp-action="Index" class="@Activo("Home")">Inicio</a>
+                <a asp-controller="Eventos" asp-action="Index" class="@Activo("Eventos", "Index")@Activo("Eventos", "Detalle")">Eventos</a>
+                <a asp-controller="Categorias" asp-action="Index" class="@Activo("Categorias")">Categorías</a>
 
-                @if (User.Identity?.IsAuthenticated == true)
+                @if (autenticado)
                 {
-                    <a asp-controller="Entradas" asp-action="Index">Mis entradas</a>
+                    <a asp-controller="Entradas" asp-action="Index" class="@Activo("Entradas")@Activo("Compras")">Mis entradas</a>
                     @if (User.IsInRole(ActivaFest.Models.Roles.Organizador) || User.IsInRole(ActivaFest.Models.Roles.Administrador))
                     {
-                        <a asp-controller="Eventos" asp-action="MisEventos">Mis eventos</a>
+                        <a asp-controller="Eventos" asp-action="MisEventos" class="@Activo("Eventos", "MisEventos")@Activo("Eventos", "Crear")@Activo("Eventos", "Editar")">Mis eventos</a>
+                        <a asp-controller="Panel" asp-action="Index" class="@Activo("Panel")">Panel</a>
+                    }
+                    @if (User.IsInRole(ActivaFest.Models.Roles.ControlAcceso))
+                    {
+                        <a asp-controller="Acceso" asp-action="Index" class="@Activo("Acceso")">Puerta</a>
                     }
                     @if (User.IsInRole(ActivaFest.Models.Roles.Administrador))
                     {
-                        <a asp-controller="Admin" asp-action="Index">Moderación</a>
+                        <a asp-controller="Admin" asp-action="Index" class="@Activo("Admin")@Activo("Usuarios")">Moderación</a>
                     }
-                    <span class="nav-usuario">👤 @User.Identity.Name</span>
-                    <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
-                        <button type="submit" class="nav-link-btn">Salir</button>
+                }
+            </div>
+
+            <div class="nav-cuenta">
+                @if (autenticado)
+                {
+                    <span class="nav-usuario" title="@User.Identity!.Name">
+                        <span class="avatar" aria-hidden="true">@(User.Identity.Name?.Substring(0, 1).ToUpperInvariant())</span>
+                        <span class="nav-usuario-correo">@User.Identity.Name</span>
+                    </span>
+                    <form asp-controller="Auth" asp-action="Logout" method="post">
+                        <button type="submit" class="boton-contorno">Salir</button>
                     </form>
                 }
                 else
                 {
-                    <a asp-controller="Auth" asp-action="Login">Iniciar sesión</a>
-                    <a asp-controller="Auth" asp-action="Registro" class="btn-rosa">Registrarse</a>
+                    <a asp-controller="Auth" asp-action="Login" class="boton-contorno @Activo("Auth", "Login")">Iniciar sesión</a>
+                    <a asp-controller="Auth" asp-action="Registro" class="boton-degradado">Crear cuenta</a>
                 }
             </div>
-
         </div>
     </nav>
 </header>
 
-<!-- 🔥 SESIÓN -->
-@if (Context.Session.GetString("UltimoEvento") != null)
-{
-    <div style="
-            background: linear-gradient(90deg,#ff4d6d,#ff006e);
-            color: white;
-            padding: 10px;
-            text-align: center;
-            font-weight: bold;
-        ">
-        Último evento creado: @Context.Session.GetString("UltimoEvento")
-    </div>
-}
-
 <!-- CONTENIDO -->
 <main class="main-content">
+    @* Dato guardado en la sesión al crear un evento (uso de sesiones del proyecto) *@
+    @if (Context.Session.GetString("UltimoEvento") is string ultimoEvento && Activo("Eventos", "MisEventos") != "")
+    {
+        <div class="alerta alerta-info"><span aria-hidden="true">i</span> Último evento creado en esta sesión: <b>@ultimoEvento</b></div>
+    }
     @if (TempData["Mensaje"] is string mensaje)
     {
-        <div class="alerta alerta-ok">@mensaje</div>
+        <div class="alerta alerta-ok" role="status"><span aria-hidden="true">✓</span> @mensaje</div>
     }
     @if (TempData["Error"] is string error)
     {
-        <div class="alerta alerta-error">@error</div>
+        <div class="alerta alerta-error" role="alert"><span aria-hidden="true">!</span> @error</div>
     }
     @RenderBody()
 </main>
 
 <!-- FOOTER -->
-<footer class="footer">
-    © 2026 - ActivaFest
+<footer class="pie">
+    <div class="pie-contenido">
+        <a asp-controller="Home" asp-action="Index" class="marca marca-chica">
+            <span class="marca-icono" aria-hidden="true">A</span>
+            <span class="marca-texto">ACTIVA-FEST</span>
+        </a>
+        <p>Vive el evento. Vive el momento.</p>
+        <nav class="pie-links" aria-label="Pie de página">
+            <a asp-controller="Eventos" asp-action="Index">Eventos</a>
+            <a asp-controller="Categorias" asp-action="Index">Categorías</a>
+            <a asp-controller="Home" asp-action="Privacy">Privacidad</a>
+        </nav>
+        <p class="pie-copy">© 2026 ActivaFest · Plataforma de eventos</p>
+    </div>
 </footer>
+
+<!-- 🤖 ASISTENTE VIRTUAL -->
+<div id="chat-widget">
+    <div id="chat-window" role="dialog" aria-label="Asistente ActivaFest">
+        <div id="chat-header">
+            <span><span class="chat-punto" aria-hidden="true"></span> Asistente ActivaFest</span>
+            <button type="button" id="chat-cerrar" aria-label="Cerrar chat">✕</button>
+        </div>
+        <div id="chat-messages" aria-live="polite"></div>
+        <div class="typing-indicator" id="chat-typing">Escribiendo...</div>
+        <form id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Pregunta sobre eventos..." autocomplete="off" aria-label="Escribe tu pregunta"/>
+            <button type="submit" id="chat-send">Enviar</button>
+        </form>
+    </div>
+    <button type="button" id="chat-toggle" aria-label="Abrir asistente virtual">💬</button>
+</div>
 
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
-
-<style>
-    #chat-widget {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-        font-family: system-ui, -apple-system, sans-serif;
-    }
-
-    #chat-window {
-        display: none;
-        width: 350px;
-        height: 450px;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 12px;
-        flex-direction: column;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-        margin-bottom: 15px;
-        overflow: hidden;
-    }
-
-    #chat-header {
-        background: #2563eb;
-        color: white;
-        padding: 15px;
-        font-weight: bold;
-        display: flex;
-        justify-content: space-between;
-    }
-
-    #chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 15px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        background: #f8fafc;
-    }
-
-    .msg {
-        padding: 10px;
-        border-radius: 8px;
-        max-width: 85%;
-        line-height: 1.4;
-        font-size: 14px;
-    }
-
-    .msg-user {
-        background: #2563eb;
-        color: white;
-        align-self: flex-end;
-        border-bottom-right-radius: 2px;
-    }
-
-    .msg-bot {
-        background: #e2e8f0;
-        color: #1e293b;
-        align-self: flex-start;
-        border-bottom-left-radius: 2px;
-    }
-
-    #chat-input-area {
-        padding: 10px;
-        border-top: 1px solid #ddd;
-        background: white;
-        display: flex;
-        gap: 8px;
-    }
-
-    #chat-input {
-        flex: 1;
-        padding: 8px 12px;
-        border: 1px solid #ccc;
-        border-radius: 20px;
-        outline: none;
-    }
-
-    #chat-send {
-        background: #2563eb;
-        color: white;
-        border: none;
-        padding: 8px 15px;
-        border-radius: 20px;
-        cursor: pointer;
-    }
-
-    #chat-toggle {
-        float: right;
-        border-radius: 50%;
-        width: 60px;
-        height: 60px;
-        background: #2563eb;
-        color: white;
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
-        font-size: 24px;
-        transition: transform 0.2s;
-    }
-
-    #chat-toggle:hover {
-        transform: scale(1.05);
-    }
-
-    /* Loader animado */
-    .typing-indicator {
-        display: none;
-        padding: 10px;
-        background: #e2e8f0;
-        align-self: flex-start;
-        border-radius: 8px;
-        font-size: 12px;
-        color: #64748b;
-    }
-</style>
-
-<div id="chat-widget">
-    <div id="chat-window">
-        <div id="chat-header">
-            <span>🤖 Asistente ActivaFest</span>
-            <span style="cursor:pointer;" onclick="toggleChat()">✖</span>
-        </div>
-        <div id="chat-messages"></div>
-        <div class="typing-indicator" id="chat-typing">Escribiendo...</div>
-        <div id="chat-input-area">
-            <input type="text" id="chat-input" placeholder="Pregunta sobre eventos..."
-                   onkeypress="handleEnter(event)">
-            <button id="chat-send" onclick="sendMessage()">Enviar</button>
-        </div>
-    </div>
-    <button id="chat-toggle" onclick="toggleChat()">💬</button>
-</div>
-
-<script>
-    const STORAGE_KEY = 'activafest_chat_history';
-    const chatWindow = document.getElementById('chat-window');
-    const messagesContainer = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
-    const typingIndicator = document.getElementById('chat-typing');
-
-    document.addEventListener("DOMContentLoaded", () => {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        history.forEach(msg => renderMessage(msg.text, msg.sender));
-
-        if (history.length === 0) {
-            renderMessage("¡Hola! Soy el asistente de ActivaFest. ¿En qué evento te puedo ayudar hoy?", 'bot');
-        }
-    });
-
-    function toggleChat() {
-        chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
-        if (chatWindow.style.display === 'flex') {
-            chatInput.focus();
-            scrollToBottom();
-        }
-    }
-
-    function handleEnter(e) {
-        if (e.key === 'Enter') sendMessage();
-    }
-
-    async function sendMessage() {
-        const text = chatInput.value.trim();
-        if (!text) return;
-
-        renderMessage(text, 'user');
-        saveToHistory(text, 'user');
-        chatInput.value = '';
-
-        typingIndicator.style.display = 'block';
-        scrollToBottom();
-
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: text})
-            });
-
-            if (!response.ok) throw new Error('Error en el servidor');
-
-            const data = await response.json();
-
-            typingIndicator.style.display = 'none';
-            renderMessage(data.reply, 'bot');
-            saveToHistory(data.reply, 'bot');
-
-        } catch (error) {
-            typingIndicator.style.display = 'none';
-            renderMessage("Ocurrió un error al conectar con el servidor local. ¿Ollama está encendido?", 'bot');
-        }
-    }
-
-    function renderMessage(text, sender) {
-        const div = document.createElement('div');
-        div.className = `msg msg-${sender}`;
-        div.innerHTML = text.replace(/\n/g, '<br>');
-        messagesContainer.appendChild(div);
-        scrollToBottom();
-    }
-
-    function saveToHistory(text, sender) {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        history.push({text, sender});
-        if (history.length > 20) history.shift();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-    }
-
-    function scrollToBottom() {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-</script>
-
 </body>
 </html>

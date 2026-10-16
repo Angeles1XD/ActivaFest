@@ -1,0 +1,67 @@
+@model List<ActivaFest.Controllers.UsuarioFila>
+@using ActivaFest.Controllers
+@{
+    ViewData["Title"] = "Usuarios";
+    var buscar = (string?)ViewBag.Buscar;
+}
+
+@section Styles {
+    <partial name="_EstilosCompra" />
+    <link rel="stylesheet" href="~/css/organizador.css" asp-append-version="true" />
+}
+
+<div class="pagina-categorias pagina-entradas">
+    <header class="cat-encabezado">
+        <p class="cat-migas">Activa-Fest / Administración</p>
+        <h1>Gestión de <span class="degradado">usuarios</span></h1>
+        <p class="cat-subtitulo">Asigna el perfil de Control de acceso al personal que escaneará entradas en la puerta.</p>
+
+        <form method="get" class="cat-buscador" role="search">
+            <input type="search" name="buscar" value="@buscar" placeholder="Buscar por nombre o correo..." aria-label="Buscar usuarios" />
+            <button type="submit">Buscar</button>
+        </form>
+    </header>
+
+    <div class="tabla-contenedor">
+        <table class="tabla-datos">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Perfiles</th>
+                    @foreach (var rol in UsuariosController.RolesGestionables)
+                    {
+                        <th class="centro">@UsuariosController.NombreRol(rol)</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model)
+                {
+                    <tr>
+                        <td>
+                            <strong>@u.Nombre</strong><br />
+                            <span class="texto-tenue">@u.Email</span>
+                        </td>
+                        <td>@string.Join(", ", u.Roles.Select(UsuariosController.NombreRol))</td>
+                        @foreach (var rol in UsuariosController.RolesGestionables)
+                        {
+                            var tiene = u.Roles.Contains(rol);
+                            <td class="centro">
+                                <form asp-action="CambiarRol" method="post">
+                                    <input type="hidden" name="usuarioId" value="@u.Id" />
+                                    <input type="hidden" name="rol" value="@rol" />
+                                    <input type="hidden" name="asignar" value="@((!tiene).ToString().ToLowerInvariant())" />
+                                    <input type="hidden" name="buscar" value="@buscar" />
+                                    <button type="submit" class="boton-rol @(tiene ? "activo" : "")"
+                                            aria-label="@(tiene ? "Quitar" : "Dar") perfil @UsuariosController.NombreRol(rol) a @u.Email">
+                                        @(tiene ? "✓ Asignado" : "+ Asignar")
+                                    </button>
+                                </form>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

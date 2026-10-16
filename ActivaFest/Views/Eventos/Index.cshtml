@@ -5,24 +5,26 @@
     var r = Model.Resultado;
 }
 
-<div class="catalogo-encabezado">
+<div class="pagina-categorias">
+<div class="catalogo-encabezado cat-encabezado">
     <div>
-        <h2 class="text-gradient">Eventos</h2>
-        <p class="texto-suave">
+        <p class="cat-migas">Activa-Fest / Eventos</p>
+        <h1>Todos los <span class="degradado">eventos</span></h1>
+        <p class="cat-subtitulo">
             @if (r.Total == 0)
             {
                 <span>No encontramos eventos con esos criterios.</span>
             }
             else
             {
-                <span>@r.Total @(r.Total == 1 ? "evento encontrado" : "eventos encontrados")</span>
+                <span>@r.Total @(r.Total == 1 ? "evento encontrado" : "eventos encontrados") · filtra por fecha, precio o categoría.</span>
             }
         </p>
     </div>
 
     @if (User.IsInRole(Roles.Organizador) || User.IsInRole(Roles.Administrador))
     {
-        <a asp-action="Crear" class="btn-rosa">+ Crear Evento</a>
+        <a asp-action="Crear" class="cat-boton">+ Crear evento</a>
     }
 </div>
 
@@ -102,12 +104,13 @@
 }
 else
 {
-    <div class="grid-catalogo">
+    <div class="cat-eventos-grid">
         @foreach (var item in r.Eventos)
         {
-            <partial name="_EventoCard" model="item" />
+            <partial name="_EventoCardModerno" model="item" />
         }
     </div>
 
     <partial name="_Paginacion" model="Model" />
 }
+</div>

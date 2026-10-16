@@ -62,7 +62,24 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 // 📚 CATÁLOGO E IMÁGENES (HU02, HU03, HU05)
 // =============================
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
-builder.Services.AddSingleton<IAlmacenamientoImagenes, AlmacenamientoLocalImagenes>();
+// Imágenes: disco local en desarrollo o Cloudinary (capa gratuita) cuando hay credenciales (HU09)
+builder.Services.Configure<ImagenesOptions>(builder.Configuration.GetSection("Imagenes"));
+builder.Services.AddSingleton<AlmacenamientoLocalImagenes>();
+builder.Services.AddHttpClient<CloudinaryAlmacenamiento>(c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddScoped<IAlmacenamientoImagenes>(sp =>
+{
+    var imagenes = sp.GetRequiredService<IOptions<ImagenesOptions>>().Value;
+    return imagenes.Proveedor == "Cloudinary" && imagenes.Cloudinary.Configurado
+        ? sp.GetRequiredService<CloudinaryAlmacenamiento>()
+        : sp.GetRequiredService<AlmacenamientoLocalImagenes>();
+});
+
+// =============================
+// 🧑‍💼 ORGANIZADOR Y PUERTA (HU08, HU09, HU13)
+// =============================
+builder.Services.AddScoped<ActivaFest.Services.Eventos.IEventoEdicionService, ActivaFest.Services.Eventos.EventoEdicionService>();
+builder.Services.AddScoped<ActivaFest.Services.Acceso.IAccesoService, ActivaFest.Services.Acceso.AccesoService>();
+builder.Services.AddScoped<ActivaFest.Services.Panel.IPanelService, ActivaFest.Services.Panel.PanelService>();
 
 // =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
@@ -191,7 +208,7 @@ app.UseAuthorization();
 // =============================
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Eventos}/{action=Index}/{id?}");
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 // =============================
 // 🔥 ENDPOINT DEL AGENTE IA

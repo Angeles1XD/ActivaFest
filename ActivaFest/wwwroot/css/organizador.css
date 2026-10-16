@@ -1,0 +1,547 @@
+/* ============================= */
+/* SPRINT 4: PANEL DE VENTAS, CONTROL DE ACCESO Y USUARIOS */
+/* Usa los tokens de categorias.css (.pagina-categorias) */
+/* ============================= */
+
+/* ---------- Tokens de visualización (paleta de referencia, modo oscuro) ---------- */
+.viz-root {
+  color-scheme: dark;
+  --viz-superficie: #1a1a25;
+  --viz-serie: #3987e5;         /* azul, paso 400: barras y relleno de medidores */
+  --viz-pista: #184f95;         /* mismo tono, paso 600: pista del medidor */
+  --viz-grilla: #2c2c3a;        /* un paso sobre la superficie, línea fina */
+  --viz-texto: #f0efec;
+  --viz-texto-2: #c3c2b7;
+  --viz-texto-3: #8f8e86;
+  --estado-ok: #0ca30c;
+  --estado-alerta: #fab219;
+  --estado-critico: #d03b3b;
+}
+
+.pagina-panel {
+  max-width: 1200px;
+}
+
+.enlace-volver-claro {
+  display: inline-block;
+  color: #c4b5fd;
+  text-decoration: none;
+  margin-bottom: 14px;
+}
+
+.texto-tenue {
+  color: var(--texto-3, #8f8e86);
+  font-size: 13px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.derecha {
+  text-align: right;
+}
+
+.centro {
+  text-align: center;
+}
+
+/* ---------- Cabecera del panel ---------- */
+.panel-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.panel-cabecera h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.panel-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.boton-chico {
+  padding: 9px 16px;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.boton-secundario.boton-chico {
+  color: white;
+}
+
+.chip-estado {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--viz-texto-2);
+}
+
+.chip-Aprobado { background: rgba(12, 163, 12, 0.18); color: #86efac; }
+.chip-Pendiente { background: rgba(250, 178, 25, 0.16); color: #fde68a; }
+.chip-Rechazado { background: rgba(208, 59, 59, 0.18); color: #fca5a5; }
+
+/* ---------- Fila de indicadores (stat tiles) ---------- */
+.fila-kpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--viz-superficie);
+  border: 1px solid var(--borde);
+}
+
+.kpi-hero {
+  grid-column: span 2;
+  background: linear-gradient(145deg, rgba(139, 92, 246, 0.22), rgba(59, 130, 246, 0.08)), var(--viz-superficie);
+}
+
+.kpi-etiqueta {
+  color: var(--viz-texto-2);
+  font-size: 14px;
+}
+
+.kpi-valor {
+  color: var(--viz-texto);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.kpi-hero .kpi-valor {
+  font-size: clamp(36px, 5vw, 52px);
+  font-weight: 800;
+}
+
+.kpi-nota {
+  color: var(--viz-texto-3);
+  font-size: 13px;
+}
+
+/* ---------- Medidor (misma rampa: relleno azul sobre pista azul oscura) ---------- */
+.meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--viz-pista);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--viz-serie);
+}
+
+.col-meter {
+  width: 160px;
+}
+
+/* ---------- Conciliación (OE4): icono + texto ---------- */
+.estado-conciliacion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 24px;
+  color: var(--viz-texto-2);
+}
+
+.estado-conciliacion span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #0a0a0f;
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.estado-conciliacion.ok span { background: var(--estado-ok); }
+.estado-conciliacion.alerta span { background: var(--estado-alerta); }
+
+/* ---------- Tarjetas y tablas ---------- */
+.tarjeta-panel {
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--viz-superficie);
+  border: 1px solid var(--borde);
+  margin-bottom: 22px;
+}
+
+.tarjeta-panel h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.tabla-contenedor {
+  overflow-x: auto;
+}
+
+.tabla-datos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tabla-datos th {
+  color: var(--viz-texto-3);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--viz-grilla);
+  white-space: nowrap;
+}
+
+.tabla-datos td {
+  padding: 12px;
+  border-bottom: 1px solid var(--viz-grilla);
+  vertical-align: middle;
+  color: var(--viz-texto);
+}
+
+.tabla-datos th.derecha,
+.tabla-datos td.derecha {
+  text-align: right;
+}
+
+.fila-pasada td {
+  opacity: 0.6;
+}
+
+.enlace-detalle {
+  color: #c4b5fd;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ---------- Gráfico de columnas ---------- */
+.grafico {
+  position: relative;
+  margin-top: 14px;
+}
+
+.grafico svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.grafico .grilla {
+  stroke: var(--viz-grilla);
+  stroke-width: 1;
+}
+
+.grafico .linea-base {
+  stroke: var(--viz-texto-3);
+  stroke-width: 1;
+}
+
+.grafico .eje {
+  fill: var(--viz-texto-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.grafico .etiqueta-dato {
+  fill: var(--viz-texto);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.grafico .barra {
+  fill: var(--viz-serie);
+}
+
+.grafico .zona-hover {
+  fill: transparent;
+}
+
+.grafico .columna {
+  outline: none;
+  cursor: default;
+}
+
+.grafico .columna.activa .zona-hover,
+.grafico .columna:focus-visible .zona-hover {
+  fill: rgba(255, 255, 255, 0.05);
+}
+
+.tooltip-grafico {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: #0b0b12;
+  border: 1px solid var(--viz-grilla);
+  color: var(--viz-texto);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.vista-tabla {
+  margin-top: 12px;
+}
+
+.vista-tabla summary {
+  cursor: pointer;
+  color: #c4b5fd;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+/* ---------- Control de acceso: lista de eventos ---------- */
+.lista-acceso {
+  display: grid;
+  gap: 12px;
+}
+
+.item-acceso {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  color: white;
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+
+.item-acceso:hover {
+  border-color: var(--morado);
+  color: white;
+}
+
+.item-acceso > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-acceso span {
+  color: var(--texto-2);
+  font-size: 14px;
+}
+
+.item-acceso.hoy {
+  border-color: rgba(12, 163, 12, 0.6);
+}
+
+.chip-hoy {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--estado-ok, #0ca30c);
+  color: #04130a !important;
+  font-weight: 800;
+  font-size: 12px !important;
+}
+
+.flecha {
+  font-size: 20px;
+}
+
+/* ---------- Escáner ---------- */
+.escaner {
+  max-width: 560px;
+  text-align: center;
+}
+
+.escaner-cabecera h1 {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 4px 0;
+}
+
+.escaner-cabecera p {
+  color: var(--texto-2);
+  margin: 0;
+  font-size: 14px;
+}
+
+.escaner-cabecera p:first-letter {
+  text-transform: uppercase;
+}
+
+.contador {
+  margin: 12px 0 18px !important;
+  font-size: 16px !important;
+}
+
+.contador strong {
+  font-size: 30px;
+  color: white;
+}
+
+.lector {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+  min-height: 260px;
+}
+
+.estado-camara {
+  margin-top: 12px;
+  color: var(--texto-2);
+  font-size: 14px;
+}
+
+/* Resultado a pantalla completa: color + icono + texto */
+.resultado {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 30px;
+  text-align: center;
+}
+
+.resultado.oculto {
+  display: none;
+}
+
+.resultado.ok { background: #0b7a0b; }
+.resultado.error { background: #a82626; }
+.resultado.alerta { background: #b07a05; }
+
+.resultado-icono {
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 80px;
+  font-weight: 900;
+  color: white;
+}
+
+.resultado-mensaje {
+  font-size: clamp(26px, 6vw, 38px);
+  font-weight: 900;
+  color: white;
+  margin: 0;
+}
+
+.resultado-detalle {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.resultado .cat-boton {
+  margin-top: 14px;
+  padding: 16px 34px;
+  font-size: 18px;
+  background: white;
+  color: #0a0a0f;
+}
+
+.manual {
+  margin-top: 24px;
+  text-align: left;
+}
+
+.manual summary {
+  cursor: pointer;
+  color: #c4b5fd;
+  font-size: 14px;
+}
+
+.form-manual {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.form-manual input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--borde);
+  background: #111;
+  color: white;
+  font: inherit;
+}
+
+/* ---------- Gestión de usuarios ---------- */
+.boton-rol {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  background: transparent;
+  color: var(--texto-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.boton-rol:hover {
+  border-color: var(--morado);
+  color: white;
+}
+
+.boton-rol.activo {
+  background: rgba(12, 163, 12, 0.18);
+  border-color: rgba(12, 163, 12, 0.6);
+  color: #86efac;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 700px) {
+  .kpi-hero {
+    grid-column: 1 / -1;
+  }
+
+  .col-meter {
+    width: 100px;
+  }
+
+  .tarjeta-panel {
+    padding: 18px 14px;
+  }
+}
+
+/* El mensaje del escáner nunca se sale de la pantalla en celulares angostos */
+.resultado-mensaje,
+.resultado-detalle {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

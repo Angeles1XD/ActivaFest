@@ -79,14 +79,14 @@ public class CompraServiceTests : IDisposable
         _conexion.Dispose();
     }
 
-    public static void CrearUsuarios(ApplicationDbContext db, params string[] ids)
+    internal static void CrearUsuarios(ApplicationDbContext db, params string[] ids)
     {
         foreach (var id in ids)
             db.Users.Add(new ApplicationUser { Id = id, UserName = id, Email = $"{id}@test.pe", NombreCompleto = id });
         db.SaveChanges();
     }
 
-    public static (Evento Evento, TipoEntrada General, TipoEntrada Vip) CrearEvento(ApplicationDbContext db,
+    internal static (Evento Evento, TipoEntrada General, TipoEntrada Vip) CrearEvento(ApplicationDbContext db,
         int capacidadGeneral = 5, int capacidadVip = 2, int dias = 10, EstadoEvento estado = EstadoEvento.Aprobado)
     {
         var general = new TipoEntrada { Nombre = "General", Precio = 50, Capacidad = capacidadGeneral };

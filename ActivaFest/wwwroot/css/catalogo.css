@@ -31,7 +31,7 @@
 
 .enlace-volver {
   display: inline-block;
-  color: #ff8fa3;
+  color: var(--lila);
   text-decoration: none;
   margin-bottom: 20px;
 }
@@ -44,7 +44,7 @@
   height: 100%;
   min-height: 180px;
   font-size: 56px;
-  background: linear-gradient(135deg, #2a0a1f, #1e1e2f);
+  background: linear-gradient(135deg, #1f1535, var(--tarjeta));
 }
 
 .sin-imagen-grande {
@@ -77,7 +77,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
   gap: 15px;
   align-items: end;
-  background: #1e1e2f;
+  background: var(--tarjeta);
   padding: 20px;
   border-radius: 16px;
   margin: 25px 0 35px;
@@ -90,7 +90,7 @@
 .filtro label {
   display: block;
   font-size: 13px;
-  color: #aaa;
+  color: var(--texto-2);
   margin-bottom: 6px;
 }
 
@@ -99,8 +99,8 @@
   width: 100%;
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid #333;
-  background: #111;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
   color: white;
   color-scheme: dark;
 }
@@ -108,7 +108,7 @@
 .filtro input:focus,
 .filtro select:focus {
   outline: none;
-  box-shadow: 0 0 10px #ff4d6d;
+  box-shadow: 0 0 10px var(--morado);
 }
 
 .filtro-buscar {
@@ -125,7 +125,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #ccc;
+  color: var(--texto-2);
   padding-bottom: 10px;
 }
 
@@ -141,7 +141,7 @@
 .vacio {
   text-align: center;
   padding: 60px 20px;
-  color: #aaa;
+  color: var(--texto-2);
 }
 
 .vacio p {
@@ -161,7 +161,7 @@
 .card-catalogo {
   display: flex;
   flex-direction: column;
-  background: #1e1e2f;
+  background: var(--tarjeta);
   border-radius: 16px;
   overflow: hidden;
   transition: 0.3s;
@@ -170,7 +170,7 @@
 
 .card-catalogo:hover {
   transform: translateY(-5px);
-  box-shadow: 0 0 30px rgba(255, 77, 109, 0.6);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
 }
 
 .card-imagen {
@@ -216,7 +216,7 @@
 }
 
 .card-fecha {
-  color: #ff8fa3;
+  color: var(--lila);
   font-size: 13px;
   margin-bottom: 6px;
 }
@@ -227,7 +227,7 @@
 }
 
 .card-lugar {
-  color: #aaa;
+  color: var(--texto-2);
   font-size: 14px;
   margin-bottom: 15px;
 }
@@ -242,7 +242,7 @@
 
 .card-precio {
   font-weight: bold;
-  color: #82e0aa;
+  color: var(--lila);
 }
 
 .card-pie .btn-rosa {
@@ -265,17 +265,17 @@
   padding: 8px 12px;
   text-align: center;
   border-radius: 10px;
-  background: #1e1e2f;
-  color: #ccc;
+  background: var(--tarjeta);
+  color: var(--texto-2);
   text-decoration: none;
 }
 
 .paginacion a:hover {
-  color: #ff4d6d;
+  color: var(--morado);
 }
 
 .paginacion .actual {
-  background: linear-gradient(90deg, #ff4d6d, #ff006e);
+  background: var(--degradado);
   color: white;
   font-weight: bold;
 }
@@ -308,7 +308,7 @@
 }
 
 .ficha-precios {
-  background: #1e1e2f;
+  background: var(--tarjeta);
   padding: 20px;
   border-radius: 16px;
 }
@@ -327,12 +327,12 @@
 .ficha-precios th,
 .ficha-precios td {
   padding: 10px 6px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--borde);
   text-align: left;
 }
 
 .ficha-precios th {
-  color: #aaa;
+  color: var(--texto-2);
   font-weight: normal;
   font-size: 13px;
 }
@@ -340,7 +340,7 @@
 .ficha-precios .precio {
   text-align: right;
   font-weight: bold;
-  color: #82e0aa;
+  color: var(--lila);
 }
 
 .ficha-seccion {
@@ -349,7 +349,7 @@
 
 .descripcion {
   white-space: pre-line;
-  color: #ddd;
+  color: var(--texto-2);
   line-height: 1.7;
   max-width: 850px;
 }
@@ -382,12 +382,12 @@
 
 .ruta-info {
   min-height: 22px;
-  color: #82e0aa;
+  color: var(--lila);
   margin-bottom: 12px;
 }
 
 .ruta-info.error {
-  color: #ff8fa3;
+  color: var(--error);
 }
 
 /* ============================= */
@@ -399,7 +399,7 @@
 }
 
 .seccion-form {
-  background: #1e1e2f;
+  background: var(--tarjeta);
   border-radius: 16px;
   padding: 25px;
   margin-bottom: 25px;
@@ -409,7 +409,7 @@
   float: none;
   width: auto;
   font-size: 18px;
-  color: #ff8fa3;
+  color: var(--lila);
   margin-bottom: 15px;
 }
 
@@ -444,8 +444,8 @@
 }
 
 .btn-quitar {
-  background: #333;
-  color: #ff8fa3;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--error);
   border: none;
   border-radius: 10px;
   padding: 12px 14px;
@@ -481,7 +481,7 @@
 
 .preview-fotos figcaption {
   font-size: 12px;
-  color: #aaa;
+  color: var(--texto-2);
   text-align: center;
   margin-top: 4px;
 }
@@ -519,7 +519,7 @@
   }
 
   .tipo-entrada {
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--borde);
     padding-bottom: 12px;
     margin-bottom: 12px;
   }
@@ -544,8 +544,8 @@
 .selector-cantidad {
   padding: 6px 10px;
   border-radius: 8px;
-  border: 1px solid #333;
-  background: #111;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
   color: white;
   color-scheme: dark;
 }
@@ -557,7 +557,7 @@
 }
 
 .agotado {
-  color: #ff8fa3;
+  color: var(--error);
   font-weight: bold;
 }
 
@@ -584,7 +584,7 @@
 /* ============================= */
 .badge-Finalizado {
   background: rgba(255, 255, 255, 0.1);
-  color: #bbb;
+  color: var(--texto-2);
   margin-left: 6px;
 }
 
@@ -600,4 +600,70 @@
   border: 1px solid rgba(251, 191, 36, 0.45);
   color: #fde68a;
   font-size: 14px;
+}
+
+/* ============================= */
+/* EDICIÓN DE EVENTOS (SPRINT 4) */
+/* ============================= */
+.foto-actual {
+  display: block;
+  margin: 0;
+  cursor: pointer;
+}
+
+.foto-actual img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.foto-actual span {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--texto-2);
+  margin-top: 4px;
+}
+
+.foto-actual:has(input:checked) img {
+  opacity: 0.3;
+  outline: 2px solid var(--morado);
+}
+
+.acciones-evento {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Filas de zonas: etiquetas alineadas arriba aunque una tenga la nota de vendidas */
+.tipo-entrada {
+  align-items: start;
+}
+
+.tipo-entrada .btn-quitar {
+  margin-top: 27px;
+}
+
+/* Título de la ficha en su propia línea, debajo de la categoría */
+.ficha-info .text-gradient {
+  display: block;
+}
+
+/* Mis eventos: cuadrícula de tarjetas con miniatura proporcionada */
+.grid-mis-eventos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 20px;
+}
+
+.grid-mis-eventos .miniatura-evento {
+  max-height: none;
+  aspect-ratio: 16 / 9;
+}
+
+.catalogo-encabezado.cat-encabezado {
+  margin-bottom: 26px;
 }

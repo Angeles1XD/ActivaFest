@@ -1,0 +1,167 @@
+@model EventoFormViewModel
+@{
+    var categorias = (List<Categoria>)ViewBag.Categorias;
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    var accion = Model.EsEdicion ? "Editar" : "Crear";
+}
+
+<form asp-action="@accion" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="form-evento" id="formEvento">
+    <div asp-validation-summary="All" class="validacion"></div>
+
+    <!-- 1. INFORMACIÓN GENERAL -->
+    <fieldset class="seccion-form">
+        <legend>1. Información general</legend>
+
+        <div class="campo">
+            <label asp-for="Titulo"></label>
+            <input asp-for="Titulo" maxlength="150" />
+            <span asp-validation-for="Titulo" class="text-danger"></span>
+        </div>
+
+        <div class="campos-fila">
+            <div class="campo">
+                <label asp-for="CategoriaId"></label>
+                <select asp-for="CategoriaId">
+                    <option value="">Selecciona...</option>
+                    @foreach (var c in categorias)
+                    {
+                        <option value="@c.Id">@c.Icono @c.Nombre</option>
+                    }
+                </select>
+                <span asp-validation-for="CategoriaId" class="text-danger"></span>
+            </div>
+
+            <div class="campo">
+                <label asp-for="Fecha"></label>
+                <input asp-for="Fecha" type="datetime-local" />
+                <span asp-validation-for="Fecha" class="text-danger"></span>
+            </div>
+        </div>
+
+        <div class="campo">
+            <label asp-for="Descripcion"></label>
+            <textarea asp-for="Descripcion" rows="5" maxlength="4000"
+                      placeholder="Cuenta de qué trata el evento, artistas, horarios de puertas, recomendaciones..."></textarea>
+            <span asp-validation-for="Descripcion" class="text-danger"></span>
+        </div>
+    </fieldset>
+
+    <!-- 2. UBICACIÓN (HU04) -->
+    <fieldset class="seccion-form">
+        <legend>2. Ubicación del recinto</legend>
+
+        <div class="campo">
+            <label asp-for="Ubicacion"></label>
+            <div class="campo-con-boton">
+                <input asp-for="Ubicacion" maxlength="200" placeholder="Ej. Estadio Nacional, Lima" />
+                <button type="button" id="btnBuscarDireccion" class="btn-gris">🔍 Buscar en el mapa</button>
+            </div>
+            <span asp-validation-for="Ubicacion" class="text-danger"></span>
+        </div>
+
+        <p class="texto-suave">Haz clic en el mapa o arrastra el marcador hasta la entrada del recinto.</p>
+        <p id="ubicacionInfo" class="ruta-info" role="status" aria-live="polite"></p>
+
+        <div id="mapaSelector" class="mapa mapa-selector"
+             data-lat="@Model.Latitud?.ToString(inv)" data-lng="@Model.Longitud?.ToString(inv)"></div>
+
+        <input type="hidden" asp-for="Latitud" />
+        <input type="hidden" asp-for="Longitud" />
+        <span asp-validation-for="Latitud" class="text-danger"></span>
+    </fieldset>
+
+    <!-- 3. ENTRADAS Y PRECIOS (HU03) -->
+    <fieldset class="seccion-form">
+        <legend>3. Entradas y precios</legend>
+        <p class="texto-suave">Define cada zona (General, VIP, Platea...). Usa precio 0 para entradas gratuitas.</p>
+
+        <div id="tiposEntrada">
+            @for (var i = 0; i < Model.TiposEntrada.Count; i++)
+            {
+                var comprometidas = Model.TiposEntrada[i].Comprometidas;
+                <div class="tipo-entrada" data-comprometidas="@comprometidas">
+                    @if (Model.TiposEntrada[i].Id is int tipoId)
+                    {
+                        <input type="hidden" name="TiposEntrada[@i].Id" value="@tipoId" />
+                    }
+                    <div class="campo">
+                        <label>Zona</label>
+                        <input name="TiposEntrada[@i].Nombre" value="@Model.TiposEntrada[i].Nombre" maxlength="60" required />
+                    </div>
+                    <div class="campo">
+                        <label>Precio (S/)</label>
+                        <input name="TiposEntrada[@i].Precio" value="@Model.TiposEntrada[i].Precio.ToString(inv)"
+                               type="number" min="0" max="100000" step="0.01" required />
+                    </div>
+                    <div class="campo">
+                        <label>Capacidad</label>
+                        <input name="TiposEntrada[@i].Capacidad" value="@Model.TiposEntrada[i].Capacidad"
+                               type="number" min="@Math.Max(1, comprometidas)" max="1000000" step="1" required />
+                        @if (comprometidas > 0)
+                        {
+                            <small class="texto-suave">@comprometidas vendidas o reservadas</small>
+                        }
+                    </div>
+                    <button type="button" class="btn-quitar" aria-label="Quitar zona"
+                            title="@(comprometidas > 0 ? "Esta zona tiene compras y no se puede quitar" : "Quitar zona")">✖</button>
+                </div>
+            }
+        </div>
+
+        <button type="button" id="btnAgregarTipo" class="btn-gris">+ Agregar zona</button>
+        <p class="texto-suave">Aforo total: <b id="aforoTotal">0</b> personas</p>
+        <span asp-validation-for="TiposEntrada" class="text-danger"></span>
+    </fieldset>
+
+    <!-- 4. FOTOS (HU03) -->
+    <fieldset class="seccion-form">
+        <legend>4. Fotos del recinto</legend>
+        <p class="texto-suave">
+            Sube entre @EventoFormViewModel.MinFotos y @EventoFormViewModel.MaxFotos imágenes (JPG, PNG o WEBP, máx. 5 MB cada una).
+            La primera será la portada.
+        </p>
+
+        @if (Model.ImagenesActuales.Count > 0)
+        {
+            <p class="texto-suave">Fotos actuales: marca las que quieras quitar.</p>
+            <div class="preview-fotos fotos-actuales">
+                @foreach (var imagen in Model.ImagenesActuales)
+                {
+                    <input type="hidden" name="ImagenesActualesIds" value="@imagen.Id" />
+                    <label class="foto-actual">
+                        <img src="@imagen.Ruta" alt="" loading="lazy" />
+                        <span><input type="checkbox" name="ImagenesEliminar" value="@imagen.Id" checked="@Model.ImagenesEliminar.Contains(imagen.Id)" /> Quitar</span>
+                    </label>
+                }
+            </div>
+            <p class="texto-suave">Agregar más fotos (opcional):</p>
+        }
+
+        <div class="campo">
+            <input asp-for="Fotos" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
+            <span asp-validation-for="Fotos" class="text-danger"></span>
+        </div>
+
+        <div id="previewFotos" class="preview-fotos"></div>
+    </fieldset>
+
+    <button type="submit" class="btn-rosa btn-grande">@(Model.EsEdicion ? "Guardar cambios" : "Enviar a revisión")</button>
+</form>
+
+<template id="plantillaTipo">
+    <div class="tipo-entrada">
+        <div class="campo">
+            <label>Zona</label>
+            <input data-campo="Nombre" maxlength="60" required />
+        </div>
+        <div class="campo">
+            <label>Precio (S/)</label>
+            <input data-campo="Precio" type="number" min="0" max="100000" step="0.01" value="0" required />
+        </div>
+        <div class="campo">
+            <label>Capacidad</label>
+            <input data-campo="Capacidad" type="number" min="1" max="1000000" step="1" value="100" required />
+        </div>
+        <button type="button" class="btn-quitar" aria-label="Quitar zona">✖</button>
+    </div>
+</template>

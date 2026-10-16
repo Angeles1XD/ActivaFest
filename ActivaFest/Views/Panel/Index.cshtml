@@ -1,0 +1,82 @@
+@model List<ActivaFest.Services.Panel.ResumenEventoPanel>
+@{
+    ViewData["Title"] = "Panel de ventas";
+    var ahora = DateTime.Now;
+    var proximos = Model.Where(e => e.Fecha >= ahora).ToList();
+}
+
+@section Styles {
+    <partial name="_EstilosCompra" />
+    <link rel="stylesheet" href="~/css/organizador.css" asp-append-version="true" />
+}
+
+<div class="pagina-categorias pagina-panel viz-root">
+    <header class="cat-encabezado">
+        <p class="cat-migas">Activa-Fest / Organizador</p>
+        <h1>Panel de <span class="degradado">ventas</span></h1>
+        <p class="cat-subtitulo">Ventas, ingresos y aforo de tus eventos, calculados a partir de las compras confirmadas.</p>
+    </header>
+
+    <section class="fila-kpi" aria-label="Resumen general">
+        <div class="kpi kpi-hero">
+            <span class="kpi-etiqueta">Ingresos totales</span>
+            <span class="kpi-valor">@Formato.Monto(Model.Sum(e => e.Ingresos))</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Entradas vendidas</span>
+            <span class="kpi-valor">@Model.Sum(e => e.Vendidas).ToString("N0")</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Eventos próximos</span>
+            <span class="kpi-valor">@proximos.Count</span>
+        </div>
+    </section>
+
+    @if (Model.Count == 0)
+    {
+        <div class="cat-vacio">
+            <p>Aún no tienes eventos.</p>
+            <a asp-controller="Eventos" asp-action="Crear" class="cat-boton">Crear evento</a>
+        </div>
+    }
+    else
+    {
+        <div class="tabla-contenedor">
+            <table class="tabla-datos">
+                <thead>
+                    <tr>
+                        <th>Evento</th>
+                        <th>Estado</th>
+                        <th class="derecha">Vendidas</th>
+                        <th class="col-meter">Ocupación</th>
+                        <th class="derecha">Ingresos</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model)
+                    {
+                        var pasado = e.Fecha < ahora;
+                        <tr class="@(pasado ? "fila-pasada" : "")">
+                            <td>
+                                <strong>@e.Titulo</strong><br />
+                                <span class="texto-tenue">@Formato.Fecha(e.Fecha, "ddd dd MMM yyyy · HH:mm")@(pasado ? " · Finalizado" : "")</span>
+                            </td>
+                            <td><span class="chip-estado chip-@e.Estado">@e.Estado</span></td>
+                            <td class="derecha num">@e.Vendidas / @e.Aforo</td>
+                            <td class="col-meter">
+                                <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Math.Round(e.Ocupacion * 100)"
+                                     aria-label="Ocupación de @e.Titulo">
+                                    <span style="width: @Math.Round(e.Ocupacion * 100, 1).ToString(System.Globalization.CultureInfo.InvariantCulture)%"></span>
+                                </div>
+                                <small class="texto-tenue">@e.Ocupacion.ToString("P0")</small>
+                            </td>
+                            <td class="derecha num">@Formato.Monto(e.Ingresos)</td>
+                            <td class="derecha"><a asp-action="Evento" asp-route-id="@e.Id" class="enlace-detalle">Ver panel →</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

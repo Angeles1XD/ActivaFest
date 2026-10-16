@@ -5,8 +5,14 @@
     var conteos = (Dictionary<EstadoEvento, int>)ViewBag.Conteos;
 }
 
-<h2 class="text-gradient">Moderación de eventos</h2>
-<p class="texto-suave">Revisa los eventos enviados por los organizadores antes de publicarlos en el catálogo.</p>
+<header class="cat-encabezado catalogo-encabezado">
+    <div>
+        <p class="cat-migas">Activa-Fest / Administración</p>
+        <h1>Moderación de <span class="degradado">eventos</span></h1>
+        <p class="cat-subtitulo">Revisa los eventos enviados por los organizadores antes de publicarlos en el catálogo.</p>
+    </div>
+    <a asp-controller="Usuarios" asp-action="Index" class="btn-gris enlace-boton">👥 Usuarios y personal de acceso</a>
+</header>
 
 <div class="tabs-estado">
     @foreach (var estado in Enum.GetValues<EstadoEvento>())

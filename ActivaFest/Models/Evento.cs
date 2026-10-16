@@ -52,6 +52,9 @@ namespace ActivaFest.Models
 
         public ICollection<EventoImagen> Imagenes { get; set; } = new List<EventoImagen>();
 
+        // Visitas a la ficha del evento (RF11: visualizaciones en el panel del organizador)
+        public int Visitas { get; set; }
+
         // =============================
         // 🛡️ MODERACIÓN (HU10)
         // =============================
@@ -76,6 +79,11 @@ namespace ActivaFest.Models
         // =============================
         // Las entradas sirven para ingresar hasta unas horas después del inicio (eventos largos, ferias, rezagados)
         public const int HorasValidezEntradas = 12;
+
+        // La puerta acepta entradas desde unas horas antes del inicio (apertura de puertas)
+        public const int HorasAperturaPuertas = 6;
+
+        public DateTime InicioIngreso => Fecha.AddHours(-HorasAperturaPuertas);
 
         public DateTime FinValidezEntradas => Fecha.AddHours(HorasValidezEntradas);
 

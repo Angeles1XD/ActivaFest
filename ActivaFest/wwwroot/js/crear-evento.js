@@ -110,7 +110,9 @@
                 input.dataset.campo = campo;
                 input.name = `TiposEntrada[${i}].${campo}`;
             });
-            fila.querySelector('.btn-quitar').disabled = filas.length === 1;
+            // No se puede quitar la única zona ni una zona con entradas vendidas o reservadas
+            const comprometidas = parseInt(fila.dataset.comprometidas || '0', 10);
+            fila.querySelector('.btn-quitar').disabled = filas.length === 1 || comprometidas > 0;
         });
         document.getElementById('btnAgregarTipo').disabled = filas.length >= MAX_TIPOS;
         recalcularAforo();

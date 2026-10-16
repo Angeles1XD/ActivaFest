@@ -72,12 +72,17 @@ namespace ActivaFest.Controllers
             if (evento == null)
                 return NotFound();
 
+            var esDuenio = evento.OrganizadorId != null && evento.OrganizadorId == _userManager.GetUserId(User);
+
             // Los eventos no aprobados solo los ve su organizador o un administrador
-            if (evento.Estado != EstadoEvento.Aprobado
-                && !User.IsInRole(Roles.Administrador)
-                && evento.OrganizadorId != _userManager.GetUserId(User))
+            if (evento.Estado != EstadoEvento.Aprobado && !User.IsInRole(Roles.Administrador) && !esDuenio)
                 return NotFound();
 
+            // Visualizaciones para el panel del organizador (RF11); sus propias visitas no cuentan
+            if (evento.Estado == EstadoEvento.Aprobado && !esDuenio)
+                await _context.Eventos.Where(e => e.Id == id).ExecuteUpdateAsync(s => s.SetProperty(e => e.Visitas, e => e.Visitas + 1), ct);
+
+            ViewBag.PuedeEditar = esDuenio || User.IsInRole(Roles.Administrador);
             return View(evento);
         }
 
@@ -175,6 +180,102 @@ namespace ActivaFest.Controllers
 
             TempData["Mensaje"] = "Tu evento fue enviado a revisión. Te avisaremos por correo cuando sea aprobado.";
             return RedirectToAction(nameof(MisEventos));
+        }
+
+        // =============================
+        // ✏️ EDITAR EVENTO (HU09)
+        // =============================
+        [Authorize(Roles = RolesPublicadores)]
+        public async Task<IActionResult> Editar(int id, CancellationToken ct)
+        {
+            var evento = await CargarEventoEditableAsync(id, ct);
+            if (evento == null)
+                return NotFound();
+
+            await CargarCategoriasAsync(ct);
+            return View(new EventoFormViewModel
+            {
+                Id = evento.Id,
+                Titulo = evento.Titulo,
+                Descripcion = evento.Descripcion,
+                CategoriaId = evento.CategoriaId,
+                Fecha = evento.Fecha,
+                Ubicacion = evento.Ubicacion,
+                Latitud = evento.Latitud,
+                Longitud = evento.Longitud,
+                TiposEntrada = evento.TiposEntrada.OrderBy(t => t.Id).Select(t => new TipoEntradaInput
+                {
+                    Id = t.Id,
+                    Nombre = t.Nombre,
+                    Precio = t.Precio,
+                    Capacidad = t.Capacidad,
+                    Comprometidas = t.Vendidas + t.Reservadas
+                }).ToList(),
+                ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList(),
+                ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList()
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = RolesPublicadores)]
+        [RequestSizeLimit(LimiteSubida)]
+        [RequestFormLimits(MultipartBodyLengthLimit = LimiteSubida)]
+        public async Task<IActionResult> Editar(int id, EventoFormViewModel model,
+            [FromServices] Services.Eventos.IEventoEdicionService edicion, CancellationToken ct)
+        {
+            var evento = await CargarEventoEditableAsync(id, ct);
+            if (evento == null)
+                return NotFound();
+
+            if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
+                ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
+
+            if (ModelState.IsValid)
+            {
+                var url = Url.Action(nameof(Detalle), "Eventos", new { id }, Request.Scheme)!;
+                var resultado = await edicion.ActualizarAsync(id, model, url, ct);
+
+                if (resultado.Exito)
+                {
+                    TempData["Mensaje"] = evento.Estado == EstadoEvento.Aprobado
+                        ? "Cambios guardados." + (resultado.CompradoresNotificados > 0
+                            ? $" Avisamos por correo a {resultado.CompradoresNotificados} {(resultado.CompradoresNotificados == 1 ? "comprador" : "compradores")}."
+                            : "")
+                        : "Cambios guardados. El evento volvió a revisión.";
+                    return RedirectToAction(nameof(MisEventos));
+                }
+
+                foreach (var error in resultado.Errores)
+                    ModelState.AddModelError(string.Empty, error);
+            }
+
+            // Se vuelve a mostrar el formulario con las fotos actuales y lo comprometido por zona
+            model.Id = id;
+            model.ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList();
+            model.ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList();
+            foreach (var tipo in model.TiposEntrada.Where(t => t.Id.HasValue))
+            {
+                var actual = evento.TiposEntrada.FirstOrDefault(t => t.Id == tipo.Id);
+                tipo.Comprometidas = actual == null ? 0 : actual.Vendidas + actual.Reservadas;
+            }
+
+            await CargarCategoriasAsync(ct);
+            return View(model);
+        }
+
+        // Solo el organizador dueño o un administrador pueden editar
+        private Task<Evento?> CargarEventoEditableAsync(int id, CancellationToken ct)
+        {
+            var userId = _userManager.GetUserId(User);
+            var esAdmin = User.IsInRole(Roles.Administrador);
+
+            return _context.Eventos
+                .AsNoTracking()
+                .Include(e => e.TiposEntrada)
+                .Include(e => e.Imagenes)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(e => e.Id == id && (esAdmin || e.OrganizadorId == userId), ct);
         }
 
         // =============================

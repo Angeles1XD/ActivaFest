@@ -12,5 +12,14 @@ namespace ActivaFest.Models
 
         // Roles que un usuario puede elegir al registrarse por su cuenta
         public static readonly string[] Registrables = { Asistente, Organizador };
+
+        // Nombre que ve la gente. Internamente se mantiene "Asistente" (RF01 del documento),
+        // pero en pantalla se muestra "Usuario" para no confundirlo con el personal del evento.
+        public static string NombreVisible(string rol) => rol switch
+        {
+            Asistente => "Usuario",
+            ControlAcceso => "Control de acceso",
+            _ => rol
+        };
     }
 }

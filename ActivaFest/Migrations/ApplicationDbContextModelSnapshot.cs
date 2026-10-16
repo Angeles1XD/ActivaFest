@@ -236,6 +236,9 @@ namespace ActivaFest.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ValidadoPorId")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Codigo")
@@ -303,6 +306,9 @@ namespace ActivaFest.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Visitas")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 

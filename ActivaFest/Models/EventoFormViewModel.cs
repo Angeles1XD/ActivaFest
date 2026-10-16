@@ -4,6 +4,12 @@ namespace ActivaFest.Models
 {
     public class TipoEntradaInput
     {
+        // Null para zonas nuevas; con valor al editar una zona existente
+        public int? Id { get; set; }
+
+        // Solo informativo en la edición (lo vendido + reservado limita la capacidad mínima)
+        public int Comprometidas { get; set; }
+
         [Required(ErrorMessage = "Indica el nombre de la zona.")]
         [StringLength(60)]
         public string Nombre { get; set; } = "General";
@@ -60,6 +66,20 @@ namespace ActivaFest.Models
         [Display(Name = "Fotos del recinto")]
         public List<IFormFile> Fotos { get; set; } = new();
 
+        // =============================
+        // ✏️ EDICIÓN (HU09)
+        // =============================
+        public int? Id { get; set; }
+
+        public bool EsEdicion => Id.HasValue;
+
+        // Fotos ya guardadas (se muestran en el formulario) y las que el organizador marcó para quitar
+        public List<EventoImagen> ImagenesActuales { get; set; } = new();
+
+        public List<int> ImagenesEliminar { get; set; } = new();
+
+        public List<int> ImagenesActualesIds { get; set; } = new();
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             if (Fecha.HasValue && Fecha.Value <= DateTime.Now)
@@ -75,11 +95,13 @@ namespace ActivaFest.Models
             if (nombres.Distinct().Count() != nombres.Count)
                 yield return new ValidationResult("Los tipos de entrada no pueden repetir nombre.", new[] { nameof(TiposEntrada) });
 
-            var fotos = Fotos.Where(f => f.Length > 0).ToList();
-            if (fotos.Count < MinFotos)
+            // En la edición cuentan también las fotos que se conservan (el servicio lo vuelve a comprobar contra la BD)
+            var conservadas = ImagenesActualesIds.Except(ImagenesEliminar).Count();
+            var fotos = Fotos.Where(f => f.Length > 0).Count() + conservadas;
+            if (fotos < MinFotos)
                 yield return new ValidationResult($"Sube al menos {MinFotos} fotos del recinto.", new[] { nameof(Fotos) });
 
-            if (fotos.Count > MaxFotos)
+            if (fotos > MaxFotos)
                 yield return new ValidationResult($"Puedes subir como máximo {MaxFotos} fotos.", new[] { nameof(Fotos) });
         }
     }

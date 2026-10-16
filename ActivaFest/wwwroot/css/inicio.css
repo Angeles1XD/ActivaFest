@@ -18,7 +18,8 @@
 /* ---------- Portada a todo el ancho ---------- */
 .inicio-hero {
   position: relative;
-  margin: -40px -40px 0;
+  /* Ancho completo aunque el contenido tenga ancho máximo */
+  margin: -40px calc(50% - 50vw) 0;
   min-height: 560px;
   display: flex;
   align-items: center;
@@ -284,7 +285,7 @@
 
 @media (max-width: 768px) {
   .inicio-hero {
-    margin: -20px -20px 0;
+    margin-top: -24px;
     min-height: 480px;
     padding: 60px 18px 100px;
   }

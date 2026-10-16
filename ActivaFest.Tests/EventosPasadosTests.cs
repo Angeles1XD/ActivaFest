@@ -115,3 +115,16 @@ public class ModeracionEventosPasadosTests : IDisposable
         Assert.Empty(_email.Enviados);
     }
 }
+
+public class RolesTests
+{
+    [Theory]
+    [InlineData(Roles.Asistente, "Usuario")]
+    [InlineData(Roles.Organizador, "Organizador")]
+    [InlineData(Roles.ControlAcceso, "Control de acceso")]
+    [InlineData(Roles.Administrador, "Administrador")]
+    public void Muestra_nombres_claros_sin_cambiar_el_rol_interno(string rol, string esperado)
+    {
+        Assert.Equal(esperado, Roles.NombreVisible(rol));
+    }
+}

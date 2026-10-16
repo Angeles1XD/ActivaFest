@@ -50,6 +50,23 @@ public static class EmailTemplates
             $"<p>Tu evento <b>{E(ev.Titulo)}</b> fue registrado y está <b>pendiente de revisión</b> por nuestro equipo.</p>" +
             "<p>Te avisaremos por correo cuando sea aprobado o si necesita cambios.</p>");
 
+    // Aviso a quienes ya compraron cuando cambia la fecha o el lugar (RF13)
+    public static string EventoActualizado(Evento ev, DateTime fechaAnterior, string ubicacionAnterior, string urlEvento)
+    {
+        var cambios = new List<string>();
+        if (fechaAnterior != ev.Fecha)
+            cambios.Add($"<li>📅 <b>Nueva fecha:</b> {Formato.Fecha(ev.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm")} " +
+                        $"<span style=\"color:#999;\">(antes: {Formato.Fecha(fechaAnterior, "dd/MM/yyyy HH:mm")})</span></li>");
+        if (ubicacionAnterior != ev.Ubicacion)
+            cambios.Add($"<li>📍 <b>Nuevo lugar:</b> {E(ev.Ubicacion)} <span style=\"color:#999;\">(antes: {E(ubicacionAnterior)})</span></li>");
+
+        return Layout("Hubo un cambio en tu evento",
+            $"<p>El organizador de <b>{E(ev.Titulo)}</b> actualizó información importante:</p>" +
+            $"<ul>{string.Join("", cambios)}</ul>" +
+            "<p>Tus entradas siguen siendo válidas con el mismo código QR. Si no puedes asistir, comunícate con el organizador.</p>",
+            "Ver el evento", urlEvento);
+    }
+
     public static string EventoAprobado(Evento ev, string urlEvento) =>
         Layout("¡Tu evento fue aprobado! 🎉",
             $"<p>El evento <b>{E(ev.Titulo)}</b> ya está publicado en el catálogo de ActivaFest.</p>" +
