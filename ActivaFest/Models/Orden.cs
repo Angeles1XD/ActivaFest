@@ -85,6 +85,10 @@ namespace ActivaFest.Models
 
         public int Cantidad { get; set; }
 
+        // HU26: en recintos con asientos numerados cada ítem es un asiento (Cantidad = 1)
+        public int? AsientoId { get; set; }
+        public Asiento? Asiento { get; set; }
+
         // Precio congelado al momento de la compra
         public decimal PrecioUnitario { get; set; }
 

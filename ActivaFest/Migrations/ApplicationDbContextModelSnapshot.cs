@@ -348,6 +348,9 @@ namespace ActivaFest.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AsientoId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Codigo")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -379,6 +382,10 @@ namespace ActivaFest.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AsientoId")
+                        .IsUnique()
+                        .HasFilter("AsientoId IS NOT NULL");
 
                     b.HasIndex("Codigo")
                         .IsUnique();
@@ -632,6 +639,9 @@ namespace ActivaFest.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AsientoId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Cantidad")
                         .HasColumnType("INTEGER");
 
@@ -646,6 +656,8 @@ namespace ActivaFest.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AsientoId");
 
                     b.HasIndex("OrdenId");
 
@@ -987,6 +999,11 @@ namespace ActivaFest.Migrations
 
             modelBuilder.Entity("ActivaFest.Models.Entrada", b =>
                 {
+                    b.HasOne("ActivaFest.Models.Asiento", "Asiento")
+                        .WithMany()
+                        .HasForeignKey("AsientoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ActivaFest.Models.Evento", "Evento")
                         .WithMany()
                         .HasForeignKey("EventoId")
@@ -1004,6 +1021,8 @@ namespace ActivaFest.Migrations
                         .HasForeignKey("TipoEntradaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Asiento");
 
                     b.Navigation("Evento");
 
@@ -1090,6 +1109,11 @@ namespace ActivaFest.Migrations
 
             modelBuilder.Entity("ActivaFest.Models.OrdenItem", b =>
                 {
+                    b.HasOne("ActivaFest.Models.Asiento", "Asiento")
+                        .WithMany()
+                        .HasForeignKey("AsientoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ActivaFest.Models.Orden", "Orden")
                         .WithMany("Items")
                         .HasForeignKey("OrdenId")
@@ -1101,6 +1125,8 @@ namespace ActivaFest.Migrations
                         .HasForeignKey("TipoEntradaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Asiento");
 
                     b.Navigation("Orden");
 

@@ -17,7 +17,17 @@
         @foreach (var item in Model.Items)
         {
             <tr>
-                <td>@item.Cantidad × @item.TipoEntrada?.Nombre</td>
+                <td>
+                    @if (item.Asiento != null)
+                    {
+                        @* HU26: asiento exacto *@
+                        <span>🪑 @item.TipoEntrada?.Nombre · Fila @item.Asiento.Fila, asiento @item.Asiento.Numero</span>
+                    }
+                    else
+                    {
+                        <span>@item.Cantidad × @item.TipoEntrada?.Nombre</span>
+                    }
+                </td>
                 <td class="monto">@Formato.Precio(item.Subtotal)</td>
             </tr>
         }

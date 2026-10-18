@@ -123,6 +123,8 @@
             {
                 var enVenta = Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now;
                 var agotado = tipos.All(t => t.Disponibles == 0);
+                // HU26: en teatro se eligen los asientos exactos en el plano; en el resto, zona y cantidad
+                var conAsientos = tipos.Any(t => t.AsientosNumerados);
 
                 <!-- 🛒 SELECCIÓN DE ENTRADAS (HU06) -->
                 <form asp-controller="Compras" asp-action="Iniciar" method="post" id="comprar" class="form-compra">
@@ -132,7 +134,7 @@
                             <tr>
                                 <th>Zona</th><th>Precio</th>
                                 @if (mostrarDisponibles) { <th class="col-disponibles">Disponibles</th> }
-                                @if (enVenta) { <th class="col-cantidad">Cantidad</th> }
+                                @if (enVenta) { <th class="col-cantidad">@(conAsientos ? "Elegidos" : "Cantidad")</th> }
                             </tr>
                         </thead>
                         <tbody>
@@ -164,6 +166,10 @@
                                             @if (t.Disponibles == 0)
                                             {
                                                 <span class="agotado">Agotado</span>
+                                            }
+                                            else if (conAsientos)
+                                            {
+                                                <span class="contador-zona" data-zona="@t.Id" data-precio="@t.Precio.ToString(System.Globalization.CultureInfo.InvariantCulture)">0</span>
                                             }
                                             else
                                             {
@@ -198,6 +204,14 @@
                     }
                     else
                     {
+                        @if (conAsientos)
+                        {
+                            <div class="asientos-elegidos" id="asientosElegidos" data-max="@OpcionesCompras.Value.MaxEntradasPorOrden" aria-live="polite">
+                                <p class="texto-suave">👇 Elige tus asientos en el <a href="#plano">plano del recinto</a> (máx. @OpcionesCompras.Value.MaxEntradasPorOrden).</p>
+                                <ul id="listaAsientos"></ul>
+                            </div>
+                            <div id="inputsAsientos"></div>
+                        }
                         <p class="total-compra">Total: <b id="totalCompra">S/ 0.00</b></p>
                         <button type="submit" class="btn-rosa btn-bloque" id="btnComprar" disabled>🎟️ Comprar entradas</button>
                         <p class="texto-suave nota-reserva">Reservamos tus entradas por @OpcionesCompras.Value.MinutosReserva minutos mientras pagas.</p>
@@ -212,12 +226,18 @@
 @if (tipos.Count > 0)
 {
     var zonasPlano = Model.TiposEntrada.OrderBy(t => t.Id).ToList();
-    <section class="ficha-seccion plano-recinto">
+    // HU26: el plano es interactivo cuando se puede comprar (clic en asientos o en zonas)
+    var planoInteractivo = Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now && User.Identity?.IsAuthenticated == true;
+    <section class="ficha-seccion plano-recinto" id="plano">
         <h3>Plano del recinto</h3>
         <p class="texto-suave">
             Plantilla: @ActivaFest.Services.Plano.PlanoService.Nombre(Model.PlantillaPlano).ToLowerInvariant()@(Model.PlantillaPlano == PlantillaPlano.Teatro ? " con asientos numerados" : "").
         </p>
-        <div class="plano-lienzo">@Html.Raw((string)ViewBag.PlanoSvg)</div>
+        @if (planoInteractivo)
+        {
+            <p class="texto-suave">@(Model.PlantillaPlano == PlantillaPlano.Teatro ? "Toca los asientos libres para elegirlos; los grises ya no están disponibles." : "Toca una zona para elegir cuántas entradas quieres.")</p>
+        }
+        <div class="plano-lienzo @(planoInteractivo ? "plano-interactivo" : "")">@Html.Raw((string)ViewBag.PlanoSvg)</div>
         <ul class="plano-leyenda">
             @for (var i = 0; i < zonasPlano.Count; i++)
             {
@@ -276,6 +296,7 @@
 
 @section Scripts {
     <script src="~/js/compra.js" asp-append-version="true"></script>
+    <script src="~/js/plano-compra.js" asp-append-version="true"></script>
     @if (Model.TieneUbicacion)
     {
         <partial name="_LeafletJs" />

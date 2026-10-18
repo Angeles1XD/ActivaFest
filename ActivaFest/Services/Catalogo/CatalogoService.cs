@@ -63,7 +63,7 @@ public class CatalogoService : ICatalogoService
         _logger.LogDebug("💾 CACHE MISS {Clave}", clave);
         var resultado = await ConsultarAsync(filtro, ct);
 
-        await _cache.SetStringAsync(clave, JsonSerializer.Serialize(resultado), OpcionesCache, ct);
+        await _cache.SetStringAsync(clave, JsonSerializer.Serialize(resultado), await OpcionesHastaProximoCambioAsync(TimeSpan.FromMinutes(5), ct), ct);
         return resultado;
     }
 
@@ -96,10 +96,32 @@ public class CatalogoService : ICatalogoService
         var tarjetas = await ProyectarTarjetas(_context.Eventos.AsNoTracking().Where(e => ids.Contains(e.Id))).ToListAsync(ct);
         var resultado = ids.Select(id => tarjetas.First(t => t.Id == id)).ToList();
 
-        // Caché corta: la vigencia de un destacado vence por hora, no por un cambio en la BD
+        // HU12: la caché vence justo cuando empieza o termina un destacado: al vencer el periodo deja de aparecer al instante
         await _cache.SetStringAsync(clave, JsonSerializer.Serialize(resultado),
-            new DistributedCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(2)), ct);
+            await OpcionesHastaProximoCambioAsync(TimeSpan.FromMinutes(2), ct), ct);
         return resultado;
+    }
+
+    // La caché dura como máximo "maximo", pero vence antes si en ese lapso empieza o termina un destacado (HU12)
+    // o empieza un evento (sale del catálogo, HU02): así lo publicado nunca queda desactualizado
+    private async Task<DistributedCacheEntryOptions> OpcionesHastaProximoCambioAsync(TimeSpan maximo, CancellationToken ct)
+    {
+        var ahora = DateTime.Now;
+        var limite = ahora + maximo;
+
+        var cambioDestacado = await _context.ContratosDestacado
+            .Where(c => c.Estado == EstadoContrato.Activo && c.FechaFin > ahora && (c.FechaInicio > ahora ? c.FechaInicio : c.FechaFin) < limite)
+            .Select(c => (DateTime?)(c.FechaInicio > ahora ? c.FechaInicio : c.FechaFin))
+            .MinAsync(ct);
+
+        var inicioEvento = await _context.Eventos
+            .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha > ahora && e.Fecha < limite)
+            .Select(e => (DateTime?)e.Fecha)
+            .MinAsync(ct);
+
+        var proximo = new[] { cambioDestacado, inicioEvento, limite }.Where(d => d.HasValue).Min()!.Value;
+        var duracion = proximo - ahora;
+        return new DistributedCacheEntryOptions().SetAbsoluteExpiration(duracion < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : duracion);
     }
 
     // Proyección común de las tarjetas del catálogo, la portada y los destacados

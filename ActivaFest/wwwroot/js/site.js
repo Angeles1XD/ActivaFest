@@ -15,6 +15,21 @@
         });
     }
 
+    // ---------- ⏱️ Tiempo restante de un destacado (HU12) ----------
+    // El servidor indica los segundos que quedan; aquí solo se descuentan (no depende del reloj del usuario)
+    document.querySelectorAll('.temporizador-destacado').forEach(function (el) {
+        const fin = Date.now() + (parseInt(el.dataset.segundos, 10) || 0) * 1000;
+        const pintar = function () {
+            const s = Math.max(0, Math.floor((fin - Date.now()) / 1000));
+            const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+            el.textContent = s === 0 ? 'periodo terminado'
+                : '⏱️ quedan ' + (d > 0 ? d + ' d ' : '') + (d > 0 || h > 0 ? h + ' h ' : '') + m + ' min' + (d === 0 && h === 0 ? ' ' + (s % 60) + ' s' : '');
+            if (s === 0) clearInterval(intervalo);
+        };
+        const intervalo = setInterval(pintar, 1000);
+        pintar();
+    });
+
     // ---------- Chat del asistente (HU14 / RF12) ----------
     const CLAVE = 'activafest_chat_v2';
     const ventana = document.getElementById('chat-window');

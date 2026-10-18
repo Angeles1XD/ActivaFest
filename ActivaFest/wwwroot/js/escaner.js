@@ -87,7 +87,10 @@
         mensaje.textContent = datos.mensaje;
 
         const partes = [];
+        // HU27: zona, asiento y puerta del titular
         if (datos.zona) partes.push('Zona: ' + datos.zona);
+        if (datos.asiento) partes.push('Asiento: ' + datos.asiento);
+        if (datos.puerta) partes.push(datos.puerta);
         if (datos.titular) partes.push('Titular: ' + datos.titular);
         if (datos.tipo === 'YaUsada' && datos.fechaUso) partes.push('Usada el ' + datos.fechaUso);
         detalle.textContent = partes.join(' · ');

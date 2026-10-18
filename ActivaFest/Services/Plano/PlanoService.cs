@@ -126,12 +126,24 @@ public static class PlanoService
     // Plano de un evento guardado (ficha del evento); las zonas se dibujan en el orden en que se crearon
     public static string SvgDeEvento(Evento evento, IEnumerable<Asiento> asientos, int? asientoResaltado = null, int? zonaResaltada = null)
     {
-        var zonas = evento.TiposEntrada.OrderBy(t => t.Id)
-            .Select((t, i) => new ZonaPlano(t.Id, t.Nombre, ColorValido(t.Color, i), t.PuertaIngreso, t.Precio, t.Capacidad, t.Disponibles, t.Filas, t.AsientosPorFila))
-            .ToList();
-        var lista = asientos.Select(a => new AsientoPlano(a.Id, a.TipoEntradaId, a.Fila, a.Numero, a.PosX, a.PosY, a.Estado)).ToList();
+        var (zonas, lista) = DatosDeEvento(evento, asientos);
         return GenerarSvg(evento.PlantillaPlano, zonas, lista, asientoResaltado, zonaResaltada);
     }
+
+    // HU27: imagen PNG del plano con varias ubicaciones resaltadas (para el correo de la compra)
+    public static byte[] PngDeEvento(Evento evento, IEnumerable<Asiento> asientos, IReadOnlySet<int> asientosResaltados, IReadOnlySet<int> zonasResaltadas)
+    {
+        var (zonas, lista) = DatosDeEvento(evento, asientos);
+        return PlanoImagen.GenerarPng(evento.PlantillaPlano, zonas, lista, asientosResaltados, zonasResaltadas);
+    }
+
+    private static (List<ZonaPlano> Zonas, List<AsientoPlano> Asientos) DatosDeEvento(Evento evento, IEnumerable<Asiento> asientos) =>
+    (
+        evento.TiposEntrada.OrderBy(t => t.Id)
+            .Select((t, i) => new ZonaPlano(t.Id, t.Nombre, ColorValido(t.Color, i), t.PuertaIngreso, t.Precio, t.Capacidad, t.Disponibles, t.Filas, t.AsientosPorFila))
+            .ToList(),
+        asientos.Select(a => new AsientoPlano(a.Id, a.TipoEntradaId, a.Fila, a.Numero, a.PosX, a.PosY, a.Estado)).ToList()
+    );
 
     // Vista previa del formulario: el plano tal como quedaría con los datos escritos (sin guardar nada)
     public static string SvgVistaPrevia(PlantillaPlano plantilla, IReadOnlyList<TipoEntradaInput> datos)
@@ -163,6 +175,33 @@ public static class PlanoService
         return GenerarSvg(plantilla, planoZonas, planoAsientos);
     }
 
+    // Geometría compartida por el SVG y la imagen PNG del correo (HU27)
+    public static int AltoPlano(PlantillaPlano plantilla, int zonas, IReadOnlyCollection<AsientoPlano>? asientos) => plantilla switch
+    {
+        PlantillaPlano.Teatro => Math.Max(300, (asientos?.Count > 0 ? asientos.Max(a => a.Y) : InicioFilas) + 110),
+        PlantillaPlano.Estadio => 540,
+        PlantillaPlano.Feria => 500,
+        _ => 120 + zonas * 78 + 110
+    };
+
+    // Rectángulo de la zona i (de "total") en las plantillas por zonas
+    public static (int X, int Y, int W, int H) RectZona(PlantillaPlano plantilla, int i, int total)
+    {
+        switch (plantilla)
+        {
+            case PlantillaPlano.Estadio:
+                var tribunas = new (int, int, int, int)[] { (60, 150, 170, 220), (570, 150, 170, 220), (250, 30, 300, 100), (250, 390, 300, 100) };
+                return tribunas[Math.Min(i, tribunas.Length - 1)];
+            case PlantillaPlano.Feria:
+                var ancho = total == 0 ? 0 : 680 / total;
+                return (60 + i * ancho, 345, ancho - (i < total - 1 ? 10 : 0), 64);
+            default:
+                // Campo abierto: la primera zona pegada al escenario y cada siguiente más ancha
+                var w = 340 + i * 90;
+                return ((Ancho - w) / 2, 100 + i * 78, w, 66);
+        }
+    }
+
     // =============================
     // 🖼️ SVG
     // =============================
@@ -170,13 +209,7 @@ public static class PlanoService
         int? asientoResaltado = null, int? zonaResaltada = null)
     {
         var sb = new StringBuilder();
-        var alto = plantilla switch
-        {
-            PlantillaPlano.Teatro => Math.Max(300, (asientos?.Count > 0 ? asientos.Max(a => a.Y) : InicioFilas) + 110),
-            PlantillaPlano.Estadio => 540,
-            PlantillaPlano.Feria => 500,
-            _ => 120 + zonas.Count * 78 + 110
-        };
+        var alto = AltoPlano(plantilla, zonas.Count, asientos);
 
         sb.Append(CultureInfo.InvariantCulture,
             $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {Ancho} {alto}\" class=\"plano-svg plano-{plantilla.ToString().ToLowerInvariant()}\" role=\"img\" aria-label=\"Plano del recinto: {E(Nombre(plantilla))}\">");
@@ -222,7 +255,7 @@ public static class PlanoService
             var clase = a.Id == resaltado ? "asiento asiento-tuyo" : libre ? "asiento" : "asiento asiento-ocupado";
             var color = libre ? colores.GetValueOrDefault(a.ZonaId, Paleta[0]) : "#3f3f46";
             var zona = nombres.GetValueOrDefault(a.ZonaId, "");
-            sb.Append($"<circle cx=\"{a.X}\" cy=\"{a.Y}\" r=\"{(a.Id == resaltado ? 12 : 9)}\" fill=\"{color}\" class=\"{clase}\" data-asiento=\"{a.Id}\" data-zona=\"{a.ZonaId}\">");
+            sb.Append($"<circle cx=\"{a.X}\" cy=\"{a.Y}\" r=\"{(a.Id == resaltado ? 12 : 9)}\" fill=\"{color}\" class=\"{clase}\" data-asiento=\"{a.Id}\" data-zona=\"{a.ZonaId}\" data-fila=\"{E(a.Fila)}\" data-numero=\"{a.Numero}\" data-libre=\"{(libre ? 1 : 0)}\">");
             sb.Append($"<title>{E(zona)} · Fila {E(a.Fila)} · Asiento {a.Numero}{(libre ? "" : " (no disponible)")}</title></circle>");
             if (a.Id == resaltado)
                 sb.Append($"<text x=\"{a.X + 18}\" y=\"{a.Y + 4}\" class=\"plano-etiqueta-tuya\">{E(a.Fila)}-{a.Numero}</text>");
@@ -233,13 +266,7 @@ public static class PlanoService
     {
         Escenario(sb, 30, 300);
         for (var i = 0; i < zonas.Count; i++)
-        {
-            // La primera zona queda pegada al escenario; cada zona siguiente es más ancha
-            var ancho = 340 + i * 90;
-            var x = (Ancho - ancho) / 2;
-            var y = 100 + i * 78;
-            Zona(sb, zonas[i], x, y, ancho, 66, resaltada);
-        }
+            ZonaEn(sb, PlantillaPlano.CampoAbierto, zonas, i, resaltada);
 
         // Servicios a los costados
         Servicio(sb, 24, 110, "🚻 Baños");
@@ -253,19 +280,8 @@ public static class PlanoService
         sb.Append("<line x1=\"400\" y1=\"150\" x2=\"400\" y2=\"370\" class=\"plano-campo-linea\"/>");
         sb.Append("<circle cx=\"400\" cy=\"260\" r=\"36\" class=\"plano-campo-linea\" fill=\"none\"/>");
 
-        var posiciones = new (int X, int Y, int W, int H)[]
-        {
-            (60, 150, 170, 220),   // Occidente (izquierda)
-            (570, 150, 170, 220),  // Oriente (derecha)
-            (250, 30, 300, 100),   // Norte (arriba)
-            (250, 390, 300, 100)   // Sur (abajo)
-        };
-
-        for (var i = 0; i < zonas.Count && i < posiciones.Length; i++)
-        {
-            var p = posiciones[i];
-            Zona(sb, zonas[i], p.X, p.Y, p.W, p.H, resaltada);
-        }
+        for (var i = 0; i < zonas.Count && i < MaxZonas[PlantillaPlano.Estadio]; i++)
+            ZonaEn(sb, PlantillaPlano.Estadio, zonas, i, resaltada);
     }
 
     private static void Feria(StringBuilder sb, IReadOnlyList<ZonaPlano> zonas, int? resaltada)
@@ -281,12 +297,17 @@ public static class PlanoService
                 sb.Append($"<text x=\"{x + 42}\" y=\"{y + 35}\" text-anchor=\"middle\" class=\"plano-nota\">Stand {fila * 6 + col + 1}</text>");
             }
 
-        var ancho = zonas.Count == 0 ? 0 : 680 / zonas.Count;
         for (var i = 0; i < zonas.Count; i++)
-            Zona(sb, zonas[i], 60 + i * ancho, 345, ancho - (i < zonas.Count - 1 ? 10 : 0), 64, resaltada);
+            ZonaEn(sb, PlantillaPlano.Feria, zonas, i, resaltada);
 
         Servicio(sb, 60, 420, "🚻 Baños");
         Servicio(sb, 640, 420, "ℹ️ Informes");
+    }
+
+    private static void ZonaEn(StringBuilder sb, PlantillaPlano plantilla, IReadOnlyList<ZonaPlano> zonas, int i, int? resaltada)
+    {
+        var (x, y, w, h) = RectZona(plantilla, i, zonas.Count);
+        Zona(sb, zonas[i], x, y, w, h, resaltada);
     }
 
     private static void Zona(StringBuilder sb, ZonaPlano z, int x, int y, int ancho, int alto, int? resaltada)

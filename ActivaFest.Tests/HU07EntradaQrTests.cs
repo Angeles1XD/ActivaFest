@@ -132,10 +132,10 @@ public class HU07EntradaQrTests : IClassFixture<AppDePrueba>
         var pasarela = (await PostAsync(cliente, checkout, "/Compras/Pagar", ("codigo", codigo))).Headers.Location!.OriginalString;
         await PostAsync(cliente, pasarela, "/Compras/PasarelaSimulada", ("codigo", codigo), ("aprobar", "true"));
 
-        // Correo con una imagen QR adjunta por entrada
+        // Correo con una imagen QR adjunta por entrada y el plano con la ubicación (HU27)
         var asunto = $"Tus entradas para {titulo}";
         Assert.Contains(_app.Correos.Para(email), c => c.Asunto == asunto);
-        Assert.Equal(2, _app.Correos.AdjuntosDe(asunto));
+        Assert.Equal(2 + 1, _app.Correos.AdjuntosDe(asunto));
 
         // "Mis entradas" muestra las 2 entradas y su QR es una imagen PNG
         var html = await cliente.GetStringAsync("/Entradas");

@@ -39,6 +39,9 @@ public interface ICompraService
 {
     Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades, CancellationToken ct = default);
 
+    // HU26: compra eligiendo los asientos exactos (recintos con asientos numerados)
+    Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos, CancellationToken ct = default);
+
     Task<ResultadoConfirmacion> ConfirmarPagoAsync(string codigoOrden, string proveedor, string referencia, decimal montoPagado,
         string urlMisEntradas, CancellationToken ct = default);
 
@@ -69,10 +72,12 @@ public class CompraService : ICompraService
     private static readonly TimeSpan EsperaBloqueo = TimeSpan.FromSeconds(10);
 
     private readonly IBloqueoDistribuido _bloqueos;
+    private readonly IBloqueoAsientos _asientosBloqueados;
     private readonly ILogger<CompraService> _logger;
 
     public CompraService(ApplicationDbContext db, ICatalogoService catalogo, IQrEntradaService qr, IEmailService email,
-        IOptions<ComprasOptions> opciones, IOptions<ComisionesOptions> comisiones, IBloqueoDistribuido bloqueos, ILogger<CompraService> logger)
+        IOptions<ComprasOptions> opciones, IOptions<ComisionesOptions> comisiones, IBloqueoDistribuido bloqueos, IBloqueoAsientos asientosBloqueados,
+        ILogger<CompraService> logger)
     {
         _db = db;
         _catalogo = catalogo;
@@ -81,41 +86,101 @@ public class CompraService : ICompraService
         _opciones = opciones.Value;
         _comisiones = comisiones.Value;
         _bloqueos = bloqueos;
+        _asientosBloqueados = asientosBloqueados;
         _logger = logger;
     }
 
     // =============================
     // 1️⃣ CREAR ORDEN Y RESERVAR AFORO
     // =============================
+    // Zonas sin asientos numerados: el usuario elige zona y cantidad
     public async Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades,
         CancellationToken ct = default)
     {
         var pedidas = cantidades.Where(c => c.Value > 0).ToDictionary(c => c.Key, c => c.Value);
-
         if (pedidas.Count == 0)
             return ResultadoOrden.Fallo("Selecciona al menos una entrada.");
 
-        if (pedidas.Values.Sum() > _opciones.MaxEntradasPorOrden)
-            return ResultadoOrden.Fallo($"Puedes comprar como máximo {_opciones.MaxEntradasPorOrden} entradas por compra.");
-
-        var evento = await _db.Eventos
-            .AsNoTracking()
-            .Include(e => e.TiposEntrada)
-            .FirstOrDefaultAsync(e => e.Id == eventoId, ct);
-
-        if (evento == null || evento.Estado != EstadoEvento.Aprobado)
-            return ResultadoOrden.Fallo("Este evento no está disponible para la venta.");
-
-        if (evento.Fecha <= DateTime.Now)
-            return ResultadoOrden.Fallo("La venta de este evento ya terminó.");
+        var (evento, error) = await EventoEnVentaAsync(eventoId, ct);
+        if (evento == null)
+            return ResultadoOrden.Fallo(error!);
 
         var tipos = evento.TiposEntrada.ToDictionary(t => t.Id);
         if (pedidas.Keys.Any(id => !tipos.ContainsKey(id)))
             return ResultadoOrden.Fallo("Tipo de entrada no válido.");
 
+        // HU26: en las zonas con asientos numerados se elige el asiento exacto en el plano
+        if (pedidas.Keys.Any(id => tipos[id].AsientosNumerados))
+            return ResultadoOrden.Fallo("En este recinto eliges tus asientos en el plano.");
+
+        var items = pedidas.Select(p => new OrdenItem { TipoEntradaId = p.Key, Cantidad = p.Value, PrecioUnitario = tipos[p.Key].Precio }).ToList();
+        return await CrearAsync(usuarioId, evento, items, ct);
+    }
+
+    // HU26: recintos con asientos numerados: el usuario elige los asientos exactos en el plano
+    public async Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos,
+        CancellationToken ct = default)
+    {
+        var ids = asientos.Distinct().ToList();
+        if (ids.Count == 0)
+            return ResultadoOrden.Fallo("Elige al menos un asiento en el plano.");
+
+        var (evento, error) = await EventoEnVentaAsync(eventoId, ct);
+        if (evento == null)
+            return ResultadoOrden.Fallo(error!);
+
+        // Un asiento cuya reserva ya venció está libre aunque el proceso periódico aún no haya pasado
+        await LiberarExpiradasDelEventoAsync(eventoId, ct);
+
+        var elegidos = await _db.Asientos.AsNoTracking()
+            .Where(a => ids.Contains(a.Id) && a.TipoEntrada!.EventoId == eventoId && a.TipoEntrada.AsientosNumerados)
+            .ToListAsync(ct);
+        if (elegidos.Count != ids.Count)
+            return ResultadoOrden.Fallo("Algún asiento elegido no pertenece a este evento.");
+
+        var ocupados = elegidos.Where(a => a.Estado != EstadoAsiento.Disponible).ToList();
+        if (ocupados.Count > 0)
+            return AsientosNoDisponibles(ocupados);
+
+        var tipos = evento.TiposEntrada.ToDictionary(t => t.Id);
+        var items = elegidos
+            .OrderBy(a => a.Fila.Length).ThenBy(a => a.Fila).ThenBy(a => a.Numero)
+            .Select(a => new OrdenItem { TipoEntradaId = a.TipoEntradaId, Cantidad = 1, AsientoId = a.Id, PrecioUnitario = tipos[a.TipoEntradaId].Precio })
+            .ToList();
+        return await CrearAsync(usuarioId, evento, items, ct, elegidos);
+    }
+
+    private async Task<(Evento? Evento, string? Error)> EventoEnVentaAsync(int eventoId, CancellationToken ct)
+    {
+        var evento = await _db.Eventos.AsNoTracking().Include(e => e.TiposEntrada).FirstOrDefaultAsync(e => e.Id == eventoId, ct);
+
+        if (evento == null || evento.Estado != EstadoEvento.Aprobado)
+            return (null, "Este evento no está disponible para la venta.");
+        if (evento.Fecha <= DateTime.Now)
+            return (null, "La venta de este evento ya terminó.");
+        return (evento, null);
+    }
+
+    // Criterio de HU26: el segundo usuario recibe un aviso para elegir otro asiento
+    private static ResultadoOrden AsientosNoDisponibles(IEnumerable<Asiento> asientos)
+    {
+        var lista = asientos.ToList();
+        return ResultadoOrden.Fallo(lista.Count == 1
+            ? $"El asiento {lista[0].Etiqueta} ya no está disponible: elige otro en el plano."
+            : $"Los asientos {string.Join(", ", lista.Select(a => a.Etiqueta))} ya no están disponibles: elige otros en el plano.");
+    }
+
+    private async Task<ResultadoOrden> CrearAsync(string usuarioId, Evento evento, List<OrdenItem> items, CancellationToken ct,
+        List<Asiento>? asientos = null)
+    {
+        if (items.Sum(i => i.Cantidad) > _opciones.MaxEntradasPorOrden)
+            return ResultadoOrden.Fallo($"Puedes comprar como máximo {_opciones.MaxEntradasPorOrden} entradas por compra.");
+
+        var tipos = evento.TiposEntrada.ToDictionary(t => t.Id);
+
         // Una sola orden pendiente por persona y evento: la anterior se cancela y libera su reserva
         var pendientes = await _db.Ordenes
-            .Where(o => o.UsuarioId == usuarioId && o.EventoId == eventoId && o.Estado == EstadoOrden.PendientePago)
+            .Where(o => o.UsuarioId == usuarioId && o.EventoId == evento.Id && o.Estado == EstadoOrden.PendientePago)
             .Select(o => o.Codigo)
             .ToListAsync(ct);
 
@@ -126,36 +191,57 @@ public class CompraService : ICompraService
         {
             Codigo = CodigoSeguro.Generar(12),
             UsuarioId = usuarioId,
-            EventoId = eventoId,
+            EventoId = evento.Id,
             Estado = EstadoOrden.PendientePago,
             FechaCreacion = DateTime.UtcNow,
             FechaExpiracion = DateTime.UtcNow.AddMinutes(_opciones.MinutosReserva),
-            Items = pedidas.Select(p => new OrdenItem
-            {
-                TipoEntradaId = p.Key,
-                Cantidad = p.Value,
-                PrecioUnitario = tipos[p.Key].Precio
-            }).ToList()
+            Items = items
         };
         orden.Total = orden.Items.Sum(i => i.Subtotal);
 
         // HU11: bloqueo distribuido (Redis) por evento: las reservas del mismo evento se procesan de una en una
-        await using var bloqueo = await _bloqueos.AdquirirAsync($"aforo:evento:{eventoId}", DuracionBloqueo, EsperaBloqueo, ct);
+        await using var bloqueo = await _bloqueos.AdquirirAsync($"aforo:evento:{evento.Id}", DuracionBloqueo, EsperaBloqueo, ct);
         if (bloqueo == null)
             return ResultadoOrden.Fallo("Hay mucha demanda en este momento. Inténtalo de nuevo en unos segundos.");
 
         // Una reserva vencida devuelve su aforo ya mismo (no espera al proceso que corre cada minuto)
-        await LiberarExpiradasDelEventoAsync(eventoId, ct);
+        await LiberarExpiradasDelEventoAsync(evento.Id, ct);
+
+        // HU26 (1ª barrera): cada asiento se aparta en Redis para esta compra durante la reserva (10 minutos)
+        var idsAsientos = asientos?.Select(a => a.Id).ToList() ?? new List<int>();
+        if (idsAsientos.Count > 0)
+        {
+            var tomados = await _asientosBloqueados.BloquearAsync(idsAsientos, orden.Codigo, TimeSpan.FromMinutes(_opciones.MinutosReserva), ct);
+            if (tomados.Count > 0)
+                return AsientosNoDisponibles(asientos!.Where(a => tomados.Contains(a.Id)));
+        }
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        foreach (var item in orden.Items)
+        foreach (var zona in items.GroupBy(i => i.TipoEntradaId))
         {
-            if (!await ReservarAsync(item.TipoEntradaId, item.Cantidad, ct))
+            var cantidad = zona.Sum(i => i.Cantidad);
+            if (!await ReservarAsync(zona.Key, cantidad, ct))
             {
                 await tx.RollbackAsync(ct);
-                var zona = tipos[item.TipoEntradaId];
-                return ResultadoOrden.Fallo($"Ya no quedan {item.Cantidad} entradas disponibles en la zona {zona.Nombre}.");
+                await _asientosBloqueados.LiberarAsync(idsAsientos, orden.Codigo, ct);
+                return ResultadoOrden.Fallo($"Ya no quedan {cantidad} entradas disponibles en la zona {tipos[zona.Key].Nombre}.");
+            }
+        }
+
+        // HU26 (2ª barrera): Disponible → Bloqueado solo si nadie lo tomó (UPDATE condicional en la BD)
+        if (idsAsientos.Count > 0)
+        {
+            var bloqueados = await _db.Asientos
+                .Where(a => idsAsientos.Contains(a.Id) && a.Estado == EstadoAsiento.Disponible)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, EstadoAsiento.Bloqueado), ct);
+
+            if (bloqueados != idsAsientos.Count)
+            {
+                await tx.RollbackAsync(ct);
+                await _asientosBloqueados.LiberarAsync(idsAsientos, orden.Codigo, ct);
+                var ocupados = await _db.Asientos.AsNoTracking().Where(a => idsAsientos.Contains(a.Id) && a.Estado != EstadoAsiento.Disponible).ToListAsync(ct);
+                return AsientosNoDisponibles(ocupados.Count > 0 ? ocupados : asientos!);
             }
         }
 
@@ -210,6 +296,12 @@ public class CompraService : ICompraService
                         .SetProperty(t => t.Vendidas, t => t.Vendidas + cantidad)
                         .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
             }
+
+            // HU26: Bloqueado → Vendido
+            var asientos = orden.Items.Where(i => i.AsientoId.HasValue).Select(i => i.AsientoId!.Value).ToList();
+            if (asientos.Count > 0)
+                await _db.Asientos.Where(a => asientos.Contains(a.Id))
+                    .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, EstadoAsiento.Vendido), ct);
         }
         else
         {
@@ -250,6 +342,7 @@ public class CompraService : ICompraService
                 OrdenId = orden.Id,
                 EventoId = orden.EventoId,
                 TipoEntradaId = i.TipoEntradaId,
+                AsientoId = i.AsientoId, // índice único: un asiento nunca queda en dos entradas
                 UsuarioId = orden.UsuarioId,
                 Estado = EstadoEntrada.Activa,
                 FechaEmision = DateTime.UtcNow
@@ -259,6 +352,11 @@ public class CompraService : ICompraService
         _db.Entradas.AddRange(entradas);
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+
+        // El asiento ya está Vendido en la BD: su apartado temporal en Redis ya no hace falta
+        var vendidos = orden.Items.Where(i => i.AsientoId.HasValue).Select(i => i.AsientoId!.Value).ToList();
+        if (vendidos.Count > 0)
+            await _asientosBloqueados.LiberarAsync(vendidos, orden.Codigo, ct);
 
         _logger.LogInformation("✅ Orden {Codigo} pagada ({Proveedor} {Referencia}): {Cantidad} entradas emitidas",
             orden.Codigo, proveedor, referencia, entradas.Count);
@@ -378,7 +476,7 @@ public class CompraService : ICompraService
 
         var items = await _db.OrdenItems
             .Where(i => i.Orden!.Codigo == codigoOrden)
-            .Select(i => new { i.TipoEntradaId, i.Cantidad })
+            .Select(i => new { i.TipoEntradaId, i.Cantidad, i.AsientoId })
             .ToListAsync(ct);
 
         foreach (var item in items)
@@ -391,7 +489,17 @@ public class CompraService : ICompraService
                     .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
         }
 
+        // HU26 / ciclo de vida del Asiento: Bloqueado → Disponible (expira, pago rechazado o compra cancelada)
+        var asientos = items.Where(i => i.AsientoId.HasValue).Select(i => i.AsientoId!.Value).ToList();
+        if (asientos.Count > 0)
+            await _db.Asientos
+                .Where(a => asientos.Contains(a.Id) && a.Estado == EstadoAsiento.Bloqueado)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, EstadoAsiento.Disponible), ct);
+
         await tx.CommitAsync(ct);
+
+        if (asientos.Count > 0)
+            await _asientosBloqueados.LiberarAsync(asientos, codigoOrden, ct);
         return true;
     }
 
@@ -409,6 +517,17 @@ public class CompraService : ICompraService
 
             if (vendidas == 0)
                 return false;
+        }
+
+        // HU26: un pago tardío solo se acepta si sus asientos siguen libres (nadie los tomó mientras tanto)
+        var asientos = orden.Items.Where(i => i.AsientoId.HasValue).Select(i => i.AsientoId!.Value).ToList();
+        if (asientos.Count > 0)
+        {
+            var tomados = await _db.Asientos
+                .Where(a => asientos.Contains(a.Id) && a.Estado == EstadoAsiento.Disponible)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, EstadoAsiento.Vendido), ct);
+            if (tomados != asientos.Count)
+                return false; // la transacción se revierte completa
         }
 
         return true;
@@ -451,15 +570,27 @@ public class CompraService : ICompraService
                 .Include(o => o.Evento)
                 .Include(o => o.Items).ThenInclude(i => i.TipoEntrada)
                 .Include(o => o.Entradas).ThenInclude(e => e.TipoEntrada)
+                .Include(o => o.Entradas).ThenInclude(e => e.Asiento)
                 .AsSplitQuery()
                 .FirstAsync(o => o.Id == ordenId, ct);
 
             if (orden.Usuario?.Email == null)
                 return;
 
+            // HU27: el QR lleva cifrada la ubicación (zona, fila y asiento)
             var adjuntos = orden.Entradas
-                .Select((e, i) => new AdjuntoCorreo($"entrada-{i + 1}-{e.TipoEntrada?.Nombre}.png", _qr.GenerarPng(e.Codigo)))
+                .Select((e, i) => new AdjuntoCorreo($"entrada-{i + 1}-{e.TipoEntrada?.Nombre}.png", _qr.GenerarPng(e.Codigo, UbicacionEntrada.De(e).ParaQr)))
                 .ToList();
+
+            // HU27: plano del recinto con los asientos (o zonas) de esta compra resaltados
+            var evento = await _db.Eventos.AsNoTracking().Include(e => e.TiposEntrada).FirstAsync(e => e.Id == orden.EventoId, ct);
+            var asientosEvento = evento.PlantillaPlano == PlantillaPlano.Teatro
+                ? await _db.Asientos.AsNoTracking().Where(a => a.TipoEntrada!.EventoId == evento.Id).ToListAsync(ct)
+                : new List<Asiento>();
+            var plano = Services.Plano.PlanoService.PngDeEvento(evento, asientosEvento,
+                orden.Entradas.Where(e => e.AsientoId.HasValue).Select(e => e.AsientoId!.Value).ToHashSet(),
+                orden.Entradas.Where(e => e.AsientoId == null).Select(e => e.TipoEntradaId).ToHashSet());
+            adjuntos.Add(new AdjuntoCorreo("plano-tu-ubicacion.png", plano));
 
             await _email.EnviarAsync(orden.Usuario.Email, $"Tus entradas para {orden.Evento!.Titulo}",
                 EmailTemplates.EntradasCompradas(orden.Usuario.NombreCompleto, orden, orden.Evento, urlMisEntradas), adjuntos);

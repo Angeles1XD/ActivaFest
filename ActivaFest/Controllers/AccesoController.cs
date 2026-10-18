@@ -69,6 +69,8 @@ namespace ActivaFest.Controllers
                 mensaje = resultado.Mensaje,
                 zona = resultado.Zona,
                 titular = resultado.Titular,
+                asiento = resultado.Asiento,
+                puerta = resultado.Puerta,
                 fechaUso = resultado.FechaUso?.ToString("dd/MM HH:mm:ss"),
                 ingresados = resultado.Ingresados,
                 vendidas = resultado.Vendidas

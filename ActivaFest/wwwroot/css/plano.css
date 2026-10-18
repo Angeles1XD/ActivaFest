@@ -110,3 +110,19 @@
 .form-evento .tipo-entrada .campo-color input { width: 100%; height: 40px; padding: 2px; cursor: pointer; }
 .form-evento .tipo-entrada .btn-quitar { margin-top: 0; margin-bottom: 4px; }
 .form-evento.es-teatro .tipo-entrada .solo-teatro { display: block; }
+
+/* =============================
+   🪑 SELECCIÓN EN EL PLANO (HU26)
+   ============================= */
+.plano-interactivo circle.asiento[data-libre="1"],
+.plano-interactivo .plano-zona:not(.plano-zona-agotada) { cursor: pointer; }
+.plano-interactivo circle.asiento[data-libre="1"]:hover,
+.plano-interactivo circle.asiento:focus-visible { stroke: #fff; stroke-width: 2.5; outline: none; }
+.plano-interactivo .plano-zona:not(.plano-zona-agotada):hover rect,
+.plano-interactivo .plano-zona:focus-visible rect { stroke: #fff; stroke-width: 3; }
+.plano-interactivo .plano-zona:focus-visible { outline: none; }
+circle.asiento-elegido { fill: #ec4899 !important; stroke: #fff; stroke-width: 3; }
+
+.asientos-elegidos ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.asientos-elegidos li { padding: 4px 10px; border-radius: 999px; background: rgba(236, 72, 153, 0.15); color: #f9a8d4; font-size: 13px; }
+.contador-zona { font-weight: 700; }

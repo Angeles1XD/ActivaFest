@@ -34,6 +34,10 @@ namespace ActivaFest.Models
 
         public TipoEntrada? TipoEntrada { get; set; }
 
+        // ENTRADA.AsientoId (HU26): asiento exacto en recintos con asientos numerados
+        public int? AsientoId { get; set; }
+        public Asiento? Asiento { get; set; }
+
         [Required]
         public string UsuarioId { get; set; } = "";
 

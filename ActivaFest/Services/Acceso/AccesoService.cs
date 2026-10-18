@@ -23,7 +23,9 @@ public record ResultadoValidacion(
     string? Titular = null,
     DateTime? FechaUso = null,
     int Ingresados = 0,
-    int Vendidas = 0)
+    int Vendidas = 0,
+    string? Asiento = null,  // HU27: "F-12" en recintos con asientos numerados
+    string? Puerta = null)
 {
     public bool PermiteIngreso => Tipo == TipoValidacion.Valida;
 
@@ -105,6 +107,7 @@ public class AccesoService : IAccesoService
             .AsNoTracking()
             .Include(e => e.Evento)
             .Include(e => e.TipoEntrada)
+            .Include(e => e.Asiento) // HU27: el escáner muestra zona y asiento
             .FirstOrDefaultAsync(e => e.Codigo == codigo, ct);
 
         if (entrada == null)
@@ -112,9 +115,10 @@ public class AccesoService : IAccesoService
 
         var titular = await _db.Users.Where(u => u.Id == entrada.UsuarioId).Select(u => u.NombreCompleto).FirstOrDefaultAsync(ct);
         var zona = entrada.TipoEntrada?.Nombre;
+        var ubicacion = UbicacionEntrada.De(entrada);
 
         ResultadoValidacion Resultado(TipoValidacion tipo, string mensaje, DateTime? uso = null) =>
-            new(tipo, mensaje, zona, titular, uso);
+            new(tipo, mensaje, zona, titular, uso, Asiento: ubicacion.Asiento, Puerta: ubicacion.Puerta);
 
         // 2. Reglas de la entrada
         if (entrada.EventoId != eventoId)

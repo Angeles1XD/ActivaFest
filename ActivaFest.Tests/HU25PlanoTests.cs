@@ -272,7 +272,9 @@ public class HU25PlanoTests : IClassFixture<AppDePrueba>
             var comprador = db.Users.First();
             var zona = db.TiposEntrada.Where(t => t.EventoId == id).OrderBy(t => t.Id).First();
             var compras = scope.ServiceProvider.GetRequiredService<ActivaFest.Services.Compras.ICompraService>();
-            await compras.CrearOrdenAsync(comprador.Id, id, new Dictionary<int, int> { [zona.Id] = 1 });
+            var asiento = db.Asientos.First(a => a.TipoEntradaId == zona.Id);
+            var compra = await compras.CrearOrdenConAsientosAsync(comprador.Id, id, new[] { asiento.Id }); // HU26: en teatro se compra por asiento
+            Assert.Null(compra.Error);
         }
 
         var cambiaFilas = await FormularioDeAsync(id);

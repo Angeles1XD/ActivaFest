@@ -21,6 +21,7 @@
                 <tr><td>Paquete</td><td class="monto">@Model.Paquete?.Nombre · @Model.Dias días</td></tr>
                 <tr><td>En Destacados desde</td><td class="monto">@Model.FechaInicio?.ToString("dd/MM/yyyy HH:mm")</td></tr>
                 <tr><td>Hasta</td><td class="monto">@Model.FechaFin?.ToString("dd/MM/yyyy HH:mm")</td></tr>
+                <tr><td>Tiempo restante</td><td class="monto"><span class="temporizador-destacado" data-segundos="@Math.Max(0, (int)((Model.FechaFin ?? DateTime.Now) - DateTime.Now).TotalSeconds)">…</span></td></tr>
             </tbody>
             <tfoot>
                 <tr><td>Total pagado</td><td class="monto">@Formato.Monto(Model.Precio)</td></tr>

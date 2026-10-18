@@ -48,3 +48,23 @@ namespace ActivaFest.Models
         public string Etiqueta => $"{Fila}-{Numero}";
     }
 }
+
+namespace ActivaFest.Models
+{
+    // HU27: dónde se ubica el titular de una entrada (zona, fila, asiento y puerta de ingreso)
+    public record UbicacionEntrada(string Zona, string? Fila, int? Numero, string? Puerta)
+    {
+        public static UbicacionEntrada De(Entrada e) =>
+            new(e.TipoEntrada?.Nombre ?? "", e.Asiento?.Fila, e.Asiento?.Numero, e.TipoEntrada?.PuertaIngreso);
+
+        public bool TieneAsiento => Fila != null && Numero != null;
+
+        public string? Asiento => TieneAsiento ? $"{Fila}-{Numero}" : null;
+
+        // Lo que viaja cifrado dentro del QR (HU27): "Zona|Fila|Número" o solo la zona
+        public string ParaQr => TieneAsiento ? $"{Zona}|{Fila}|{Numero}" : Zona;
+
+        public string Texto =>
+            (TieneAsiento ? $"{Zona} · Fila {Fila}, asiento {Numero}" : Zona) + (string.IsNullOrEmpty(Puerta) ? "" : $" · Ingreso por {Puerta}");
+    }
+}

@@ -15,6 +15,9 @@ public class CorreoDePrueba : IEmailService
 {
     private readonly List<(string Para, string Asunto, string Html)> _enviados = new();
     private readonly Dictionary<string, int> _adjuntos = new();
+    private readonly Dictionary<string, IReadOnlyList<AdjuntoCorreo>> _archivos = new();
+
+    public IReadOnlyList<AdjuntoCorreo> ArchivosDe(string asunto) { lock (_enviados) return _archivos.GetValueOrDefault(asunto) ?? Array.Empty<AdjuntoCorreo>(); }
 
     // Cantidad de adjuntos del último correo con ese asunto
     public int AdjuntosDe(string asunto) { lock (_enviados) return _adjuntos.GetValueOrDefault(asunto); }
@@ -30,6 +33,7 @@ public class CorreoDePrueba : IEmailService
         {
             _enviados.Add((destinatario, asunto, html));
             _adjuntos[asunto] = adjuntos?.Count ?? 0;
+            _archivos[asunto] = adjuntos ?? Array.Empty<AdjuntoCorreo>();
         }
         return Task.CompletedTask;
     }

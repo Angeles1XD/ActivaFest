@@ -43,9 +43,15 @@ namespace ActivaFest.Controllers
         // Paso 1: selección de entradas en la ficha → crea la orden y reserva el aforo
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Iniciar(int eventoId, Dictionary<int, int>? cantidades, CancellationToken ct)
+        // Nombres explícitos: sin ellos, si el formulario no trae "cantidades[...]" el enlazador intentaría leer
+        // todos los campos como cantidades (y fallaría con el token antifalsificación)
+        public async Task<IActionResult> Iniciar(int eventoId, [FromForm(Name = "cantidades")] Dictionary<int, int>? cantidades,
+            [FromForm(Name = "asientos")] List<int>? asientos, CancellationToken ct)
         {
-            var resultado = await _compras.CrearOrdenAsync(UsuarioId, eventoId, cantidades ?? new(), ct);
+            // HU26: en teatro se compran los asientos elegidos en el plano; en el resto, zona y cantidad
+            var resultado = asientos is { Count: > 0 }
+                ? await _compras.CrearOrdenConAsientosAsync(UsuarioId, eventoId, asientos, ct)
+                : await _compras.CrearOrdenAsync(UsuarioId, eventoId, cantidades ?? new(), ct);
 
             if (resultado.Error != null)
             {
@@ -300,6 +306,7 @@ namespace ActivaFest.Controllers
                 .AsNoTracking()
                 .Include(o => o.Evento).ThenInclude(e => e!.Imagenes.OrderBy(i => i.Orden).Take(1))
                 .Include(o => o.Items).ThenInclude(i => i.TipoEntrada)
+                .Include(o => o.Items).ThenInclude(i => i.Asiento)
                 .AsSplitQuery()
                 .Where(o => o.Codigo == codigo && o.UsuarioId == UsuarioId);
 

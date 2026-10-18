@@ -119,6 +119,7 @@ namespace ActivaFest.Data
                 i.Property(x => x.PrecioUnitario).HasPrecision(10, 2);
                 i.HasOne(x => x.Orden).WithMany(o => o.Items).HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.Cascade);
                 i.HasOne(x => x.TipoEntrada).WithMany().HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Restrict);
+                i.HasOne(x => x.Asiento).WithMany().HasForeignKey(x => x.AsientoId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<Entrada>(e =>
@@ -128,6 +129,10 @@ namespace ActivaFest.Data
                 e.HasOne(x => x.Orden).WithMany(o => o.Entradas).HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.TipoEntrada).WithMany().HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Restrict);
+
+                // HU26: un asiento nunca está en dos entradas (índice único: imposible la doble venta)
+                e.HasIndex(x => x.AsientoId).IsUnique().HasFilter("AsientoId IS NOT NULL");
+                e.HasOne(x => x.Asiento).WithMany().HasForeignKey(x => x.AsientoId).OnDelete(DeleteBehavior.Restrict);
             });
 
             // =============================

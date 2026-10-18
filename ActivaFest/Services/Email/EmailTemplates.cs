@@ -109,8 +109,11 @@ public static class EmailTemplates
 
     public static string EntradasCompradas(string nombre, Orden orden, Evento evento, string urlMisEntradas)
     {
-        var filas = string.Join("", orden.Items.Select(i =>
-            $"<tr><td style=\"padding:6px 0;\">{i.Cantidad} × {E(i.TipoEntrada?.Nombre)}</td>" +
+        var filas = string.Join("", orden.Items
+            .GroupBy(i => (Zona: i.TipoEntrada?.Nombre, i.PrecioUnitario))
+            .Select(g => (g.Key.Zona, Cantidad: g.Sum(i => i.Cantidad), Subtotal: g.Sum(i => i.Subtotal)))
+            .Select(i =>
+            $"<tr><td style=\"padding:6px 0;\">{i.Cantidad} × {E(i.Zona)}</td>" +
             $"<td style=\"padding:6px 0;text-align:right;\">{Formato.Precio(i.Subtotal)}</td></tr>"));
 
         return Layout("¡Tus entradas están listas! 🎟️",
@@ -118,10 +121,35 @@ public static class EmailTemplates
             $"<p>📅 {Formato.Fecha(evento.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm")}<br/>📍 {E(evento.Ubicacion)}</p>" +
             $"<table width=\"100%\" style=\"border-top:1px solid #eee;border-bottom:1px solid #eee;margin:15px 0;\">{filas}" +
             $"<tr><td style=\"padding:8px 0;\"><b>Total</b></td><td style=\"padding:8px 0;text-align:right;\"><b>{Formato.Precio(orden.Total)}</b></td></tr></table>" +
-            $"<p>Adjuntamos <b>{orden.Entradas.Count}</b> {(orden.Entradas.Count == 1 ? "código QR" : "códigos QR")}, uno por persona. " +
-            "Preséntalo en la puerta desde tu celular o impreso. Cada QR solo se puede usar una vez.</p>" +
+            UbicacionesHtml(orden) +
+            $"<p>Adjuntamos <b>{orden.Entradas.Count}</b> {(orden.Entradas.Count == 1 ? "código QR" : "códigos QR")}, uno por persona, " +
+            "y el <b>plano del recinto con tu ubicación resaltada</b> (plano-tu-ubicacion.png). " +
+            "Presenta el QR en la puerta desde tu celular o impreso. Cada QR solo se puede usar una vez.</p>" +
             $"<p style=\"color:#888;font-size:13px;\">N.° de orden: {E(orden.Codigo)}</p>",
             "Ver mis entradas", urlMisEntradas);
+    }
+
+    // HU27: zona, fila, asiento y puerta de cada entrada
+    private static string UbicacionesHtml(Orden orden)
+    {
+        if (orden.Entradas.Count == 0)
+            return "";
+
+        var filas = string.Join("", orden.Entradas.Select((e, i) =>
+        {
+            var u = UbicacionEntrada.De(e);
+            return "<tr>" +
+                   $"<td style=\"padding:6px 8px;\">#{i + 1}</td>" +
+                   $"<td style=\"padding:6px 8px;\"><b>{E(u.Zona)}</b></td>" +
+                   $"<td style=\"padding:6px 8px;\">{(u.TieneAsiento ? $"Fila {E(u.Fila)}, asiento {u.Numero}" : "Ubicación libre en la zona")}</td>" +
+                   $"<td style=\"padding:6px 8px;\">{(string.IsNullOrEmpty(u.Puerta) ? "—" : "🚪 " + E(u.Puerta))}</td>" +
+                   "</tr>";
+        }));
+
+        return "<p style=\"margin-bottom:6px;\"><b>Tu ubicación</b></p>" +
+               "<table width=\"100%\" style=\"background:#f6f4ff;border-radius:10px;margin-bottom:15px;font-size:14px;\">" +
+               "<tr style=\"color:#666;font-size:12px;\"><td style=\"padding:6px 8px;\">Entrada</td><td style=\"padding:6px 8px;\">Zona</td>" +
+               "<td style=\"padding:6px 8px;\">Asiento</td><td style=\"padding:6px 8px;\">Puerta</td></tr>" + filas + "</table>";
     }
 
     public static string RecuperarContrasena(string nombre, string urlReset) =>

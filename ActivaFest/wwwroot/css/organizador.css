@@ -768,3 +768,11 @@ a.boton-rol {
 .grafico-chart.grafico-zonas {
   height: 240px;
 }
+
+/* HU20: acciones de cada paquete */
+.acciones-paquete {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}

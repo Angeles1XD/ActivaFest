@@ -34,6 +34,7 @@ namespace ActivaFest.Controllers
                 .Include(e => e.Evento)
                 .Include(e => e.TipoEntrada)
                 .Include(e => e.Orden)
+                .Include(e => e.Asiento) // HU27: fila y asiento
                 .Where(e => e.UsuarioId == userId)
                 .ToListAsync(ct);
 
@@ -49,20 +50,41 @@ namespace ActivaFest.Controllers
             return View(grupos);
         }
 
-        // Imagen del QR: solo para el dueño de la entrada
+        // Imagen del QR: solo para el dueño de la entrada. El token cifrado incluye zona, fila y asiento (HU27)
         [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> Qr(int id, CancellationToken ct)
         {
-            var userId = _userManager.GetUserId(User);
-            var codigo = await _db.Entradas
-                .Where(e => e.Id == id && e.UsuarioId == userId)
-                .Select(e => e.Codigo)
-                .FirstOrDefaultAsync(ct);
-
-            if (codigo == null)
+            var entrada = await EntradaPropiaAsync(id, ct);
+            if (entrada == null)
                 return NotFound();
 
-            return File(_qr.GenerarPng(codigo), "image/png", $"entrada-{id}.png");
+            return File(_qr.GenerarPng(entrada.Codigo, UbicacionEntrada.De(entrada).ParaQr), "image/png", $"entrada-{id}.png");
+        }
+
+        // HU27: plano del recinto con el asiento (o la zona) de esta entrada resaltado
+        public async Task<IActionResult> Plano(int id, CancellationToken ct)
+        {
+            var entrada = await EntradaPropiaAsync(id, ct);
+            if (entrada == null)
+                return NotFound();
+
+            var evento = await _db.Eventos.AsNoTracking().Include(e => e.TiposEntrada).FirstAsync(e => e.Id == entrada.EventoId, ct);
+            var asientos = evento.PlantillaPlano == PlantillaPlano.Teatro
+                ? await _db.Asientos.AsNoTracking().Where(a => a.TipoEntrada!.EventoId == evento.Id).ToListAsync(ct)
+                : new List<Asiento>();
+
+            var svg = Services.Plano.PlanoService.SvgDeEvento(evento, asientos,
+                asientoResaltado: entrada.AsientoId, zonaResaltada: entrada.AsientoId == null ? entrada.TipoEntradaId : null);
+            return Content(svg, "image/svg+xml; charset=utf-8");
+        }
+
+        private Task<Entrada?> EntradaPropiaAsync(int id, CancellationToken ct)
+        {
+            var userId = _userManager.GetUserId(User);
+            return _db.Entradas.AsNoTracking()
+                .Include(e => e.TipoEntrada)
+                .Include(e => e.Asiento)
+                .FirstOrDefaultAsync(e => e.Id == id && e.UsuarioId == userId, ct);
         }
     }
 }

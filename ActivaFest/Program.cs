@@ -111,6 +111,7 @@ builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 
 builder.Services.AddSingleton<IQrEntradaService, QrEntradaService>();
 builder.Services.AddSingleton<BloqueoEnMemoria>();
+builder.Services.AddSingleton<BloqueoAsientosEnMemoria>();
 builder.Services.AddScoped<ICompraService, CompraService>();
 builder.Services.AddHostedService<ExpiracionReservasService>();
 
@@ -203,11 +204,13 @@ if (!string.IsNullOrEmpty(redisHost))
     builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
         StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions.Configuration));
     builder.Services.AddSingleton<IBloqueoDistribuido, BloqueoRedis>();
+    builder.Services.AddSingleton<IBloqueoAsientos, BloqueoAsientosRedis>(); // HU26: asientos apartados 10 min
 }
 else
 {
     builder.Services.AddDistributedMemoryCache(); // local
     builder.Services.AddSingleton<IBloqueoDistribuido>(sp => sp.GetRequiredService<BloqueoEnMemoria>());
+    builder.Services.AddSingleton<IBloqueoAsientos>(sp => sp.GetRequiredService<BloqueoAsientosEnMemoria>());
 }
 
 var app = builder.Build();

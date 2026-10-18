@@ -28,6 +28,13 @@ namespace ActivaFest.Controllers
                 .Select(g => new { g.Key, Cantidad = g.Count() })
                 .ToDictionaryAsync(x => x.Key, x => x.Cantidad, ct);
 
+            var ahora = DateTime.UtcNow;
+            ViewBag.Vigentes = await _db.ContratosDestacado
+                .Where(c => c.Estado == EstadoContrato.Activo && c.FechaFin > ahora)
+                .GroupBy(c => c.PaqueteId)
+                .Select(g => new { g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Cantidad, ct);
+
             return View(await _db.PaquetesDestacado.AsNoTracking().OrderBy(p => p.Dias).ToListAsync(ct));
         }
 
@@ -70,6 +77,38 @@ namespace ActivaFest.Controllers
 
             await _db.SaveChangesAsync(ct);
             TempData["Mensaje"] = $"Paquete \"{datos.Nombre}\" guardado.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // =============================
+        // 🗑️ ELIMINAR (HU20): un paquete con contrataciones vigentes no se elimina, solo se desactiva
+        // =============================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Eliminar(int id, CancellationToken ct)
+        {
+            var paquete = await _db.PaquetesDestacado.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (paquete == null)
+                return NotFound();
+
+            var ahora = DateTime.UtcNow;
+            var vigentes = await _db.ContratosDestacado.CountAsync(c => c.PaqueteId == id && c.Estado == EstadoContrato.Activo && c.FechaFin > ahora, ct);
+            var historial = await _db.ContratosDestacado.AnyAsync(c => c.PaqueteId == id, ct);
+
+            if (vigentes > 0 || historial)
+            {
+                // Desactivar: deja de ofrecerse a los organizadores, y lo ya contratado se respeta hasta su fin
+                paquete.Activo = false;
+                await _db.SaveChangesAsync(ct);
+                TempData["Mensaje"] = vigentes > 0
+                    ? $"\"{paquete.Nombre}\" tiene {vigentes} {(vigentes == 1 ? "contratación vigente" : "contrataciones vigentes")}: no se eliminó, quedó desactivado (ya no se ofrece)."
+                    : $"\"{paquete.Nombre}\" tiene contrataciones anteriores que se conservan en el historial: no se eliminó, quedó desactivado.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            _db.PaquetesDestacado.Remove(paquete);
+            await _db.SaveChangesAsync(ct);
+            TempData["Mensaje"] = $"Paquete \"{paquete.Nombre}\" eliminado.";
             return RedirectToAction(nameof(Index));
         }
     }

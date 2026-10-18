@@ -23,13 +23,16 @@ public static class CodigoSeguro
 
 public interface IQrEntradaService
 {
-    // Texto que va dentro del QR: "AF2.{token cifrado}" (el código de la entrada no es legible)
-    string CrearContenido(string codigoEntrada);
+    // Texto que va dentro del QR: "AF2.{token cifrado}". Cifra el código y, si se indica, la ubicación (HU27)
+    string CrearContenido(string codigoEntrada, string? ubicacion = null);
 
     // Devuelve el código de la entrada si el token es auténtico; null si fue alterado o no es de ActivaFest
     string? LeerContenido(string contenido);
 
-    byte[] GenerarPng(string codigoEntrada, int pixelesPorModulo = 10);
+    // Ubicación cifrada en el QR ("Zona|Fila|Número" o la zona); null si no la tiene o el QR no es válido
+    string? LeerUbicacion(string contenido);
+
+    byte[] GenerarPng(string codigoEntrada, string? ubicacion = null, int pixelesPorModulo = 10);
 }
 
 // =============================
@@ -64,9 +67,10 @@ public class QrEntradaService : IQrEntradaService
         _claveCifrado = HKDF.DeriveKey(HashAlgorithmName.SHA256, _claveFirma, 32, info: Encoding.UTF8.GetBytes("activafest-qr-cifrado"));
     }
 
-    public string CrearContenido(string codigoEntrada)
+    public string CrearContenido(string codigoEntrada, string? ubicacion = null)
     {
-        var texto = Encoding.UTF8.GetBytes(codigoEntrada);
+        // El código nunca contiene "|" (base64url): sirve de separador con la ubicación
+        var texto = Encoding.UTF8.GetBytes(ubicacion == null ? codigoEntrada : $"{codigoEntrada}|{ubicacion}");
         var token = new byte[TamanoNonce + texto.Length + TamanoEtiqueta];
         var nonce = token.AsSpan(0, TamanoNonce);
         RandomNumberGenerator.Fill(nonce);
@@ -82,16 +86,26 @@ public class QrEntradaService : IQrEntradaService
         var partes = (contenido ?? "").Trim().Split('.');
         return partes switch
         {
-            [Prefijo, var token] => Descifrar(token),
+            [Prefijo, var token] => Descifrar(token)?.Split('|', 2)[0],
             [PrefijoFirmado, var codigo, var firma] when codigo.Length > 0 => VerificarFirma(codigo, firma),
             _ => null
         };
     }
 
-    public byte[] GenerarPng(string codigoEntrada, int pixelesPorModulo = 10)
+    public string? LeerUbicacion(string contenido)
+    {
+        var partes = (contenido ?? "").Trim().Split('.');
+        if (partes is not [Prefijo, var token])
+            return null;
+        var texto = Descifrar(token);
+        var separador = texto?.IndexOf('|') ?? -1;
+        return separador < 0 ? null : texto![(separador + 1)..];
+    }
+
+    public byte[] GenerarPng(string codigoEntrada, string? ubicacion = null, int pixelesPorModulo = 10)
     {
         using var generador = new QRCodeGenerator();
-        using var datos = generador.CreateQrCode(CrearContenido(codigoEntrada), QRCodeGenerator.ECCLevel.Q);
+        using var datos = generador.CreateQrCode(CrearContenido(codigoEntrada, ubicacion), QRCodeGenerator.ECCLevel.Q);
         return new PngByteQRCode(datos).GetGraphic(pixelesPorModulo);
     }
 

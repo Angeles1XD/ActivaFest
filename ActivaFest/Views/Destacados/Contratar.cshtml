@@ -33,7 +33,9 @@
             <p class="texto-tenue">@Formato.Fecha(ev.Fecha, "dddd dd 'de' MMMM, HH:mm") · faltan @Model.DiasDisponibles @(Model.DiasDisponibles == 1 ? "día" : "días")</p>
             @if (Model.Vigente != null)
             {
-                <p class="estado-conciliacion ok"><span aria-hidden="true">✓</span> Destacado hasta el @Model.Vigente.FechaFin?.ToString("dd/MM/yyyy HH:mm"). Si contratas otro paquete, se suma a continuación.</p>
+                <p class="estado-conciliacion ok"><span aria-hidden="true">✓</span> Destacado hasta el @Model.Vigente.FechaFin?.ToString("dd/MM/yyyy HH:mm")
+                    · <span class="temporizador-destacado" data-segundos="@Math.Max(0, (int)(Model.Vigente.FechaFin!.Value - DateTime.Now).TotalSeconds)">⏱️ quedan …</span>.
+                    Si contratas otro paquete, se suma a continuación.</p>
             }
             else if (ev.Estado != EstadoEvento.Aprobado)
             {

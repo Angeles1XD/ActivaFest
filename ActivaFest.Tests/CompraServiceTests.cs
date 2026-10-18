@@ -45,11 +45,11 @@ public static class Fabrica
         new(Options.Create(new QrOptions { Secreto = secreto }), new EntornoFalso(), NullLogger<QrEntradaService>.Instance);
 
     public static CompraService Compras(ApplicationDbContext db, IEmailService email, IDistributedCache? cache = null, decimal comision = 8m,
-        IBloqueoDistribuido? bloqueo = null) =>
+        IBloqueoDistribuido? bloqueo = null, IBloqueoAsientos? asientos = null) =>
         new(db,
             new CatalogoService(db, cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<CatalogoService>.Instance),
             Qr(), email, Options.Create(new ComprasOptions()), Options.Create(new ComisionesOptions { Porcentaje = comision }),
-            bloqueo ?? new BloqueoEnMemoria(), NullLogger<CompraService>.Instance);
+            bloqueo ?? new BloqueoEnMemoria(), asientos ?? new BloqueoAsientosEnMemoria(), NullLogger<CompraService>.Instance);
 }
 
 // =============================
@@ -204,7 +204,7 @@ public class CompraServiceTests : IDisposable
 
         var correo = Assert.Single(_email.Enviados);
         Assert.Equal("ana@test.pe", correo.Para);
-        Assert.Equal(3, correo.Adjuntos);
+        Assert.Equal(3 + 1, correo.Adjuntos); // un QR por entrada + el plano con la ubicación (HU27)
     }
 
     [Fact]
