@@ -46,12 +46,12 @@ namespace ActivaFest.Controllers
         // Nombres explícitos: sin ellos, si el formulario no trae "cantidades[...]" el enlazador intentaría leer
         // todos los campos como cantidades (y fallaría con el token antifalsificación)
         public async Task<IActionResult> Iniciar(int eventoId, [FromForm(Name = "cantidades")] Dictionary<int, int>? cantidades,
-            [FromForm(Name = "asientos")] List<int>? asientos, CancellationToken ct)
+            [FromForm(Name = "asientos")] List<int>? asientos, [FromForm(Name = "cupon")] string? cupon, CancellationToken ct)
         {
             // HU26: en teatro se compran los asientos elegidos en el plano; en el resto, zona y cantidad
             var resultado = asientos is { Count: > 0 }
-                ? await _compras.CrearOrdenConAsientosAsync(UsuarioId, eventoId, asientos, ct)
-                : await _compras.CrearOrdenAsync(UsuarioId, eventoId, cantidades ?? new(), ct);
+                ? await _compras.CrearOrdenConAsientosAsync(UsuarioId, eventoId, asientos, cupon, ct)
+                : await _compras.CrearOrdenAsync(UsuarioId, eventoId, cantidades ?? new(), cupon, ct);
 
             if (resultado.Error != null)
             {
@@ -307,6 +307,7 @@ namespace ActivaFest.Controllers
                 .Include(o => o.Evento).ThenInclude(e => e!.Imagenes.OrderBy(i => i.Orden).Take(1))
                 .Include(o => o.Items).ThenInclude(i => i.TipoEntrada)
                 .Include(o => o.Items).ThenInclude(i => i.Asiento)
+                .Include(o => o.Cupon)
                 .AsSplitQuery()
                 .Where(o => o.Codigo == codigo && o.UsuarioId == UsuarioId);
 

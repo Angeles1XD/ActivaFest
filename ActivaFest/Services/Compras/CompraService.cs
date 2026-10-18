@@ -5,6 +5,7 @@ using ActivaFest.Models;
 using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
 using ActivaFest.Services.Entradas;
+using ActivaFest.Services.Promociones;
 
 namespace ActivaFest.Services.Compras;
 
@@ -37,10 +38,11 @@ public enum ResultadoConfirmacion
 
 public interface ICompraService
 {
-    Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades, CancellationToken ct = default);
+    // HU30: "cupon" es opcional; se valida en el servidor y se aparta junto con la reserva
+    Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades, string? cupon = null, CancellationToken ct = default);
 
     // HU26: compra eligiendo los asientos exactos (recintos con asientos numerados)
-    Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos, CancellationToken ct = default);
+    Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos, string? cupon = null, CancellationToken ct = default);
 
     Task<ResultadoConfirmacion> ConfirmarPagoAsync(string codigoOrden, string proveedor, string referencia, decimal montoPagado,
         string urlMisEntradas, CancellationToken ct = default);
@@ -94,7 +96,7 @@ public class CompraService : ICompraService
     // 1️⃣ CREAR ORDEN Y RESERVAR AFORO
     // =============================
     // Zonas sin asientos numerados: el usuario elige zona y cantidad
-    public async Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades,
+    public async Task<ResultadoOrden> CrearOrdenAsync(string usuarioId, int eventoId, IReadOnlyDictionary<int, int> cantidades, string? cupon = null,
         CancellationToken ct = default)
     {
         var pedidas = cantidades.Where(c => c.Value > 0).ToDictionary(c => c.Key, c => c.Value);
@@ -114,11 +116,11 @@ public class CompraService : ICompraService
             return ResultadoOrden.Fallo("En este recinto eliges tus asientos en el plano.");
 
         var items = pedidas.Select(p => new OrdenItem { TipoEntradaId = p.Key, Cantidad = p.Value, PrecioUnitario = tipos[p.Key].Precio }).ToList();
-        return await CrearAsync(usuarioId, evento, items, ct);
+        return await CrearAsync(usuarioId, evento, items, cupon, ct);
     }
 
     // HU26: recintos con asientos numerados: el usuario elige los asientos exactos en el plano
-    public async Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos,
+    public async Task<ResultadoOrden> CrearOrdenConAsientosAsync(string usuarioId, int eventoId, IReadOnlyCollection<int> asientos, string? cupon = null,
         CancellationToken ct = default)
     {
         var ids = asientos.Distinct().ToList();
@@ -147,7 +149,7 @@ public class CompraService : ICompraService
             .OrderBy(a => a.Fila.Length).ThenBy(a => a.Fila).ThenBy(a => a.Numero)
             .Select(a => new OrdenItem { TipoEntradaId = a.TipoEntradaId, Cantidad = 1, AsientoId = a.Id, PrecioUnitario = tipos[a.TipoEntradaId].Precio })
             .ToList();
-        return await CrearAsync(usuarioId, evento, items, ct, elegidos);
+        return await CrearAsync(usuarioId, evento, items, cupon, ct, elegidos);
     }
 
     private async Task<(Evento? Evento, string? Error)> EventoEnVentaAsync(int eventoId, CancellationToken ct)
@@ -170,11 +172,20 @@ public class CompraService : ICompraService
             : $"Los asientos {string.Join(", ", lista.Select(a => a.Etiqueta))} ya no están disponibles: elige otros en el plano.");
     }
 
-    private async Task<ResultadoOrden> CrearAsync(string usuarioId, Evento evento, List<OrdenItem> items, CancellationToken ct,
+    private async Task<ResultadoOrden> CrearAsync(string usuarioId, Evento evento, List<OrdenItem> items, string? codigoCupon, CancellationToken ct,
         List<Asiento>? asientos = null)
     {
         if (items.Sum(i => i.Cantidad) > _opciones.MaxEntradasPorOrden)
             return ResultadoOrden.Fallo($"Puedes comprar como máximo {_opciones.MaxEntradasPorOrden} entradas por compra.");
+
+        // HU30: el cupón se valida en el servidor antes de reservar (secuencia de compra: ValidarCupon(código, usuario))
+        ResultadoCupon? cupon = null;
+        if (!string.IsNullOrWhiteSpace(codigoCupon))
+        {
+            cupon = await PromocionService.ValidarAsync(_db, codigoCupon, usuarioId, items.Sum(i => i.Subtotal), DateTime.Now, ct);
+            if (cupon.Error != null)
+                return ResultadoOrden.Fallo(cupon.Error);
+        }
 
         var tipos = evento.TiposEntrada.ToDictionary(t => t.Id);
 
@@ -197,7 +208,9 @@ public class CompraService : ICompraService
             FechaExpiracion = DateTime.UtcNow.AddMinutes(_opciones.MinutosReserva),
             Items = items
         };
-        orden.Total = orden.Items.Sum(i => i.Subtotal);
+        orden.Descuento = cupon?.Descuento ?? 0;
+        orden.CuponId = cupon?.Cupon?.Id;
+        orden.Total = orden.Items.Sum(i => i.Subtotal) - orden.Descuento;
 
         // HU11: bloqueo distribuido (Redis) por evento: las reservas del mismo evento se procesan de una en una
         await using var bloqueo = await _bloqueos.AdquirirAsync($"aforo:evento:{evento.Id}", DuracionBloqueo, EsperaBloqueo, ct);
@@ -247,6 +260,16 @@ public class CompraService : ICompraService
 
         _db.Ordenes.Add(orden);
         await _db.SaveChangesAsync(ct);
+
+        // HU30: el cupón se aparta para esta compra en la misma transacción (un solo uso y límite de la promoción)
+        if (cupon?.Cupon != null && !await ApartarCuponAsync(cupon.Cupon, orden.Id, ct))
+        {
+            await tx.RollbackAsync(ct);
+            _db.ChangeTracker.Clear();
+            await _asientosBloqueados.LiberarAsync(idsAsientos, orden.Codigo, ct);
+            return ResultadoOrden.Fallo("Este cupón ya se está usando en otra compra o la promoción alcanzó su límite de usos.");
+        }
+
         await tx.CommitAsync(ct);
 
         _logger.LogInformation("🛒 Orden {Codigo} creada: {Cantidad} entradas, total {Total}", orden.Codigo, orden.CantidadEntradas, orden.Total);
@@ -302,6 +325,9 @@ public class CompraService : ICompraService
             if (asientos.Count > 0)
                 await _db.Asientos.Where(a => asientos.Contains(a.Id))
                     .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, EstadoAsiento.Vendido), ct);
+
+            // HU30: el cupón apartado queda usado y asociado a esta compra
+            await MarcarCuponUsadoAsync(orden, ct);
         }
         else
         {
@@ -332,6 +358,9 @@ public class CompraService : ICompraService
                 await tx.RollbackAsync(ct);
                 return ResultadoConfirmacion.YaEstabaConfirmada;
             }
+
+            // La reserva caducada ya había devuelto el cupón: se vuelve a tomar, porque el pago se hizo con el descuento
+            await MarcarCuponUsadoAsync(orden, ct, retomar: true);
         }
 
         // Emisión: una entrada con QR único por cada persona
@@ -489,6 +518,19 @@ public class CompraService : ICompraService
                     .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
         }
 
+        // HU30: el cupón apartado vuelve a estar disponible para su dueño y se devuelve el uso a la promoción
+        var orden = await _db.Ordenes.Where(o => o.Codigo == codigoOrden).Select(o => new { o.Id, o.CuponId }).FirstAsync(ct);
+        if (orden.CuponId != null)
+        {
+            var promocionId = await _db.Cupones.Where(c => c.Id == orden.CuponId).Select(c => c.PromocionId).FirstAsync(ct);
+            var devuelto = await _db.Cupones
+                .Where(c => c.Id == orden.CuponId && c.OrdenId == orden.Id && !c.Usado)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.OrdenId, (int?)null), ct);
+            if (devuelto == 1)
+                await _db.Promociones.Where(p => p.Id == promocionId && p.Usos > 0)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Usos, p => p.Usos - 1), ct);
+        }
+
         // HU26 / ciclo de vida del Asiento: Bloqueado → Disponible (expira, pago rechazado o compra cancelada)
         var asientos = items.Where(i => i.AsientoId.HasValue).Select(i => i.AsientoId!.Value).ToList();
         if (asientos.Count > 0)
@@ -531,6 +573,50 @@ public class CompraService : ICompraService
         }
 
         return true;
+    }
+
+    // =============================
+    // 🎁 CUPÓN DE UN SOLO USO (HU30)
+    // =============================
+    // Dos UPDATE condicionales: el cupón solo se aparta si nadie lo tiene y no está usado, y la promoción solo
+    // suma un uso si no llegó a su límite. Si alguno falla, la transacción de la reserva se revierte completa.
+    private async Task<bool> ApartarCuponAsync(Cupon cupon, int ordenId, CancellationToken ct)
+    {
+        int? id = ordenId;
+        var apartado = await _db.Cupones
+            .Where(c => c.Id == cupon.Id && !c.Usado && c.OrdenId == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.OrdenId, id), ct);
+        if (apartado == 0)
+            return false;
+
+        var usos = await _db.Promociones
+            .Where(p => p.Id == cupon.PromocionId && p.Activa && (p.LimiteUsos == null || p.Usos < p.LimiteUsos))
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Usos, p => p.Usos + 1), ct);
+        return usos == 1;
+    }
+
+    private async Task MarcarCuponUsadoAsync(Orden orden, CancellationToken ct, bool retomar = false)
+    {
+        if (orden.CuponId == null)
+            return;
+
+        int? ordenId = orden.Id;
+        DateTime? ahora = DateTime.UtcNow;
+        var usados = await _db.Cupones
+            .Where(c => c.Id == orden.CuponId && !c.Usado && (c.OrdenId == orden.Id || (retomar && c.OrdenId == null)))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.Usado, true)
+                .SetProperty(c => c.OrdenId, ordenId)
+                .SetProperty(c => c.FechaUso, ahora), ct);
+
+        if (retomar && usados == 1)
+        {
+            // El pago ya se hizo con el descuento: se respeta aunque la promoción haya llegado a su límite mientras tanto
+            var promocionId = await _db.Cupones.Where(c => c.Id == orden.CuponId).Select(c => c.PromocionId).FirstAsync(ct);
+            await _db.Promociones.Where(p => p.Id == promocionId).ExecuteUpdateAsync(s => s.SetProperty(p => p.Usos, p => p.Usos + 1), ct);
+        }
+        else if (usados == 0)
+            _logger.LogWarning("🎁 El cupón {Cupon} de la orden {Codigo} no se pudo marcar como usado (ya usado en otra compra)", orden.CuponId, orden.Codigo);
     }
 
     private async Task<bool> MarcarPagadaAsync(string codigo, EstadoOrden desde, string proveedor, string referencia, CancellationToken ct)

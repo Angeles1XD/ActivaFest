@@ -524,3 +524,6 @@
 .entrada-plano .plano-svg {
   min-width: 0;
 }
+
+/* HU30: descuento del cupón en el resumen */
+.resumen-items .fila-descuento td { color: #4ade80; }

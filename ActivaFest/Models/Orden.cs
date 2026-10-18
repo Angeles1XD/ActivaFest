@@ -37,7 +37,19 @@ namespace ActivaFest.Models
 
         public EstadoOrden Estado { get; set; } = EstadoOrden.PendientePago;
 
+        // Lo que se cobra: subtotal de las entradas menos el descuento del cupón
         public decimal Total { get; set; }
+
+        // =============================
+        // 🎁 CUPÓN APLICADO (HU30)
+        // =============================
+        public decimal Descuento { get; set; }
+
+        public int? CuponId { get; set; }
+
+        public Cupon? Cupon { get; set; }
+
+        public decimal Subtotal => Total + Descuento;
 
         // =============================
         // 💰 COMISIÓN DE LA PLATAFORMA (HU16 / RF14)

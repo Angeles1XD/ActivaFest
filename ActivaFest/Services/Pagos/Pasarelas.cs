@@ -41,13 +41,16 @@ public record SolicitudCobro(string Codigo, IReadOnlyList<ItemCobro> Items, Date
 
     public bool EsDestacado => Codigo.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal);
 
+    // HU30: con cupón se cobra una sola línea por el total con descuento (la pasarela no admite precios negativos)
     public static SolicitudCobro DesdeOrden(Orden orden, string tituloEvento) => new(
         orden.Codigo,
-        orden.Items.Select(i => new ItemCobro(
-            i.TipoEntradaId.ToString(CultureInfo.InvariantCulture),
-            $"{tituloEvento} - {i.TipoEntrada?.Nombre ?? "Entrada"}",
-            i.Cantidad,
-            i.PrecioUnitario)).ToList(),
+        orden.Descuento > 0
+            ? new[] { new ItemCobro($"orden-{orden.Codigo}", $"{tituloEvento} - {orden.CantidadEntradas} entradas (con cupón)", 1, orden.Total) }
+            : orden.Items.Select(i => new ItemCobro(
+                i.TipoEntradaId.ToString(CultureInfo.InvariantCulture),
+                $"{tituloEvento} - {i.TipoEntrada?.Nombre ?? "Entrada"}",
+                i.Cantidad,
+                i.PrecioUnitario)).ToList(),
         orden.FechaExpiracion);
 
     public static SolicitudCobro DesdeContrato(ContratoDestacado contrato, string tituloEvento, string nombrePaquete) => new(

@@ -102,6 +102,9 @@ builder.Services.Configure<ComisionesOptions>(builder.Configuration.GetSection("
 builder.Services.AddScoped<ActivaFest.Services.Publicidad.IDestacadoService, ActivaFest.Services.Publicidad.DestacadoService>();
 builder.Services.AddScoped<ActivaFest.Services.Comisiones.IComisionService, ActivaFest.Services.Comisiones.ComisionService>();
 
+// 📊 Analítica del administrador (HU21, HU22, HU29)
+builder.Services.AddScoped<ActivaFest.Services.Analitica.IAnaliticaService, ActivaFest.Services.Analitica.AnaliticaService>();
+
 // =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
 // =============================
@@ -113,6 +116,7 @@ builder.Services.AddSingleton<IQrEntradaService, QrEntradaService>();
 builder.Services.AddSingleton<BloqueoEnMemoria>();
 builder.Services.AddSingleton<BloqueoAsientosEnMemoria>();
 builder.Services.AddScoped<ICompraService, CompraService>();
+builder.Services.AddScoped<ActivaFest.Services.Promociones.IPromocionService, ActivaFest.Services.Promociones.PromocionService>();
 builder.Services.AddHostedService<ExpiracionReservasService>();
 
 builder.Services.AddHttpClient<MercadoPagoPasarela>(c => c.Timeout = TimeSpan.FromSeconds(20));

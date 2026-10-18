@@ -25,8 +25,9 @@ namespace ActivaFest.Controllers
 
         private bool EsAdmin => User.IsInRole(Roles.Administrador);
 
-        public async Task<IActionResult> Index(CancellationToken ct) =>
-            View(await _panel.ResumenAsync(UsuarioId, EsAdmin, ct));
+        // Búsqueda, filtros y paginación (con muchos eventos no se cargan todos a la vez)
+        public async Task<IActionResult> Index([FromQuery] FiltroPanel filtro, CancellationToken ct) =>
+            View(await _panel.BuscarAsync(UsuarioId, EsAdmin, filtro, ct));
 
         public async Task<IActionResult> Evento(int id, CancellationToken ct)
         {

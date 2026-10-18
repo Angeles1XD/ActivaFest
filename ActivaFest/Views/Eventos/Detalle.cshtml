@@ -1,5 +1,7 @@
 @model Evento
+@using System.Security.Claims
 @inject Microsoft.Extensions.Options.IOptions<ActivaFest.Services.Compras.ComprasOptions> OpcionesCompras
+@inject ActivaFest.Services.Promociones.IPromocionService Promociones
 @{
     ViewData["Title"] = Model.Titulo;
     var imagenes = Model.Imagenes.OrderBy(i => i.Orden).ToList();
@@ -212,6 +214,23 @@
                             </div>
                             <div id="inputsAsientos"></div>
                         }
+                        @* HU30: cupón personal (opcional); se valida en el servidor al reservar *@
+                        var misCupones = await Promociones.CuponesDisponiblesAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+                        <div class="campo-cupon">
+                            <label for="cupon">🎁 Cupón de descuento <span class="texto-suave">(opcional)</span></label>
+                            <input id="cupon" name="cupon" type="text" maxlength="20" autocomplete="off" placeholder="AF-XXXXXXXX"
+                                   list="misCupones" style="text-transform:uppercase" />
+                            @if (misCupones.Count > 0)
+                            {
+                                <datalist id="misCupones">
+                                    @foreach (var c in misCupones)
+                                    {
+                                        <option value="@c.Codigo">@c.Promocion!.Nombre · @c.Promocion.Etiqueta</option>
+                                    }
+                                </datalist>
+                                <p class="texto-suave">Tienes @misCupones.Count @(misCupones.Count == 1 ? "cupón disponible" : "cupones disponibles"). El descuento se aplica en el resumen de pago.</p>
+                            }
+                        </div>
                         <p class="total-compra">Total: <b id="totalCompra">S/ 0.00</b></p>
                         <button type="submit" class="btn-rosa btn-bloque" id="btnComprar" disabled>🎟️ Comprar entradas</button>
                         <p class="texto-suave nota-reserva">Reservamos tus entradas por @OpcionesCompras.Value.MinutosReserva minutos mientras pagas.</p>

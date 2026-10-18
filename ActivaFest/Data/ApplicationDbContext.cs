@@ -29,6 +29,12 @@ namespace ActivaFest.Data
 
         public DbSet<Asiento> Asientos { get; set; }
 
+        public DbSet<AuditoriaAnalitica> AuditoriasAnalitica { get; set; }
+
+        // HU30: promociones y cupones personales
+        public DbSet<Promocion> Promociones { get; set; }
+        public DbSet<Cupon> Cupones { get; set; }
+
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
         {
@@ -183,6 +189,13 @@ namespace ActivaFest.Data
                 v.HasOne<Evento>().WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
             });
 
+            // HU22: auditoría de la analítica por usuario (se conserva aunque se borre el usuario consultado)
+            builder.Entity<AuditoriaAnalitica>(a =>
+            {
+                a.HasIndex(x => x.Fecha);
+                a.HasOne(x => x.Administrador).WithMany().HasForeignKey(x => x.AdministradorId).OnDelete(DeleteBehavior.Restrict);
+            });
+
             // HU25: cada asiento tiene zona, fila y número únicos
             builder.Entity<Asiento>(a =>
             {
@@ -191,6 +204,23 @@ namespace ActivaFest.Data
             });
 
             builder.Entity<Evento>().Property(e => e.PlantillaPlano).HasConversion<string>().HasMaxLength(20);
+
+            // HU30: un cupón por cliente y promoción, código único y aplicado como máximo en una compra
+            builder.Entity<Promocion>(p =>
+            {
+                p.Property(x => x.TipoDescuento).HasConversion<string>().HasMaxLength(20);
+                p.HasOne(x => x.CreadaPor).WithMany().HasForeignKey(x => x.CreadaPorId).OnDelete(DeleteBehavior.Restrict);
+            });
+            builder.Entity<Cupon>(c =>
+            {
+                c.HasIndex(x => x.Codigo).IsUnique();
+                c.HasIndex(x => new { x.PromocionId, x.UsuarioId }).IsUnique();
+                c.HasIndex(x => x.OrdenId).IsUnique().HasFilter("OrdenId IS NOT NULL");
+                c.HasOne(x => x.Promocion).WithMany(p => p.Cupones).HasForeignKey(x => x.PromocionId).OnDelete(DeleteBehavior.Cascade);
+                c.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+                c.HasOne(x => x.Orden).WithMany().HasForeignKey(x => x.OrdenId).OnDelete(DeleteBehavior.SetNull);
+            });
+            builder.Entity<Orden>().HasOne(o => o.Cupon).WithMany().HasForeignKey(o => o.CuponId).OnDelete(DeleteBehavior.SetNull);
 
             // Un mismo miembro del personal se asigna una sola vez a cada evento
             builder.Entity<AsignacionAcceso>(a =>

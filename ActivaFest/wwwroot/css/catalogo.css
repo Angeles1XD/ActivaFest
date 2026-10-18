@@ -697,3 +697,11 @@
 .catalogo-encabezado.cat-encabezado {
   margin-bottom: 26px;
 }
+
+/* ===== HU30: cupón en el formulario de compra ===== */
+.campo-cupon { display: grid; gap: 6px; margin: 14px 0 4px; }
+.campo-cupon label { font-weight: 600; font-size: 14px; }
+.campo-cupon input {
+  padding: 10px 12px; border-radius: 10px; border: 1px dashed rgba(255, 0, 110, 0.6);
+  background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; letter-spacing: 1px;
+}

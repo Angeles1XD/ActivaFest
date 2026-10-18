@@ -33,6 +33,14 @@
         }
     </tbody>
     <tfoot>
+        @if (Model.Descuento > 0)
+        {
+            @* HU30: cupón aplicado *@
+            <tr class="fila-descuento">
+                <td>🎁 Cupón @Model.Cupon?.Codigo</td>
+                <td class="monto">− @Formato.Precio(Model.Descuento)</td>
+            </tr>
+        }
         <tr>
             <td>Total</td>
             <td class="monto">@Formato.Precio(Model.Total)</td>

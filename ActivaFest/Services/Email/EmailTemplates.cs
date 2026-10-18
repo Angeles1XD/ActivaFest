@@ -107,6 +107,17 @@ public static class EmailTemplates
             "<p>Puedes corregir la información y volver a enviarlo.</p>",
             "Ir a mis eventos", urlMisEventos);
 
+    // HU30: cupón personal de una promoción
+    public static string CuponPromocion(string nombre, Promocion p, string codigo, string urlCatalogo) =>
+        Layout("¡Tienes un cupón de descuento! 🎁",
+            $"<p>Hola {E(nombre)}, gracias por ser parte de ActivaFest. Te regalamos <b>{E(p.Etiqueta)}</b> en tu próxima compra de entradas.</p>" +
+            $"<p style=\"text-align:center;margin:24px 0;\"><span style=\"display:inline-block;padding:12px 22px;border:2px dashed #ff006e;border-radius:10px;font-size:22px;font-weight:bold;letter-spacing:2px;color:#111;\">{E(codigo)}</span></p>" +
+            $"<p>Válido del <b>{p.FechaInicio:dd/MM/yyyy}</b> al <b>{p.FechaFin:dd/MM/yyyy}</b>. Escríbelo en el campo «Cupón de descuento» al comprar.</p>" +
+            "<p style=\"color:#888;font-size:13px;\">El cupón es personal: solo funciona con tu cuenta y se puede usar una sola vez." +
+            (p.LimiteUsos != null ? " La promoción tiene cupos limitados." : "") + "</p>" +
+            "<p style=\"color:#888;font-size:12px;\">Recibes este correo porque aceptaste recibir promociones. Puedes desactivarlas en tu perfil.</p>",
+            "Ver eventos", urlCatalogo);
+
     public static string EntradasCompradas(string nombre, Orden orden, Evento evento, string urlMisEntradas)
     {
         var filas = string.Join("", orden.Items
@@ -120,6 +131,9 @@ public static class EmailTemplates
             $"<p>Hola {E(nombre)}, tu compra para <b>{E(evento.Titulo)}</b> fue confirmada.</p>" +
             $"<p>📅 {Formato.Fecha(evento.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm")}<br/>📍 {E(evento.Ubicacion)}</p>" +
             $"<table width=\"100%\" style=\"border-top:1px solid #eee;border-bottom:1px solid #eee;margin:15px 0;\">{filas}" +
+            (orden.Descuento > 0
+                ? $"<tr><td style=\"padding:6px 0;color:#16a34a;\">Descuento (cupón)</td><td style=\"padding:6px 0;text-align:right;color:#16a34a;\">− {Formato.Precio(orden.Descuento)}</td></tr>"
+                : "") +
             $"<tr><td style=\"padding:8px 0;\"><b>Total</b></td><td style=\"padding:8px 0;text-align:right;\"><b>{Formato.Precio(orden.Total)}</b></td></tr></table>" +
             UbicacionesHtml(orden) +
             $"<p>Adjuntamos <b>{orden.Entradas.Count}</b> {(orden.Entradas.Count == 1 ? "código QR" : "códigos QR")}, uno por persona, " +

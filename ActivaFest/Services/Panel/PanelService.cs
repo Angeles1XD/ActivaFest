@@ -14,6 +14,9 @@ public class ResumenEventoPanel
     public int Vendidas { get; set; }
     public decimal Ingresos { get; set; }
     public int Reservadas { get; set; }
+    public string? Organizador { get; set; }
+    public string? Categoria { get; set; }
+    public string? IconoCategoria { get; set; }
 
     // HU13: aforo restante = lo que aún se puede vender (un evento cancelado ya no vende)
     public int AforoRestante => Estado == EstadoEvento.Cancelado ? 0 : Math.Max(0, Aforo - Vendidas - Reservadas);
@@ -21,6 +24,52 @@ public class ResumenEventoPanel
     public double Ocupacion => Aforo == 0 ? 0 : (double)Vendidas / Aforo;
 }
 
+
+// Búsqueda y filtros del panel (mejora de HU13 para bases con muchos eventos)
+public class FiltroPanel
+{
+    public const int TamanoPagina = 20;
+    public static readonly string[] Periodos = { "proximos", "pasados" };
+
+    // Texto en el título, la ubicación o (solo administrador) el organizador
+    public string? Q { get; set; }
+    public EstadoEvento? Estado { get; set; }
+    public int? CategoriaId { get; set; }
+
+    // "proximos", "pasados" o vacío (todos)
+    public string? Periodo { get; set; }
+    public int Pagina { get; set; } = 1;
+
+    public bool TieneFiltros => !string.IsNullOrWhiteSpace(Q) || Estado != null || CategoriaId != null || !string.IsNullOrEmpty(Periodo);
+}
+
+public record RendimientoCategoria(int CategoriaId, string Nombre, string Icono, string Color, int Eventos, int Aforo, int Vendidas, decimal Ingresos)
+{
+    // Umbral del documento: ocupación menor al 40 % = baja venta (candidata a promoción o destacado)
+    public const double UmbralBajo = 0.40, UmbralAlto = 0.70;
+
+    public double Ocupacion => Aforo == 0 ? 0 : (double)Vendidas / Aforo;
+    public string Nivel => Ocupacion >= UmbralAlto ? "Alta" : Ocupacion < UmbralBajo ? "Baja" : "Media";
+}
+
+public class ListadoPanel
+{
+    public FiltroPanel Filtro { get; set; } = new();
+    public List<ResumenEventoPanel> Eventos { get; set; } = new();
+
+    // Totales de todos los eventos que cumplen el filtro (no solo de la página)
+    public int Total { get; set; }
+    public decimal Ingresos { get; set; }
+    public int Vendidas { get; set; }
+    public int Proximos { get; set; }
+
+    // Rendimiento por categoría de los eventos aprobados encontrados (¿qué categoría se llena y cuál está floja?)
+    public List<RendimientoCategoria> PorCategoria { get; set; } = new();
+    public List<Categoria> Categorias { get; set; } = new();
+
+    public int Pagina { get; set; } = 1;
+    public int Paginas => Math.Max(1, (int)Math.Ceiling(Total / (double)FiltroPanel.TamanoPagina));
+}
 public class ZonaPanel
 {
     public string Nombre { get; set; } = "";
@@ -70,6 +119,9 @@ public interface IPanelService
 {
     Task<List<ResumenEventoPanel>> ResumenAsync(string usuarioId, bool esAdmin, CancellationToken ct = default);
 
+    // Búsqueda, filtros y paginación del panel
+    Task<ListadoPanel> BuscarAsync(string usuarioId, bool esAdmin, FiltroPanel filtro, CancellationToken ct = default);
+
     Task<PanelEvento?> DetalleAsync(int eventoId, string usuarioId, bool esAdmin, CancellationToken ct = default);
 }
 
@@ -96,18 +148,116 @@ public class PanelService : IPanelService
 
     public async Task<List<ResumenEventoPanel>> ResumenAsync(string usuarioId, bool esAdmin, CancellationToken ct = default)
     {
-        var eventos = await EventosVisibles(usuarioId, esAdmin)
-            .Select(e => new ResumenEventoPanel
-            {
-                Id = e.Id,
-                Titulo = e.Titulo,
-                Fecha = e.Fecha,
-                Estado = e.Estado,
-                Aforo = e.TiposEntrada.Sum(t => t.Capacidad),
-                Reservadas = e.TiposEntrada.Sum(t => t.Reservadas)
-            })
-            .ToListAsync(ct);
+        var eventos = await Proyectar(EventosVisibles(usuarioId, esAdmin)).ToListAsync(ct);
+        await CompletarVentasAsync(eventos, ct);
 
+        // Próximos primero (más cercano arriba), luego los pasados (más reciente arriba)
+        var ahora = DateTime.Now;
+        return eventos
+            .OrderBy(e => e.Fecha < ahora)
+            .ThenBy(e => e.Fecha < ahora ? -e.Fecha.Ticks : e.Fecha.Ticks)
+            .ToList();
+    }
+
+    // Filtra y pagina en la base de datos: el panel sigue siendo rápido aunque haya miles de eventos
+    public async Task<ListadoPanel> BuscarAsync(string usuarioId, bool esAdmin, FiltroPanel filtro, CancellationToken ct = default)
+    {
+        var ahora = DateTime.Now;
+        var q = EventosVisibles(usuarioId, esAdmin);
+
+        var texto = filtro.Q?.Trim();
+        if (!string.IsNullOrEmpty(texto))
+        {
+            // Los comodines que escriba el usuario (% y _) se buscan literalmente, con "\" como carácter de escape
+            var patron = "%" + texto.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
+            q = esAdmin
+                ? q.Where(e => EF.Functions.Like(e.Titulo, patron, "\\") || EF.Functions.Like(e.Ubicacion, patron, "\\")
+                               || EF.Functions.Like(e.Organizador!.NombreCompleto, patron, "\\") || EF.Functions.Like(e.Organizador!.Email!, patron, "\\"))
+                : q.Where(e => EF.Functions.Like(e.Titulo, patron, "\\") || EF.Functions.Like(e.Ubicacion, patron, "\\"));
+        }
+        if (filtro.CategoriaId != null)
+            q = q.Where(e => e.CategoriaId == filtro.CategoriaId);
+        if (filtro.Estado != null)
+            q = q.Where(e => e.Estado == filtro.Estado);
+        if (filtro.Periodo == "proximos")
+            q = q.Where(e => e.Fecha >= ahora);
+        else if (filtro.Periodo == "pasados")
+            q = q.Where(e => e.Fecha < ahora);
+
+        var listado = new ListadoPanel { Filtro = filtro, Total = await q.CountAsync(ct) };
+        listado.Pagina = Math.Clamp(filtro.Pagina, 1, listado.Paginas);
+        listado.Proximos = await q.CountAsync(e => e.Fecha >= ahora, ct);
+
+        // Totales de todos los eventos filtrados (no solo de la página visible)
+        var ids = q.Select(e => e.Id);
+        listado.Vendidas = await _db.Entradas.CountAsync(e => ids.Contains(e.EventoId) && e.Estado != EstadoEntrada.Anulada, ct);
+        listado.Ingresos = (await _db.Ordenes
+            .Where(o => ids.Contains(o.EventoId) && o.Estado == EstadoOrden.Pagada)
+            .Select(o => o.Total)
+            .ToListAsync(ct)).Sum();
+
+        // Mismo orden que el panel: próximos (el más cercano arriba) y luego pasados (el más reciente arriba)
+        listado.Eventos = await Proyectar(q
+                .OrderBy(e => e.Fecha < ahora)
+                .ThenBy(e => e.Fecha < ahora ? (DateTime?)null : e.Fecha)
+                .ThenByDescending(e => e.Fecha)
+                .ThenBy(e => e.Id)
+                .Skip((listado.Pagina - 1) * FiltroPanel.TamanoPagina)
+                .Take(FiltroPanel.TamanoPagina))
+            .ToListAsync(ct);
+        await CompletarVentasAsync(listado.Eventos, ct);
+
+        listado.Categorias = await _db.Categorias.AsNoTracking().OrderBy(c => c.Nombre).ToListAsync(ct);
+        listado.PorCategoria = await RendimientoPorCategoriaAsync(q, listado.Categorias, ct);
+        return listado;
+    }
+
+    // Rendimiento de cada categoría con los eventos aprobados del filtro (sin pendientes, rechazados ni cancelados).
+    // Vendidas e ingresos salen de las entradas emitidas y las órdenes pagadas (OE4).
+    private async Task<List<RendimientoCategoria>> RendimientoPorCategoriaAsync(IQueryable<Evento> eventos, List<Categoria> categorias,
+        CancellationToken ct)
+    {
+        var ids = eventos.Where(e => e.Estado == EstadoEvento.Aprobado).Select(e => e.Id);
+
+        var cantidad = await _db.Eventos.Where(e => ids.Contains(e.Id))
+            .GroupBy(e => e.CategoriaId).Select(g => new { g.Key, Total = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+        var aforo = await _db.TiposEntrada.Where(t => ids.Contains(t.EventoId))
+            .GroupBy(t => t.Evento!.CategoriaId).Select(g => new { g.Key, Total = g.Sum(t => t.Capacidad) })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+        var vendidas = await _db.Entradas.Where(e => ids.Contains(e.EventoId) && e.Estado != EstadoEntrada.Anulada)
+            .GroupBy(e => e.Evento!.CategoriaId).Select(g => new { g.Key, Total = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+        var ingresos = await _db.Ordenes.Where(o => ids.Contains(o.EventoId) && o.Estado == EstadoOrden.Pagada)
+            .GroupBy(o => o.Evento!.CategoriaId).Select(g => new { g.Key, Total = g.Sum(o => o.Total) })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+
+        return categorias
+            .Where(c => cantidad.ContainsKey(c.Id))
+            .Select(c => new RendimientoCategoria(c.Id, c.Nombre, c.Icono, c.Color, cantidad[c.Id],
+                aforo.GetValueOrDefault(c.Id), vendidas.GetValueOrDefault(c.Id), ingresos.GetValueOrDefault(c.Id)))
+            .OrderByDescending(r => r.Ocupacion)
+            .ThenByDescending(r => r.Ingresos)
+            .ToList();
+    }
+
+    private static IQueryable<ResumenEventoPanel> Proyectar(IQueryable<Evento> eventos) =>
+        eventos.Select(e => new ResumenEventoPanel
+        {
+            Id = e.Id,
+            Titulo = e.Titulo,
+            Fecha = e.Fecha,
+            Estado = e.Estado,
+            Aforo = e.TiposEntrada.Sum(t => t.Capacidad),
+            Reservadas = e.TiposEntrada.Sum(t => t.Reservadas),
+            Organizador = e.Organizador!.NombreCompleto,
+            Categoria = e.Categoria!.Nombre,
+            IconoCategoria = e.Categoria.Icono
+        });
+
+    // Vendidas e ingresos salen de las transacciones (OE4), no de contadores
+    private async Task CompletarVentasAsync(List<ResumenEventoPanel> eventos, CancellationToken ct)
+    {
         var ids = eventos.Select(e => e.Id).ToList();
 
         var vendidas = await _db.Entradas
@@ -127,13 +277,6 @@ public class PanelService : IPanelService
             e.Vendidas = vendidas.GetValueOrDefault(e.Id);
             e.Ingresos = ingresos.GetValueOrDefault(e.Id);
         }
-
-        // Próximos primero (más cercano arriba), luego los pasados (más reciente arriba)
-        var ahora = DateTime.Now;
-        return eventos
-            .OrderBy(e => e.Fecha < ahora)
-            .ThenBy(e => e.Fecha < ahora ? -e.Fecha.Ticks : e.Fecha.Ticks)
-            .ToList();
     }
 
     public async Task<PanelEvento?> DetalleAsync(int eventoId, string usuarioId, bool esAdmin, CancellationToken ct = default)
