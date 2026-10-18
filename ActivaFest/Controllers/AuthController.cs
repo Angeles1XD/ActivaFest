@@ -11,6 +11,9 @@ namespace ActivaFest.Controllers
     // =============================
     public class AuthController : Controller
     {
+        public const string MensajeLoginFallido =
+            "No pudimos iniciar sesión con esos datos. Revisa tu correo y contraseña; tras 5 intentos fallidos el acceso se bloquea 10 minutos.";
+
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEmailService _email;
@@ -54,7 +57,9 @@ namespace ActivaFest.Controllers
             {
                 UserName = model.Email,
                 Email = model.Email,
-                NombreCompleto = model.NombreCompleto.Trim()
+                NombreCompleto = model.NombreCompleto.Trim(),
+                AceptaTratamientoDatos = model.AceptaTratamientoDatos,
+                AceptaPromociones = model.AceptaPromociones
             };
 
             var result = await _userManager.CreateAsync(usuario, model.Password);
@@ -113,9 +118,9 @@ namespace ActivaFest.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ModelState.AddModelError(string.Empty, result.IsLockedOut
-                ? "Cuenta bloqueada temporalmente por varios intentos fallidos. Intenta en 10 minutos."
-                : "Correo o contraseña incorrectos.");
+            // Un único mensaje para todo fallo (correo inexistente, clave errada, cuenta bloqueada o desactivada):
+            // no revela qué dato falló ni si el correo está registrado (criterio de HU01)
+            ModelState.AddModelError(string.Empty, MensajeLoginFallido);
 
             return View(model);
         }
@@ -147,8 +152,8 @@ namespace ActivaFest.Controllers
 
             var usuario = await _userManager.FindByEmailAsync(model.Email);
 
-            // No revelamos si el correo existe o no
-            if (usuario != null)
+            // No revelamos si el correo existe o no; una cuenta desactivada tampoco recibe enlace (HU19)
+            if (usuario is { Activo: true })
             {
                 var token = await _userManager.GeneratePasswordResetTokenAsync(usuario);
                 var url = Url.Action(nameof(RestablecerContrasena), "Auth",
@@ -205,7 +210,7 @@ namespace ActivaFest.Controllers
             "PasswordRequiresUpper" => "La contraseña debe tener al menos una letra mayúscula.",
             "PasswordRequiresDigit" => "La contraseña debe tener al menos un número.",
             "PasswordRequiresLower" => "La contraseña debe tener al menos una letra minúscula.",
-            "InvalidToken" => "El enlace de recuperación no es válido o ya expiró.",
+            "InvalidToken" => "El enlace de recuperación no es válido, ya fue usado o venció (dura 1 hora). Solicita uno nuevo.",
             _ => error.Description
         };
     }

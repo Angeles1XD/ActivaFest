@@ -1,14 +1,21 @@
 @model Evento
+@inject Microsoft.Extensions.Options.IOptions<ActivaFest.Services.Compras.ComprasOptions> OpcionesCompras
 @{
     ViewData["Title"] = Model.Titulo;
     var imagenes = Model.Imagenes.OrderBy(i => i.Orden).ToList();
     var tipos = Model.TiposEntrada.OrderBy(t => t.Precio).ToList();
     var inv = System.Globalization.CultureInfo.InvariantCulture;
+    // Un evento realizado o cancelado ya no tiene aforo "disponible"
+    var mostrarDisponibles = !Model.YaOcurrio(DateTime.Now) && Model.Estado != EstadoEvento.Cancelado;
 }
 
 @section Styles {
     <partial name="_LeafletCss" />
+    <link rel="stylesheet" href="~/css/plano.css" asp-append-version="true" />
 }
+
+<!-- El asistente virtual usa este evento como contexto ("¿dónde es?", "¿cuánto cuesta?") -->
+<div id="chat-contexto" data-evento="@Model.Id" hidden></div>
 
 <a asp-action="Index" class="enlace-volver">← Volver al catálogo</a>
 
@@ -59,7 +66,7 @@
 
     <!-- ℹ️ INFORMACIÓN -->
     <section class="ficha-info">
-        @if (ViewBag.PuedeEditar == true && !Model.YaOcurrio(DateTime.Now))
+        @if (ViewBag.PuedeEditar == true && !Model.YaOcurrio(DateTime.Now) && Model.Estado != EstadoEvento.Cancelado)
         {
             <p class="acciones-evento">
                 <a asp-action="Editar" asp-route-id="@Model.Id" class="btn-gris enlace-boton">✏️ Editar evento</a>
@@ -72,6 +79,10 @@
         @if (Model.Estado != EstadoEvento.Aprobado)
         {
             <p><span class="badge-estado badge-@Model.Estado">@Model.Estado</span></p>
+            @if (Model.Estado == EstadoEvento.Cancelado)
+            {
+                <p class="aviso-vencido">🚫 Este evento fue cancelado. Motivo: @Model.MotivoCancelacion. Las entradas quedaron anuladas y el organizador gestionará la devolución.</p>
+            }
         }
         @if (Model.YaOcurrio(DateTime.Now))
         {
@@ -87,7 +98,17 @@
             <li>📍 @Model.Ubicacion</li>
             @if (Model.Aforo > 0)
             {
-                <li>👥 Aforo: @Model.Aforo.ToString("N0") personas</li>
+                // HU03: aforo disponible = capacidad menos lo vendido y lo reservado en compras en curso
+                var disponibles = tipos.Sum(t => t.Disponibles);
+                <li>
+                    👥 Aforo: @Model.Aforo.ToString("N0") personas
+                    @if (mostrarDisponibles)
+                    {
+                        <span class="aforo-disponible @(disponibles == 0 ? "agotado" : "")">
+                            · @(disponibles == 0 ? "agotado" : $"{disponibles:N0} disponibles")
+                        </span>
+                    }
+                </li>
             }
         </ul>
 
@@ -108,20 +129,35 @@
                     <input type="hidden" name="eventoId" value="@Model.Id" />
                     <table>
                         <thead>
-                            <tr><th>Zona</th><th>Precio</th>@if (enVenta) { <th class="col-cantidad">Cantidad</th> }</tr>
+                            <tr>
+                                <th>Zona</th><th>Precio</th>
+                                @if (mostrarDisponibles) { <th class="col-disponibles">Disponibles</th> }
+                                @if (enVenta) { <th class="col-cantidad">Cantidad</th> }
+                            </tr>
                         </thead>
                         <tbody>
                             @foreach (var t in tipos)
                             {
                                 <tr>
-                                    <td>
-                                        @t.Nombre
-                                        @if (enVenta && t.Disponibles > 0 && t.Disponibles <= 10)
-                                        {
-                                            <span class="quedan">¡Quedan @t.Disponibles!</span>
-                                        }
-                                    </td>
+                                    <td>@t.Nombre</td>
                                     <td class="precio">@Formato.Precio(t.Precio)</td>
+                                    @if (mostrarDisponibles)
+                                    {
+                                        <td class="col-disponibles">
+                                            @if (t.Disponibles == 0)
+                                            {
+                                                <span class="agotado">Agotado</span>
+                                            }
+                                            else if (t.Disponibles <= 10)
+                                            {
+                                                <span class="quedan">¡Quedan @t.Disponibles!</span>
+                                            }
+                                            else
+                                            {
+                                                @t.Disponibles.ToString("N0")
+                                            }
+                                        </td>
+                                    }
                                     @if (enVenta)
                                     {
                                         <td class="col-cantidad">
@@ -164,13 +200,44 @@
                     {
                         <p class="total-compra">Total: <b id="totalCompra">S/ 0.00</b></p>
                         <button type="submit" class="btn-rosa btn-bloque" id="btnComprar" disabled>🎟️ Comprar entradas</button>
-                        <p class="texto-suave nota-reserva">Reservamos tus entradas por 15 minutos mientras pagas.</p>
+                        <p class="texto-suave nota-reserva">Reservamos tus entradas por @OpcionesCompras.Value.MinutosReserva minutos mientras pagas.</p>
                     }
                 </form>
             }
         </div>
     </section>
 </div>
+
+<!-- 🗺️ PLANO DEL RECINTO (HU25) -->
+@if (tipos.Count > 0)
+{
+    var zonasPlano = Model.TiposEntrada.OrderBy(t => t.Id).ToList();
+    <section class="ficha-seccion plano-recinto">
+        <h3>Plano del recinto</h3>
+        <p class="texto-suave">
+            Plantilla: @ActivaFest.Services.Plano.PlanoService.Nombre(Model.PlantillaPlano).ToLowerInvariant()@(Model.PlantillaPlano == PlantillaPlano.Teatro ? " con asientos numerados" : "").
+        </p>
+        <div class="plano-lienzo">@Html.Raw((string)ViewBag.PlanoSvg)</div>
+        <ul class="plano-leyenda">
+            @for (var i = 0; i < zonasPlano.Count; i++)
+            {
+                var z = zonasPlano[i];
+                <li>
+                    <span class="plano-punto" style="background: @ActivaFest.Services.Plano.PlanoService.ColorValido(z.Color, i)"></span>
+                    @z.Nombre · @(z.Precio == 0 ? "Gratis" : Formato.Precio(z.Precio))
+                    @if (z.AsientosNumerados)
+                    {
+                        <span class="texto-suave">(@z.Filas filas × @z.AsientosPorFila asientos)</span>
+                    }
+                    @if (!string.IsNullOrEmpty(z.PuertaIngreso))
+                    {
+                        <span class="texto-suave">· 🚪 @z.PuertaIngreso</span>
+                    }
+                </li>
+            }
+        </ul>
+    </section>
+}
 
 @if (!string.IsNullOrWhiteSpace(Model.Descripcion))
 {

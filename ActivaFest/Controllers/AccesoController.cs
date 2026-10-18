@@ -13,7 +13,8 @@ namespace ActivaFest.Controllers
     // =============================
     // 🚪 CONTROL DE ACCESO EN PUERTA (HU08) — web móvil con la cámara del celular
     // =============================
-    [Authorize(Roles = Roles.ControlAcceso + "," + Roles.Organizador + "," + Roles.Administrador)]
+    // HU08: solo el rol Control de Acceso usa el escáner (y solo en los eventos que tiene asignados, HU19)
+    [Authorize(Roles = Roles.ControlAcceso)]
     public class AccesoController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -29,19 +30,18 @@ namespace ActivaFest.Controllers
 
         private string UsuarioId => _userManager.GetUserId(User)!;
 
-        // Un organizador (sin otro rol) solo controla sus propios eventos
-        private bool SoloSusEventos =>
-            !User.IsInRole(Roles.Administrador) && !User.IsInRole(Roles.ControlAcceso);
+        // El administrador controla todos los eventos; el resto, los propios o los asignados (HU19)
+        private bool EsAdministrador => User.IsInRole(Roles.Administrador);
 
         public async Task<IActionResult> Index(CancellationToken ct)
         {
-            var eventos = await _acceso.EventosControlablesAsync(UsuarioId, SoloSusEventos, ct);
+            var eventos = await _acceso.EventosControlablesAsync(UsuarioId, EsAdministrador, ct);
             return View(eventos);
         }
 
         public async Task<IActionResult> Escanear(int id, CancellationToken ct)
         {
-            if (!await _acceso.PuedeControlarAsync(UsuarioId, SoloSusEventos, id, ct))
+            if (!await _acceso.PuedeControlarAsync(UsuarioId, EsAdministrador, id, ct))
                 return NotFound();
 
             var evento = await _db.Eventos.AsNoTracking().FirstAsync(e => e.Id == id, ct);
@@ -56,7 +56,7 @@ namespace ActivaFest.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Validar([FromBody] SolicitudValidacion solicitud, CancellationToken ct)
         {
-            if (!await _acceso.PuedeControlarAsync(UsuarioId, SoloSusEventos, solicitud.EventoId, ct))
+            if (!await _acceso.PuedeControlarAsync(UsuarioId, EsAdministrador, solicitud.EventoId, ct))
                 return Forbid();
 
             var resultado = await _acceso.ValidarAsync(solicitud.EventoId, solicitud.Contenido, UsuarioId, DateTime.Now, ct);
@@ -64,6 +64,7 @@ namespace ActivaFest.Controllers
             return Json(new
             {
                 tipo = resultado.Tipo.ToString(),
+                titulo = resultado.Titulo,
                 permiteIngreso = resultado.PermiteIngreso,
                 mensaje = resultado.Mensaje,
                 zona = resultado.Zona,

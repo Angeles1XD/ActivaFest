@@ -103,6 +103,43 @@
         </section>
     }
 
+    <!-- ✨ RECOMENDADOS PARA TI (HU17) -->
+    @if (Model.Recomendados.Count > 0)
+    {
+        <section class="inicio-seccion" id="recomendados">
+            <div class="inicio-seccion-titulo">
+                <div>
+                    @if (Model.RecomendacionesPersonalizadas)
+                    {
+                        <h2>✨ Recomendados para ti</h2>
+                        <p>Según lo que buscas, los eventos que visitas@(Model.UsaUbicacion ? " y qué tan cerca están" : "")</p>
+                    }
+                    else
+                    {
+                        @* Usuario nuevo sin historial: los más populares cercanos (HU17) *@
+                        <h2>🔥 Populares @(Model.UsaUbicacion ? "cerca de ti" : "en ActivaFest")</h2>
+                        <p>Mientras más eventos explores, más personalizadas serán tus recomendaciones</p>
+                    }
+                </div>
+                @if (Model.UsaUbicacion)
+                {
+                    <a asp-controller="Home" asp-action="Index" asp-fragment="recomendados" class="inicio-ver-todo">Quitar ubicación</a>
+                }
+                else
+                {
+                    <button type="button" class="inicio-ver-todo boton-ubicacion" id="usarUbicacion" data-ancla="recomendados">📍 Usar mi ubicación</button>
+                }
+            </div>
+            <p class="inicio-aviso" id="avisoUbicacion" role="status" hidden></p>
+            <div class="cat-eventos-grid">
+                @foreach (var evento in Model.Recomendados)
+                {
+                    <partial name="_EventoCardModerno" model="evento" />
+                }
+            </div>
+        </section>
+    }
+
     <!-- 🗂️ CATEGORÍAS -->
     <section class="inicio-seccion">
         <div class="inicio-seccion-titulo">
@@ -184,3 +221,7 @@
         </section>
     }
 </div>
+
+@section Scripts {
+    <script src="~/js/ubicacion.js" asp-append-version="true"></script>
+}

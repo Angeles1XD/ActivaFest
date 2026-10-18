@@ -13,6 +13,7 @@
 
     const panel = document.getElementById('resultado');
     const icono = document.getElementById('resultadoIcono');
+    const titulo = document.getElementById('resultadoTitulo');
     const mensaje = document.getElementById('resultadoMensaje');
     const detalle = document.getElementById('resultadoDetalle');
     const estadoCamara = document.getElementById('estadoCamara');
@@ -22,10 +23,10 @@
         Valida: { clase: 'ok', icono: '✓' },
         YaUsada: { clase: 'error', icono: '✕' },
         Invalida: { clase: 'error', icono: '✕' },
-        OtroEvento: { clase: 'alerta', icono: '⚠' },
+        OtroEvento: { clase: 'error', icono: '✕' },
         Anulada: { clase: 'error', icono: '✕' },
-        Temprano: { clase: 'alerta', icono: '⏳' },
-        Vencida: { clase: 'alerta', icono: '⚠' }
+        Temprano: { clase: 'error', icono: '⏳' },
+        Vencida: { clase: 'error', icono: '✕' }
     };
 
     let lector = null;
@@ -63,7 +64,7 @@
             });
 
             if (respuesta.status === 401 || respuesta.status === 403) {
-                mostrar({ tipo: 'Invalida', mensaje: 'Tu sesión expiró o no tienes permiso para este evento.' });
+                mostrar({ tipo: 'Invalida', titulo: 'SIN PERMISO', mensaje: 'Tu sesión expiró o no tienes asignado este evento.' });
                 return;
             }
 
@@ -73,7 +74,7 @@
             document.getElementById('vendidas').textContent = datos.vendidas;
         } catch (e) {
             console.error(e);
-            mostrar({ tipo: 'Invalida', mensaje: 'Sin conexión con el servidor. Vuelve a intentar.' });
+            mostrar({ tipo: 'Invalida', titulo: 'SIN CONEXIÓN', mensaje: 'No se pudo validar: vuelve a escanear.' });
         }
     }
 
@@ -81,6 +82,8 @@
         const estilo = ESTILOS[datos.tipo] || ESTILOS.Invalida;
         panel.className = 'resultado ' + estilo.clase;
         icono.textContent = estilo.icono;
+        // HU08: «INGRESO PERMITIDO», «ENTRADA YA UTILIZADA» o «INGRESO RECHAZADO»
+        titulo.textContent = datos.titulo || (datos.permiteIngreso ? 'INGRESO PERMITIDO' : 'INGRESO RECHAZADO');
         mensaje.textContent = datos.mensaje;
 
         const partes = [];

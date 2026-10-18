@@ -87,8 +87,16 @@
         @if (r.Eventos.Count == 0)
         {
             <div class="cat-vacio">
-                <p>Aún no hay eventos próximos aquí.</p>
-                <a asp-action="Index" class="cat-boton">Ver todas las categorías</a>
+                @if (!string.IsNullOrWhiteSpace(f.Buscar))
+                {
+                    <p>No hay eventos que coincidan con «@f.Buscar»@(Model.Seleccionada != null ? $" en {Model.Seleccionada.Nombre}" : "").</p>
+                    <a asp-action="Index" asp-route-CategoriaId="@f.CategoriaId" class="cat-boton">🧹 Limpiar búsqueda</a>
+                }
+                else
+                {
+                    <p>Aún no hay eventos próximos aquí.</p>
+                    <a asp-action="Index" class="cat-boton">Ver todas las categorías</a>
+                }
             </div>
         }
         else

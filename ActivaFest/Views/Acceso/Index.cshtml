@@ -19,6 +19,10 @@
     {
         <div class="cat-vacio">
             <p>No tienes eventos próximos para controlar.</p>
+            @if (User.IsInRole(Roles.ControlAcceso) && !User.IsInRole(Roles.Administrador))
+            {
+                <p class="texto-tenue">Solo puedes validar las entradas de los eventos que el administrador te asignó.</p>
+            }
         </div>
     }
 

@@ -1,0 +1,112 @@
+/* =============================
+   🗺️ PLANO DEL RECINTO (HU25)
+   ============================= */
+.plano-lienzo {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.plano-svg {
+  display: block;
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+  font-family: var(--fuente);
+}
+
+.plano-escenario { fill: #6d5bf0; }
+.plano-escenario-texto { fill: #fff; font-size: 20px; font-weight: 600; }
+.plano-nota { fill: var(--texto-3); font-size: 12px; }
+.plano-fila { fill: var(--texto-2); font-size: 12px; font-weight: 600; }
+
+.asiento { stroke: rgba(0, 0, 0, 0.25); stroke-width: 1; }
+.asiento-ocupado { opacity: 0.7; }
+.asiento-tuyo { fill: #ec4899; stroke: #fff; stroke-width: 3; }
+.plano-etiqueta-tuya { fill: #f9a8d4; font-size: 13px; font-weight: 700; }
+
+.plano-zona rect { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1.5; }
+.plano-zona-agotada rect { opacity: 0.6; }
+.plano-zona-tuya rect { stroke: #fff; stroke-width: 4; }
+.plano-zona-nombre { fill: #fff; font-size: 16px; font-weight: 700; }
+.plano-zona-dato { fill: rgba(255, 255, 255, 0.85); font-size: 13px; }
+
+.plano-campo { fill: #166534; stroke: #4ade80; stroke-width: 2; }
+.plano-campo-linea { stroke: #4ade80; stroke-width: 2; }
+.plano-pabellon { fill: rgba(255, 255, 255, 0.03); stroke: var(--borde-fuerte); stroke-width: 2; }
+.plano-stand { fill: rgba(255, 255, 255, 0.06); stroke: var(--borde-fuerte); }
+.plano-servicio { fill: rgba(255, 255, 255, 0.05); stroke: var(--borde); }
+
+.plano-puerta rect { fill: rgba(139, 92, 246, 0.2); stroke: rgba(139, 92, 246, 0.6); }
+.plano-puerta text { fill: var(--lila); font-size: 13px; font-weight: 600; }
+
+.plano-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  color: var(--texto-2);
+  font-size: 14px;
+}
+
+.plano-punto {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* Formulario del organizador */
+.plantillas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.plantilla-opcion {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  cursor: pointer;
+}
+
+.plantilla-opcion:has(input:checked) {
+  border-color: var(--morado);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.plantilla-opcion input { margin-right: 6px; }
+.plantilla-opcion small { display: block; color: var(--texto-3); margin-top: 4px; }
+
+.solo-teatro { display: none; }
+.form-evento.es-teatro .solo-teatro { display: block; }
+.form-evento.es-teatro .campo-capacidad input { background: var(--superficie); }
+
+.vista-previa-plano { margin-top: 18px; }
+
+/* Fila de zona con los datos del plano: se acomoda en varias líneas si no cabe */
+.form-evento .tipo-entrada {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: flex-end;
+}
+
+.form-evento .tipo-entrada .campo {
+  flex: 1 1 100px;
+  margin: 0;
+}
+
+.form-evento .tipo-entrada .campo:first-of-type { flex: 2 1 170px; }
+.form-evento .tipo-entrada .campo-color { flex: 0 0 64px; }
+.form-evento .tipo-entrada .campo-color input { width: 100%; height: 40px; padding: 2px; cursor: pointer; }
+.form-evento .tipo-entrada .btn-quitar { margin-top: 0; margin-bottom: 4px; }
+.form-evento.es-teatro .tipo-entrada .solo-teatro { display: block; }

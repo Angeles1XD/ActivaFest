@@ -21,6 +21,13 @@ namespace ActivaFest.Data
         public DbSet<PaqueteDestacado> PaquetesDestacado { get; set; }
         public DbSet<ContratoDestacado> ContratosDestacado { get; set; }
         public DbSet<Liquidacion> Liquidaciones { get; set; }
+        public DbSet<HistorialBusqueda> HistorialBusquedas { get; set; }
+
+        public DbSet<VisualizacionEvento> VisualizacionesEvento { get; set; }
+
+        public DbSet<AsignacionAcceso> AsignacionesAcceso { get; set; }
+
+        public DbSet<Asiento> Asientos { get; set; }
 
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
@@ -76,6 +83,7 @@ namespace ActivaFest.Data
             builder.Entity<TipoEntrada>(t =>
             {
                 t.Property(x => x.Precio).HasPrecision(10, 2);
+                t.Property(x => x.RowVersion).IsConcurrencyToken();
 
                 t.HasOne(x => x.Evento)
                     .WithMany(e => e.TiposEntrada)
@@ -155,6 +163,38 @@ namespace ActivaFest.Data
                 l.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
             });
 
+            // 🧭 Historial para recomendaciones (HU17): se borra junto con el usuario
+            builder.Entity<HistorialBusqueda>(h =>
+            {
+                h.Property(x => x.Termino).HasMaxLength(100);
+                h.HasIndex(x => new { x.UsuarioId, x.Fecha });
+                h.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<VisualizacionEvento>(v =>
+            {
+                v.HasIndex(x => new { x.UsuarioId, x.Fecha });
+                v.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+                v.HasOne<Evento>().WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // HU25: cada asiento tiene zona, fila y número únicos
+            builder.Entity<Asiento>(a =>
+            {
+                a.HasIndex(x => new { x.TipoEntradaId, x.Fila, x.Numero }).IsUnique();
+                a.HasOne(x => x.TipoEntrada).WithMany(t => t.Asientos).HasForeignKey(x => x.TipoEntradaId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<Evento>().Property(e => e.PlantillaPlano).HasConversion<string>().HasMaxLength(20);
+
+            // Un mismo miembro del personal se asigna una sola vez a cada evento
+            builder.Entity<AsignacionAcceso>(a =>
+            {
+                a.HasIndex(x => new { x.UsuarioId, x.EventoId }).IsUnique();
+                a.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+                a.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+            });
+
             // SQLite no ordena ni agrega columnas decimal: en ese proveedor todos los montos se guardan como REAL
             if (Database.IsSqlite())
             {
@@ -166,6 +206,26 @@ namespace ActivaFest.Data
                         v => (double)v, v => (decimal)v));
                 }
             }
+        }
+
+        // HU11: toda zona modificada con el seguimiento de EF sube su versión; si otra operación la cambió
+        // desde que se leyó, SaveChanges lanza DbUpdateConcurrencyException en lugar de pisar los datos
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            SubirVersiones();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            SubirVersiones();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void SubirVersiones()
+        {
+            foreach (var zona in ChangeTracker.Entries<TipoEntrada>().Where(e => e.State == EntityState.Modified))
+                zona.Entity.RowVersion++;
         }
     }
 }

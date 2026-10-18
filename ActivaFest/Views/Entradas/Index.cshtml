@@ -27,14 +27,15 @@
     {
         var evento = grupo[0].Evento!;
         var pasado = evento.Fecha < hoy;
+        var cancelado = evento.Estado == EstadoEvento.Cancelado;
 
-        <section class="grupo-entradas @(pasado ? "pasado" : "")">
+        <section class="grupo-entradas @(pasado || cancelado ? "pasado" : "")">
             <div class="grupo-titulo">
                 <div>
                     <h2><a asp-controller="Eventos" asp-action="Detalle" asp-route-id="@evento.Id">@evento.Titulo</a></h2>
                     <p>📅 @Formato.Fecha(evento.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm") · 📍 @evento.Ubicacion</p>
                 </div>
-                <span class="cat-total">@(pasado ? "Evento finalizado" : $"{grupo.Count} {(grupo.Count == 1 ? "entrada" : "entradas")}")</span>
+                <span class="cat-total">@(cancelado ? "🚫 Evento cancelado" : pasado ? "Evento finalizado" : $"{grupo.Count} {(grupo.Count == 1 ? "entrada" : "entradas")}")</span>
             </div>
 
             <div class="grid-entradas">

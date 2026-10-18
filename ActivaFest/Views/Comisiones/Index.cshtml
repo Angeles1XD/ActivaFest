@@ -80,7 +80,9 @@
                     <thead>
                         <tr>
                             <th>Evento / organizador</th>
+                            <th class="derecha">Entradas</th>
                             <th class="derecha">Ventas</th>
+                            <th class="derecha">% comisión</th>
                             <th class="derecha">Comisión</th>
                             <th class="derecha">Neto</th>
                             <th class="derecha">Liquidado</th>
@@ -96,7 +98,9 @@
                                     <strong>@f.Evento</strong><br />
                                     <span class="texto-tenue">@f.Organizador · @f.CorreoOrganizador · @f.FechaEvento.ToString("dd/MM/yyyy")</span>
                                 </td>
+                                <td class="derecha num">@f.EntradasVendidas</td>
                                 <td class="derecha num">@Formato.Monto(f.Bruto)</td>
+                                <td class="derecha num">@f.PorcentajeComision.ToString("0.##") %</td>
                                 <td class="derecha num">@Formato.Monto(f.Comision)</td>
                                 <td class="derecha num">@Formato.Monto(f.Neto)</td>
                                 <td class="derecha num">@Formato.Monto(f.Liquidado)</td>

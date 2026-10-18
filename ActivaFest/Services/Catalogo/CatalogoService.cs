@@ -131,7 +131,7 @@ public class CatalogoService : ICatalogoService
         if (enCache != null)
             return JsonSerializer.Deserialize<Dictionary<int, int>>(enCache)!;
 
-        var conteo = await EventosPublicados(DateTime.Today)
+        var conteo = await EventosPublicados(DateTime.Now)
             .GroupBy(e => e.CategoriaId)
             .Select(g => new { g.Key, Cantidad = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Cantidad, ct);
@@ -140,7 +140,7 @@ public class CatalogoService : ICatalogoService
         return conteo;
     }
 
-    // Eventos aprobados desde una fecha: la base de todas las consultas públicas
+    // Eventos aprobados que aún no empiezan (HU02: "solo Aprobado y con fecha futura"): base de todas las consultas públicas
     private IQueryable<Evento> EventosPublicados(DateTime desde) =>
         _context.Eventos
             .AsNoTracking()
@@ -148,8 +148,9 @@ public class CatalogoService : ICatalogoService
 
     private async Task<ResultadoCatalogo> ConsultarAsync(CatalogoFiltro filtro, CancellationToken ct)
     {
-        // Por defecto solo eventos próximos
-        var query = EventosPublicados(filtro.Desde?.Date ?? DateTime.Today);
+        // Un filtro "desde" en el pasado o de hoy no trae eventos que ya empezaron
+        var ahora = DateTime.Now;
+        var query = EventosPublicados(filtro.Desde?.Date > ahora ? filtro.Desde.Value.Date : ahora);
 
         if (filtro.Hasta.HasValue)
         {
@@ -188,13 +189,14 @@ public class CatalogoService : ICatalogoService
 
         List<EventoCardViewModel> eventos;
 
+        // HU02: los eventos con un paquete publicitario vigente (HU12) aparecen primero en cualquier orden
         if (filtro.Orden is OrdenCatalogo.PrecioAsc or OrdenCatalogo.PrecioDesc)
         {
             // SQLite no ordena columnas decimal en el servidor: se ordena en memoria sobre el resultado filtrado
             var todos = await proyeccion.ToListAsync(ct);
             var ordenados = filtro.Orden == OrdenCatalogo.PrecioAsc
-                ? todos.OrderBy(e => e.PrecioDesde ?? decimal.MaxValue).ThenBy(e => e.Fecha)
-                : todos.OrderByDescending(e => e.PrecioDesde ?? -1).ThenBy(e => e.Fecha);
+                ? todos.OrderByDescending(e => e.Destacado).ThenBy(e => e.PrecioDesde ?? decimal.MaxValue).ThenBy(e => e.Fecha)
+                : todos.OrderByDescending(e => e.Destacado).ThenByDescending(e => e.PrecioDesde ?? -1).ThenBy(e => e.Fecha);
 
             eventos = ordenados
                 .Skip((pagina - 1) * CatalogoFiltro.TamanoPagina)
@@ -204,8 +206,8 @@ public class CatalogoService : ICatalogoService
         else
         {
             var ordenada = filtro.Orden == OrdenCatalogo.Recientes
-                ? proyeccion.OrderByDescending(e => e.Id)
-                : proyeccion.OrderBy(e => e.Fecha).ThenBy(e => e.Id);
+                ? proyeccion.OrderByDescending(e => e.Destacado).ThenByDescending(e => e.Id)
+                : proyeccion.OrderByDescending(e => e.Destacado).ThenBy(e => e.Fecha).ThenBy(e => e.Id);
 
             eventos = await ordenada
                 .Skip((pagina - 1) * CatalogoFiltro.TamanoPagina)

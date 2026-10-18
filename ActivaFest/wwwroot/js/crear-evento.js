@@ -95,11 +95,28 @@
             }
         });
     }
-
-    // ---------- 🎟️ ZONAS DE ENTRADA ----------
+    // ---------- 🎟️ ZONAS Y 🗺️ PLANO DEL RECINTO (HU25) ----------
+    const formulario = document.getElementById('formEvento');
     const lista = document.getElementById('tiposEntrada');
     const plantilla = document.getElementById('plantillaTipo');
     const aforoTotal = document.getElementById('aforoTotal');
+    const vistaPrevia = document.getElementById('vistaPreviaPlano');
+    const botonAgregar = document.getElementById('btnAgregarTipo');
+    const COLORES = ['#6366f1', '#a855f7', '#0d9488', '#f59e0b', '#ec4899', '#22c55e'];
+
+    function plantillaElegida() {
+        return formulario.querySelector('input[name="Plantilla"]:checked');
+    }
+
+    function esTeatro() {
+        const p = plantillaElegida();
+        return !!p && p.value === 'Teatro';
+    }
+
+    function maxZonas() {
+        const p = plantillaElegida();
+        return Math.min(MAX_TIPOS, p ? parseInt(p.dataset.maxZonas, 10) : MAX_TIPOS);
+    }
 
     // Renumera los name="TiposEntrada[i].Campo" para que el model binding reciba una lista continua
     function renumerar() {
@@ -114,22 +131,62 @@
             const comprometidas = parseInt(fila.dataset.comprometidas || '0', 10);
             fila.querySelector('.btn-quitar').disabled = filas.length === 1 || comprometidas > 0;
         });
-        document.getElementById('btnAgregarTipo').disabled = filas.length >= MAX_TIPOS;
-        recalcularAforo();
+        botonAgregar.disabled = filas.length >= maxZonas();
+        recalcular();
     }
 
-    function recalcularAforo() {
+    // En teatro el aforo de cada zona es filas x asientos por fila (no se escribe a mano)
+    function recalcular() {
+        const teatro = esTeatro();
+        formulario.classList.toggle('es-teatro', teatro);
+
         let total = 0;
-        lista.querySelectorAll('input[data-campo="Capacidad"]').forEach(function (input) {
-            total += parseInt(input.value, 10) || 0;
+        lista.querySelectorAll('.tipo-entrada').forEach(function (fila) {
+            const capacidad = fila.querySelector('input[data-campo="Capacidad"]');
+            const filas = fila.querySelector('input[data-campo="Filas"]');
+            const asientos = fila.querySelector('input[data-campo="AsientosPorFila"]');
+            filas.required = asientos.required = teatro;
+            capacidad.readOnly = teatro;
+            if (teatro)
+                capacidad.value = (parseInt(filas.value, 10) || 0) * (parseInt(asientos.value, 10) || 0);
+            total += parseInt(capacidad.value, 10) || 0;
         });
         aforoTotal.textContent = total.toLocaleString('es-PE');
+        programarVistaPrevia();
     }
 
-    document.getElementById('btnAgregarTipo').addEventListener('click', function () {
+    // Vista previa del plano: el servidor genera el mismo SVG que verá el público
+    let temporizador = null;
+    let peticion = null;
+    function programarVistaPrevia() {
+        clearTimeout(temporizador);
+        temporizador = setTimeout(actualizarVistaPrevia, 350);
+    }
+
+    async function actualizarVistaPrevia() {
+        if (!vistaPrevia) return;
+        const parametros = new URLSearchParams();
+        parametros.set('plantilla', plantillaElegida() ? plantillaElegida().value : 'CampoAbierto');
+        lista.querySelectorAll('.tipo-entrada input').forEach(function (input) {
+            if (input.dataset.campo !== 'Id' && input.value !== '') parametros.append(input.name, input.value);
+        });
+
+        if (peticion) peticion.abort();
+        peticion = new AbortController();
+        try {
+            const r = await fetch(`${vistaPrevia.dataset.url}?${parametros}`, { signal: peticion.signal });
+            if (!r.ok) return;
+            const svg = new DOMParser().parseFromString(await r.text(), 'image/svg+xml').documentElement;
+            if (svg.nodeName === 'svg') vistaPrevia.replaceChildren(document.importNode(svg, true));
+        } catch (e) { /* vista previa no disponible: el formulario sigue funcionando */ }
+    }
+
+    botonAgregar.addEventListener('click', function () {
         lista.appendChild(plantilla.content.cloneNode(true));
+        const nueva = lista.lastElementChild;
+        nueva.querySelector('input[data-campo="Color"]').value = COLORES[(lista.children.length - 1) % COLORES.length];
         renumerar();
-        lista.lastElementChild.querySelector('input').focus();
+        nueva.querySelector('input').focus();
     });
 
     lista.addEventListener('click', function (e) {
@@ -139,7 +196,25 @@
         }
     });
 
-    lista.addEventListener('input', recalcularAforo);
+    lista.addEventListener('input', recalcular);
+    formulario.querySelectorAll('input[name="Plantilla"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            // Si la nueva plantilla admite menos zonas, se quitan las sobrantes que no tienen compras
+            const filas = Array.from(lista.querySelectorAll('.tipo-entrada'));
+            filas.slice(maxZonas()).reverse().forEach(function (fila) {
+                if (parseInt(fila.dataset.comprometidas || '0', 10) === 0) fila.remove();
+            });
+            if (esTeatro()) {
+                lista.querySelectorAll('.tipo-entrada').forEach(function (fila) {
+                    const f = fila.querySelector('input[data-campo="Filas"]');
+                    const a = fila.querySelector('input[data-campo="AsientosPorFila"]');
+                    if (!f.value) f.value = 5;
+                    if (!a.value) a.value = 16;
+                });
+            }
+            renumerar();
+        });
+    });
     renumerar();
 
     // ---------- 📸 VISTA PREVIA DE FOTOS ----------

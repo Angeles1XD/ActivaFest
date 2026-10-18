@@ -703,3 +703,68 @@
     align-items: flex-start;
   }
 }
+
+/* ---------- Estado de cuentas y asignación de personal (HU19) ---------- */
+.boton-rol.inactivo {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--error);
+}
+
+.boton-rol:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+a.boton-rol {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.fila-inactiva td > strong,
+.fila-inactiva td > .texto-tenue {
+  opacity: 0.55;
+}
+
+
+.lista-asignacion {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.lista-asignacion li {
+  padding: 14px 16px;
+  border-radius: var(--radio-sm);
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+}
+
+/* HU08: el título («INGRESO PERMITIDO», «ENTRADA YA UTILIZADA», «INGRESO RECHAZADO») domina la pantalla */
+.resultado-titulo {
+  font-size: clamp(30px, 7.5vw, 46px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: white;
+  margin: 0 0 6px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.resultado .resultado-mensaje {
+  font-size: clamp(18px, 4.5vw, 24px);
+  font-weight: 700;
+}
+
+/* HU13: gráficos de Chart.js (el lienzo necesita un contenedor con alto fijo) */
+.grafico-chart {
+  position: relative;
+  height: 300px;
+  margin: 14px 0 6px;
+}
+
+.grafico-chart.grafico-zonas {
+  height: 240px;
+}

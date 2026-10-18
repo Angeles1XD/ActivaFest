@@ -7,7 +7,7 @@ namespace ActivaFest.Services.Entradas;
 
 public class QrOptions
 {
-    // Clave secreta para firmar los QR. En producción se define por variable de entorno Qr__Secreto.
+    // Clave secreta para cifrar los QR. En producción se define por variable de entorno Qr__Secreto.
     public string Secreto { get; set; } = "";
 }
 
@@ -23,53 +23,69 @@ public static class CodigoSeguro
 
 public interface IQrEntradaService
 {
-    // Texto que va dentro del QR: "AF1.{codigo}.{firma}"
+    // Texto que va dentro del QR: "AF2.{token cifrado}" (el código de la entrada no es legible)
     string CrearContenido(string codigoEntrada);
 
-    // Devuelve el código de la entrada si la firma es válida; null si el QR fue alterado o no es de ActivaFest
+    // Devuelve el código de la entrada si el token es auténtico; null si fue alterado o no es de ActivaFest
     string? LeerContenido(string contenido);
 
     byte[] GenerarPng(string codigoEntrada, int pixelesPorModulo = 10);
 }
 
 // =============================
-// 🔐 QR FIRMADO DE LA ENTRADA (HU07)
+// 🔐 QR CIFRADO DE LA ENTRADA (HU07)
 // =============================
+// El token se cifra con AES-256-GCM (cifrado autenticado): quien lee el QR no ve el código de la entrada
+// y cualquier alteración invalida el token. Las entradas emitidas con el formato anterior "AF1" (firmado
+// con HMAC) se siguen aceptando en la puerta.
 public class QrEntradaService : IQrEntradaService
 {
-    private const string Prefijo = "AF1";
+    private const string Prefijo = "AF2";
+    private const string PrefijoFirmado = "AF1";
+    private const int TamanoNonce = 12, TamanoEtiqueta = 16;
 
-    private readonly byte[] _clave;
+    private readonly byte[] _claveFirma;
+    private readonly byte[] _claveCifrado;
 
     public QrEntradaService(IOptions<QrOptions> opciones, IWebHostEnvironment env, ILogger<QrEntradaService> logger)
     {
         var secreto = opciones.Value.Secreto;
-
         if (string.IsNullOrWhiteSpace(secreto))
         {
             if (!env.IsDevelopment())
-                throw new InvalidOperationException("Configura Qr:Secreto (variable Qr__Secreto) para firmar las entradas en producción.");
+                throw new InvalidOperationException("Configura Qr:Secreto (variable Qr__Secreto) para cifrar las entradas en producción.");
 
             logger.LogWarning("Qr:Secreto no configurado: se usa una clave de desarrollo. No la uses en producción.");
             secreto = "activafest-clave-solo-desarrollo";
         }
 
-        _clave = SHA256.HashData(Encoding.UTF8.GetBytes(secreto));
+        _claveFirma = SHA256.HashData(Encoding.UTF8.GetBytes(secreto));
+        // Clave distinta para cifrar, derivada del mismo secreto
+        _claveCifrado = HKDF.DeriveKey(HashAlgorithmName.SHA256, _claveFirma, 32, info: Encoding.UTF8.GetBytes("activafest-qr-cifrado"));
     }
 
-    public string CrearContenido(string codigoEntrada) => $"{Prefijo}.{codigoEntrada}.{Firmar(codigoEntrada)}";
+    public string CrearContenido(string codigoEntrada)
+    {
+        var texto = Encoding.UTF8.GetBytes(codigoEntrada);
+        var token = new byte[TamanoNonce + texto.Length + TamanoEtiqueta];
+        var nonce = token.AsSpan(0, TamanoNonce);
+        RandomNumberGenerator.Fill(nonce);
+
+        using var aes = new AesGcm(_claveCifrado, TamanoEtiqueta);
+        aes.Encrypt(nonce, texto, token.AsSpan(TamanoNonce, texto.Length), token.AsSpan(TamanoNonce + texto.Length), Asociado);
+
+        return $"{Prefijo}.{Base64Url(token)}";
+    }
 
     public string? LeerContenido(string contenido)
     {
-        var partes = contenido.Trim().Split('.');
-        if (partes.Length != 3 || partes[0] != Prefijo || partes[1].Length == 0)
-            return null;
-
-        var esperada = Encoding.ASCII.GetBytes(Firmar(partes[1]));
-        var recibida = Encoding.ASCII.GetBytes(partes[2]);
-
-        // Comparación en tiempo constante para no filtrar información de la firma
-        return CryptographicOperations.FixedTimeEquals(esperada, recibida) ? partes[1] : null;
+        var partes = (contenido ?? "").Trim().Split('.');
+        return partes switch
+        {
+            [Prefijo, var token] => Descifrar(token),
+            [PrefijoFirmado, var codigo, var firma] when codigo.Length > 0 => VerificarFirma(codigo, firma),
+            _ => null
+        };
     }
 
     public byte[] GenerarPng(string codigoEntrada, int pixelesPorModulo = 10)
@@ -79,10 +95,52 @@ public class QrEntradaService : IQrEntradaService
         return new PngByteQRCode(datos).GetGraphic(pixelesPorModulo);
     }
 
-    private string Firmar(string codigo)
+    // El prefijo va como dato asociado: un token no se puede reutilizar con otro formato
+    private static readonly byte[] Asociado = Encoding.ASCII.GetBytes(Prefijo);
+
+    private string? Descifrar(string tokenBase64)
     {
-        var hash = HMACSHA256.HashData(_clave, Encoding.UTF8.GetBytes(codigo));
-        // 16 bytes de la firma bastan y mantienen el QR pequeño
-        return Convert.ToBase64String(hash, 0, 16).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        byte[] token;
+        try { token = DesdeBase64Url(tokenBase64); }
+        catch (FormatException) { return null; }
+
+        if (token.Length <= TamanoNonce + TamanoEtiqueta)
+            return null;
+
+        var largo = token.Length - TamanoNonce - TamanoEtiqueta;
+        var texto = new byte[largo];
+        try
+        {
+            using var aes = new AesGcm(_claveCifrado, TamanoEtiqueta);
+            aes.Decrypt(token.AsSpan(0, TamanoNonce), token.AsSpan(TamanoNonce, largo), token.AsSpan(TamanoNonce + largo), texto, Asociado);
+            return Encoding.UTF8.GetString(texto);
+        }
+        catch (CryptographicException)
+        {
+            return null; // alterado o cifrado con otra clave
+        }
+    }
+
+    private string? VerificarFirma(string codigo, string firma)
+    {
+        var esperada = Encoding.ASCII.GetBytes(Firmar(codigo));
+        var recibida = Encoding.ASCII.GetBytes(firma);
+        // Comparación en tiempo constante para no filtrar información de la firma
+        return CryptographicOperations.FixedTimeEquals(esperada, recibida) ? codigo : null;
+    }
+
+    // Formato anterior (AF1): se conserva solo para validar entradas ya emitidas
+    public string Firmar(string codigo)
+    {
+        var hash = HMACSHA256.HashData(_claveFirma, Encoding.UTF8.GetBytes(codigo));
+        return Base64Url(hash.AsSpan(0, 16).ToArray());
+    }
+
+    private static string Base64Url(byte[] datos) => Convert.ToBase64String(datos).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] DesdeBase64Url(string texto)
+    {
+        var b64 = texto.Replace('-', '+').Replace('_', '/');
+        return Convert.FromBase64String(b64.PadRight(b64.Length + (4 - b64.Length % 4) % 4, '='));
     }
 }

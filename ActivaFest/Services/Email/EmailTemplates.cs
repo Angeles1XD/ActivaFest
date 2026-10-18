@@ -75,6 +75,25 @@ public static class EmailTemplates
             "Ver el evento", urlEvento);
     }
 
+    // HU15: aviso de cancelación a cada comprador
+    public static string EventoCancelado(Evento ev, string nombre, IReadOnlyList<string> ordenes, string urlMisEntradas) =>
+        Layout("Tu evento fue cancelado",
+            $"<p>Hola {E(nombre)}, lamentamos informarte que el evento <b>{E(ev.Titulo)}</b> " +
+            $"programado para el {Formato.Fecha(ev.Fecha, "dddd dd 'de' MMMM 'de' yyyy, HH:mm")} fue <b>cancelado</b>.</p>" +
+            $"<p><b>Motivo:</b> {E(ev.MotivoCancelacion)}</p>" +
+            "<p>Tus entradas quedaron anuladas. El organizador gestionará la devolución de tu dinero; " +
+            $"tus números de orden son: <b>{E(string.Join(", ", ordenes))}</b>. Si tienes dudas, escríbenos a soporte@activafest.com.</p>",
+            "Ver mis entradas", urlMisEntradas);
+
+    public static string EventoCanceladoOrganizador(Evento ev, int ordenesPagadas) =>
+        Layout("Cancelaste tu evento",
+            $"<p>El evento <b>{E(ev.Titulo)}</b> quedó cancelado y fue retirado del catálogo.</p>" +
+            $"<p><b>Motivo informado a los compradores:</b> {E(ev.MotivoCancelacion)}</p>" +
+            (ordenesPagadas > 0
+                ? $"<p>Hay <b>{ordenesPagadas}</b> {(ordenesPagadas == 1 ? "compra pagada" : "compras pagadas")} pendientes de reembolso. " +
+                  "Recuerda devolver el dinero a cada comprador; estas ventas no generan comisión para ActivaFest.</p>"
+                : "<p>No había compras pagadas, así que no tienes reembolsos pendientes.</p>"));
+
     public static string EventoAprobado(Evento ev, string urlEvento) =>
         Layout("¡Tu evento fue aprobado! 🎉",
             $"<p>El evento <b>{E(ev.Titulo)}</b> ya está publicado en el catálogo de ActivaFest.</p>" +
@@ -108,6 +127,6 @@ public static class EmailTemplates
     public static string RecuperarContrasena(string nombre, string urlReset) =>
         Layout("Restablecer contraseña",
             $"<p>Hola {E(nombre)}, recibimos una solicitud para restablecer tu contraseña.</p>" +
-            "<p>Si no fuiste tú, ignora este mensaje. El enlace caduca en unas horas.</p>",
+            "<p>El enlace vence en <b>1 hora</b> y solo se puede usar una vez. Si no fuiste tú, ignora este mensaje: tu contraseña no cambiará.</p>",
             "Restablecer contraseña", urlReset);
 }

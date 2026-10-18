@@ -7,6 +7,7 @@ using ActivaFest.Models;
 using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
 using ActivaFest.Services.Imagenes;
+using ActivaFest.Services.Recomendaciones;
 
 namespace ActivaFest.Controllers
 {
@@ -20,6 +21,7 @@ namespace ActivaFest.Controllers
         private readonly IAlmacenamientoImagenes _imagenes;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _email;
+        private readonly IRecomendacionService _recomendaciones;
         private readonly ILogger<EventosController> _logger;
 
         public EventosController(
@@ -28,6 +30,7 @@ namespace ActivaFest.Controllers
             IAlmacenamientoImagenes imagenes,
             UserManager<ApplicationUser> userManager,
             IEmailService email,
+            IRecomendacionService recomendaciones,
             ILogger<EventosController> logger)
         {
             _context = context;
@@ -35,6 +38,7 @@ namespace ActivaFest.Controllers
             _imagenes = imagenes;
             _userManager = userManager;
             _email = email;
+            _recomendaciones = recomendaciones;
             _logger = logger;
         }
 
@@ -52,6 +56,10 @@ namespace ActivaFest.Controllers
                 Resultado = await _catalogo.BuscarAsync(filtro, ct),
                 Categorias = await _catalogo.ObtenerCategoriasAsync(ct)
             };
+
+            // Lo que busca el usuario alimenta sus recomendaciones (HU17); cambiar de página no es otra búsqueda
+            if (User.Identity?.IsAuthenticated == true && filtro.Pagina == 1 && (filtro.CategoriaId != null || !string.IsNullOrWhiteSpace(filtro.Buscar)))
+                await _recomendaciones.RegistrarBusquedaAsync(_userManager.GetUserId(User)!, filtro.CategoriaId, filtro.Buscar, ct);
 
             return View(modelo);
         }
@@ -75,14 +83,27 @@ namespace ActivaFest.Controllers
             var esDuenio = evento.OrganizadorId != null && evento.OrganizadorId == _userManager.GetUserId(User);
 
             // Los eventos no aprobados solo los ve su organizador o un administrador
-            if (evento.Estado != EstadoEvento.Aprobado && !User.IsInRole(Roles.Administrador) && !esDuenio)
+            // Los cancelados siguen visibles (con aviso) para quien llegue desde el correo o "Mis entradas"
+            if (evento.Estado is not (EstadoEvento.Aprobado or EstadoEvento.Cancelado) && !User.IsInRole(Roles.Administrador) && !esDuenio)
                 return NotFound();
 
             // Visualizaciones para el panel del organizador (RF11); sus propias visitas no cuentan
             if (evento.Estado == EstadoEvento.Aprobado && !esDuenio)
+            {
                 await _context.Eventos.Where(e => e.Id == id).ExecuteUpdateAsync(s => s.SetProperty(e => e.Visitas, e => e.Visitas + 1), ct);
 
+                // Historial para "Eventos recomendados para ti" (HU17)
+                if (User.Identity?.IsAuthenticated == true)
+                    await _recomendaciones.RegistrarVistaAsync(_userManager.GetUserId(User)!, evento.Id, ct);
+            }
+
             ViewBag.PuedeEditar = esDuenio || User.IsInRole(Roles.Administrador);
+
+            // HU25: plano del recinto generado desde la plantilla (con los asientos numerados si es teatro)
+            var asientos = evento.PlantillaPlano == PlantillaPlano.Teatro
+                ? await _context.Asientos.AsNoTracking().Where(a => a.TipoEntrada!.EventoId == id).ToListAsync(ct)
+                : new List<Asiento>();
+            ViewBag.PlanoSvg = Services.Plano.PlanoService.SvgDeEvento(evento, asientos);
             return View(evento);
         }
 
@@ -135,14 +156,19 @@ namespace ActivaFest.Controllers
                 OrganizadorId = usuario?.Id,
                 Estado = EstadoEvento.Pendiente,
                 FechaCreacion = DateTime.UtcNow,
-                TiposEntrada = model.TiposEntrada.Select(t => new TipoEntrada
+                PlantillaPlano = model.Plantilla,
+                TiposEntrada = model.TiposEntrada.Select((t, i) => Services.Plano.PlanoService.AplicarZona(new TipoEntrada
                 {
                     Nombre = t.Nombre.Trim(),
                     Precio = Math.Round(t.Precio, 2),
                     Capacidad = t.Capacidad
-                }).ToList()
+                }, t, model.Plantilla, i)).ToList()
             };
+            // HU25: el aforo del evento es siempre la suma de sus zonas; en teatro se generan los asientos numerados
             evento.Aforo = evento.TiposEntrada.Sum(t => t.Capacidad);
+            if (evento.PlantillaPlano == PlantillaPlano.Teatro)
+                foreach (var asiento in Services.Plano.PlanoService.GenerarAsientos(evento.TiposEntrada.ToList()))
+                    asiento.TipoEntrada!.Asientos.Add(asiento);
 
             // Primero se guardan las fotos; si la BD falla, se eliminan para no dejar archivos huérfanos
             var rutasGuardadas = new List<string>();
@@ -192,6 +218,12 @@ namespace ActivaFest.Controllers
             if (evento == null)
                 return NotFound();
 
+            if (evento.Estado == EstadoEvento.Cancelado)
+            {
+                TempData["Error"] = "Este evento fue cancelado y ya no se puede editar.";
+                return RedirectToAction(nameof(MisEventos));
+            }
+
             await CargarCategoriasAsync(ct);
             return View(new EventoFormViewModel
             {
@@ -203,12 +235,17 @@ namespace ActivaFest.Controllers
                 Ubicacion = evento.Ubicacion,
                 Latitud = evento.Latitud,
                 Longitud = evento.Longitud,
+                Plantilla = evento.PlantillaPlano,
                 TiposEntrada = evento.TiposEntrada.OrderBy(t => t.Id).Select(t => new TipoEntradaInput
                 {
                     Id = t.Id,
                     Nombre = t.Nombre,
                     Precio = t.Precio,
                     Capacidad = t.Capacidad,
+                    Color = t.Color,
+                    Puerta = t.PuertaIngreso,
+                    Filas = t.Filas,
+                    AsientosPorFila = t.AsientosPorFila,
                     Comprometidas = t.Vendidas + t.Reservadas
                 }).ToList(),
                 ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList(),
@@ -265,6 +302,69 @@ namespace ActivaFest.Controllers
         }
 
         // Solo el organizador dueño o un administrador pueden editar
+        // =============================
+        // 🚫 CANCELAR EVENTO (HU15): anula las entradas y avisa a los compradores
+        // =============================
+        [Authorize(Roles = RolesPublicadores)]
+        public async Task<IActionResult> Cancelar(int id, CancellationToken ct)
+        {
+            var evento = await CargarEventoEditableAsync(id, ct);
+            if (evento == null)
+                return NotFound();
+
+            if (evento.Estado != EstadoEvento.Aprobado || evento.YaOcurrio(DateTime.Now))
+            {
+                TempData["Error"] = "Solo se puede cancelar un evento publicado que aún no se realizó.";
+                return RedirectToAction(nameof(MisEventos));
+            }
+
+            ViewBag.EntradasVendidas = evento.TiposEntrada.Sum(t => t.Vendidas);
+            ViewBag.Compradores = await _context.Ordenes.CountAsync(o => o.EventoId == id && o.Estado == EstadoOrden.Pagada, ct);
+            return View(evento);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = RolesPublicadores)]
+        [ActionName(nameof(Cancelar))]
+        public async Task<IActionResult> ConfirmarCancelacion(int id, string? motivo,
+            [FromServices] Services.Eventos.ICancelacionEventoService cancelacion, CancellationToken ct)
+        {
+            // Solo el organizador del evento o un administrador
+            if (await CargarEventoEditableAsync(id, ct) == null)
+                return NotFound();
+
+            var urlMisEntradas = Url.Action("Index", "Entradas", null, Request.Scheme)!;
+            var r = await cancelacion.CancelarAsync(id, motivo, urlMisEntradas, ct);
+
+            switch (r.Resultado)
+            {
+                case Services.Eventos.ResultadoCancelacion.Cancelado:
+                    TempData["Mensaje"] = $"El evento fue cancelado. Se anularon {r.EntradasAnuladas} entradas y avisamos por correo a " +
+                                          $"{r.CompradoresAvisados} {(r.CompradoresAvisados == 1 ? "comprador" : "compradores")}.";
+                    return RedirectToAction(nameof(MisEventos));
+                case Services.Eventos.ResultadoCancelacion.MotivoInvalido:
+                    TempData["Error"] = $"Indica el motivo de la cancelación (máximo {Services.Eventos.CancelacionEventoService.LargoMaximoMotivo} caracteres).";
+                    return RedirectToAction(nameof(Cancelar), new { id });
+                default:
+                    TempData["Error"] = "Solo se puede cancelar un evento publicado que aún no se realizó.";
+                    return RedirectToAction(nameof(MisEventos));
+            }
+        }
+
+        // =============================
+        // 🗺️ VISTA PREVIA DEL PLANO (HU25): el SVG se genera con los datos del formulario, sin guardar nada
+        // =============================
+        [Authorize(Roles = RolesPublicadores)]
+        [HttpGet]
+        public IActionResult VistaPreviaPlano([FromQuery] PlantillaPlano plantilla, [FromQuery] List<TipoEntradaInput> tiposEntrada)
+        {
+            if (!Enum.IsDefined(plantilla))
+                return BadRequest();
+
+            return Content(Services.Plano.PlanoService.SvgVistaPrevia(plantilla, tiposEntrada), "image/svg+xml; charset=utf-8");
+        }
+
         private Task<Evento?> CargarEventoEditableAsync(int id, CancellationToken ct)
         {
             var userId = _userManager.GetUserId(User);

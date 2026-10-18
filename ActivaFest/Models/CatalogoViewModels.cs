@@ -90,6 +90,10 @@ namespace ActivaFest.Models
 
         // Tiene un paquete publicitario vigente (HU12)
         public bool Destacado { get; set; }
+
+        // Recomendaciones (HU17): por qué se sugiere y a qué distancia está
+        public string? Motivo { get; set; }
+        public double? DistanciaKm { get; set; }
     }
 
     public class ResultadoCatalogo
@@ -122,6 +126,9 @@ namespace ActivaFest.Models
         public int TotalEventos { get; set; }
         public List<EventoCardViewModel> Proximos { get; set; } = new();
         public List<EventoCardViewModel> Destacados { get; set; } = new();
+        public List<EventoCardViewModel> Recomendados { get; set; } = new();
+        public bool RecomendacionesPersonalizadas { get; set; }
+        public bool UsaUbicacion { get; set; }
         public List<CategoriaResumen> Categorias { get; set; } = new();
 
         // Solo el primer nombre para el saludo

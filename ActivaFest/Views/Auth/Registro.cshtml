@@ -43,6 +43,18 @@
             <span asp-validation-for="ConfirmarPassword" class="text-danger"></span>
         </div>
 
+        <!-- Consentimientos separados (Ley N.° 29733, RNF07) -->
+        <label class="campo-check">
+            <input asp-for="AceptaTratamientoDatos" />
+            <span>Acepto el tratamiento de mis datos personales según la <a asp-controller="Home" asp-action="Privacy" target="_blank">política de privacidad</a>.</span>
+        </label>
+        <span asp-validation-for="AceptaTratamientoDatos" class="text-danger"></span>
+
+        <label class="campo-check">
+            <input asp-for="AceptaPromociones" />
+            <span>Quiero recibir promociones y descuentos por correo (opcional).</span>
+        </label>
+
         <button type="submit" class="btn-rosa">Registrarme</button>
     </form>
 

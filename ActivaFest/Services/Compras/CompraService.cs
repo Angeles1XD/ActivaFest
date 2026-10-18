@@ -10,7 +10,8 @@ namespace ActivaFest.Services.Compras;
 
 public class ComprasOptions
 {
-    public int MinutosReserva { get; set; } = 15;
+    // Diagrama de secuencia de compra: la reserva dura 10 minutos
+    public int MinutosReserva { get; set; } = 10;
     public int MaxEntradasPorOrden { get; set; } = 10;
 }
 
@@ -43,13 +44,17 @@ public interface ICompraService
 
     Task<bool> CancelarAsync(string codigoOrden, string usuarioId, CancellationToken ct = default);
 
+    // HU06: un pago rechazado no descuenta aforo; la reserva se libera de inmediato
+    Task<bool> RechazarPagoAsync(string codigoOrden, CancellationToken ct = default);
+
     Task<int> LiberarExpiradasAsync(CancellationToken ct = default);
 }
 
 // =============================
 // 🛒 COMPRA DE ENTRADAS (HU06) + CONTROL DE AFORO SIN SOBREVENTA (HU11) + EMISIÓN (HU07)
 // =============================
-// Regla de oro: el stock solo cambia con UPDATE condicionales atómicos ("...WHERE quedan >= cantidad").
+// Regla de oro: el stock solo cambia con UPDATE condicionales atómicos ("...WHERE quedan >= cantidad"),
+// con token de concurrencia (RowVersion) por zona y un bloqueo distribuido por evento (Redis) al reservar (HU11).
 // Así, aunque lleguen compras simultáneas, la base de datos impide vender más de la capacidad.
 public class CompraService : ICompraService
 {
@@ -59,10 +64,15 @@ public class CompraService : ICompraService
     private readonly IEmailService _email;
     private readonly ComprasOptions _opciones;
     private readonly ComisionesOptions _comisiones;
+    private const int IntentosReserva = 5;
+    private static readonly TimeSpan DuracionBloqueo = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan EsperaBloqueo = TimeSpan.FromSeconds(10);
+
+    private readonly IBloqueoDistribuido _bloqueos;
     private readonly ILogger<CompraService> _logger;
 
     public CompraService(ApplicationDbContext db, ICatalogoService catalogo, IQrEntradaService qr, IEmailService email,
-        IOptions<ComprasOptions> opciones, IOptions<ComisionesOptions> comisiones, ILogger<CompraService> logger)
+        IOptions<ComprasOptions> opciones, IOptions<ComisionesOptions> comisiones, IBloqueoDistribuido bloqueos, ILogger<CompraService> logger)
     {
         _db = db;
         _catalogo = catalogo;
@@ -70,6 +80,7 @@ public class CompraService : ICompraService
         _email = email;
         _opciones = opciones.Value;
         _comisiones = comisiones.Value;
+        _bloqueos = bloqueos;
         _logger = logger;
     }
 
@@ -128,22 +139,23 @@ public class CompraService : ICompraService
         };
         orden.Total = orden.Items.Sum(i => i.Subtotal);
 
+        // HU11: bloqueo distribuido (Redis) por evento: las reservas del mismo evento se procesan de una en una
+        await using var bloqueo = await _bloqueos.AdquirirAsync($"aforo:evento:{eventoId}", DuracionBloqueo, EsperaBloqueo, ct);
+        if (bloqueo == null)
+            return ResultadoOrden.Fallo("Hay mucha demanda en este momento. Inténtalo de nuevo en unos segundos.");
+
+        // Una reserva vencida devuelve su aforo ya mismo (no espera al proceso que corre cada minuto)
+        await LiberarExpiradasDelEventoAsync(eventoId, ct);
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         foreach (var item in orden.Items)
         {
-            var cantidad = item.Cantidad;
-
-            // UPDATE atómico: solo reserva si quedan suficientes entradas en este momento
-            var reservadas = await _db.TiposEntrada
-                .Where(t => t.Id == item.TipoEntradaId && t.Capacidad - t.Vendidas - t.Reservadas >= cantidad)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.Reservadas, t => t.Reservadas + cantidad), ct);
-
-            if (reservadas == 0)
+            if (!await ReservarAsync(item.TipoEntradaId, item.Cantidad, ct))
             {
                 await tx.RollbackAsync(ct);
                 var zona = tipos[item.TipoEntradaId];
-                return ResultadoOrden.Fallo($"Ya no quedan {cantidad} entradas disponibles en la zona {zona.Nombre}.");
+                return ResultadoOrden.Fallo($"Ya no quedan {item.Cantidad} entradas disponibles en la zona {zona.Nombre}.");
             }
         }
 
@@ -195,7 +207,8 @@ public class CompraService : ICompraService
                     .Where(t => t.Id == item.TipoEntradaId)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(t => t.Reservadas, t => t.Reservadas - cantidad)
-                        .SetProperty(t => t.Vendidas, t => t.Vendidas + cantidad), ct);
+                        .SetProperty(t => t.Vendidas, t => t.Vendidas + cantidad)
+                        .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
             }
         }
         else
@@ -265,6 +278,17 @@ public class CompraService : ICompraService
         return esDelUsuario && await LiberarAsync(codigoOrden, EstadoOrden.Cancelada, ct);
     }
 
+    public async Task<bool> RechazarPagoAsync(string codigoOrden, CancellationToken ct = default)
+    {
+        var liberada = await LiberarAsync(codigoOrden, EstadoOrden.Rechazada, ct);
+        if (liberada)
+        {
+            _logger.LogInformation("💳 Pago rechazado: la orden {Codigo} liberó su reserva", codigoOrden);
+            await _catalogo.InvalidarAsync(ct);
+        }
+        return liberada;
+    }
+
     public async Task<int> LiberarExpiradasAsync(CancellationToken ct = default)
     {
         var ahora = DateTime.UtcNow;
@@ -287,6 +311,54 @@ public class CompraService : ICompraService
         }
 
         return liberadas;
+    }
+
+    // =============================
+    // 🔐 RESERVA CON TOKEN DE CONCURRENCIA (RowVersion)
+    // =============================
+    // Se lee la zona con su versión y se actualiza "WHERE RowVersion = la leída": si otra compra la cambió
+    // entre medio, no se toca ninguna fila y se reintenta con datos frescos. La condición de stock en el
+    // WHERE es una segunda barrera: aunque algo falle, la base nunca deja Vendidas + Reservadas > Capacidad.
+    private async Task<bool> ReservarAsync(int tipoEntradaId, int cantidad, CancellationToken ct)
+    {
+        for (var intento = 0; intento < IntentosReserva; intento++)
+        {
+            var zona = await _db.TiposEntrada.AsNoTracking()
+                .Where(t => t.Id == tipoEntradaId)
+                .Select(t => new { Libres = t.Capacidad - t.Vendidas - t.Reservadas, t.RowVersion })
+                .FirstOrDefaultAsync(ct);
+
+            if (zona == null || zona.Libres < cantidad)
+                return false;
+
+            var version = zona.RowVersion;
+            var actualizadas = await _db.TiposEntrada
+                .Where(t => t.Id == tipoEntradaId && t.RowVersion == version
+                            && t.Capacidad - t.Vendidas - t.Reservadas >= cantidad
+                            && _db.Eventos.Any(e => e.Id == t.EventoId && e.Estado == EstadoEvento.Aprobado)) // por si se canceló mientras tanto
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.Reservadas, t => t.Reservadas + cantidad)
+                    .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
+
+            if (actualizadas == 1)
+                return true;
+        }
+
+        _logger.LogWarning("Reserva de {Cantidad} entradas en la zona {Zona} no lograda tras {Intentos} intentos por concurrencia",
+            cantidad, tipoEntradaId, IntentosReserva);
+        return false;
+    }
+
+    private async Task LiberarExpiradasDelEventoAsync(int eventoId, CancellationToken ct)
+    {
+        var ahora = DateTime.UtcNow;
+        var vencidas = await _db.Ordenes
+            .Where(o => o.EventoId == eventoId && o.Estado == EstadoOrden.PendientePago && o.FechaExpiracion < ahora)
+            .Select(o => o.Codigo)
+            .ToListAsync(ct);
+
+        foreach (var codigo in vencidas)
+            await LiberarAsync(codigo, EstadoOrden.Expirada, ct);
     }
 
     private async Task<bool> LiberarAsync(string codigoOrden, EstadoOrden nuevoEstado, CancellationToken ct)
@@ -314,7 +386,9 @@ public class CompraService : ICompraService
             var cantidad = item.Cantidad;
             await _db.TiposEntrada
                 .Where(t => t.Id == item.TipoEntradaId)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.Reservadas, t => t.Reservadas - cantidad), ct);
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.Reservadas, t => t.Reservadas - cantidad)
+                    .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
         }
 
         await tx.CommitAsync(ct);
@@ -327,8 +401,11 @@ public class CompraService : ICompraService
         {
             var cantidad = item.Cantidad;
             var vendidas = await _db.TiposEntrada
-                .Where(t => t.Id == item.TipoEntradaId && t.Capacidad - t.Vendidas - t.Reservadas >= cantidad)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.Vendidas, t => t.Vendidas + cantidad), ct);
+                .Where(t => t.Id == item.TipoEntradaId && t.Capacidad - t.Vendidas - t.Reservadas >= cantidad
+                            && _db.Eventos.Any(e => e.Id == t.EventoId && e.Estado == EstadoEvento.Aprobado)) // no se vende si se canceló
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.Vendidas, t => t.Vendidas + cantidad)
+                    .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
 
             if (vendidas == 0)
                 return false;

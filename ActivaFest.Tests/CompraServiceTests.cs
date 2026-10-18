@@ -44,10 +44,12 @@ public static class Fabrica
     public static QrEntradaService Qr(string secreto = "secreto-de-pruebas") =>
         new(Options.Create(new QrOptions { Secreto = secreto }), new EntornoFalso(), NullLogger<QrEntradaService>.Instance);
 
-    public static CompraService Compras(ApplicationDbContext db, IEmailService email, IDistributedCache? cache = null, decimal comision = 8m) =>
+    public static CompraService Compras(ApplicationDbContext db, IEmailService email, IDistributedCache? cache = null, decimal comision = 8m,
+        IBloqueoDistribuido? bloqueo = null) =>
         new(db,
             new CatalogoService(db, cache ?? new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<CatalogoService>.Instance),
-            Qr(), email, Options.Create(new ComprasOptions()), Options.Create(new ComisionesOptions { Porcentaje = comision }), NullLogger<CompraService>.Instance);
+            Qr(), email, Options.Create(new ComprasOptions()), Options.Create(new ComisionesOptions { Porcentaje = comision }),
+            bloqueo ?? new BloqueoEnMemoria(), NullLogger<CompraService>.Instance);
 }
 
 // =============================
@@ -233,6 +235,61 @@ public class CompraServiceTests : IDisposable
         Assert.Empty(_db.Entradas);
     }
 
+    // HU06: un pago rechazado no descuenta aforo (la reserva se libera en el momento, no al vencer)
+    [Fact]
+    public async Task Un_pago_rechazado_no_descuenta_aforo()
+    {
+        var (evento, general, _) = CrearEvento(_db);
+        var antes = Releer(general.Id).Disponibles;
+        var orden = (await _compras.CrearOrdenAsync("ana", evento.Id, new Dictionary<int, int> { [general.Id] = 3 })).Orden!;
+        Assert.Equal(antes - 3, Releer(general.Id).Disponibles);
+
+        Assert.True(await _compras.RechazarPagoAsync(orden.Codigo));
+
+        Assert.Equal(EstadoOrden.Rechazada, EstadoDe(orden.Codigo));
+        Assert.Equal(antes, Releer(general.Id).Disponibles);
+        Assert.Equal(0, Releer(general.Id).Vendidas);
+        Assert.False(await _compras.RechazarPagoAsync(orden.Codigo)); // no devuelve la reserva dos veces
+        Assert.Equal(antes, Releer(general.Id).Disponibles);
+    }
+
+    [Fact]
+    public async Task Un_rechazo_tardio_no_anula_una_orden_ya_pagada()
+    {
+        var (evento, general, _) = CrearEvento(_db);
+        var orden = (await _compras.CrearOrdenAsync("ana", evento.Id, new Dictionary<int, int> { [general.Id] = 2 })).Orden!;
+        await _compras.ConfirmarPagoAsync(orden.Codigo, "Simulado", "SIM-1", orden.Total, Url);
+
+        Assert.False(await _compras.RechazarPagoAsync(orden.Codigo));
+        Assert.Equal(EstadoOrden.Pagada, EstadoDe(orden.Codigo));
+        Assert.Equal(2, Releer(general.Id).Vendidas);
+    }
+
+    [Fact]
+    public async Task Si_tras_un_rechazo_el_reintento_se_aprueba_se_emiten_las_entradas()
+    {
+        var (evento, general, _) = CrearEvento(_db);
+        var orden = (await _compras.CrearOrdenAsync("ana", evento.Id, new Dictionary<int, int> { [general.Id] = 2 })).Orden!;
+        await _compras.RechazarPagoAsync(orden.Codigo);
+
+        var resultado = await _compras.ConfirmarPagoAsync(orden.Codigo, "MercadoPago", "123", orden.Total, Url);
+
+        Assert.Equal(EstadoOrden.Pagada, EstadoDe(orden.Codigo));
+        Assert.Equal(2, Releer(general.Id).Vendidas);
+        Assert.Equal(0, Releer(general.Id).Reservadas);
+        Assert.Equal(2, _db.Entradas.Count(e => e.OrdenId == orden.Id));
+        Assert.NotEqual(ResultadoConfirmacion.RequiereReembolso, resultado);
+    }
+
+    [Fact]
+    public async Task La_reserva_dura_diez_minutos()
+    {
+        var (evento, general, _) = CrearEvento(_db);
+        var orden = (await _compras.CrearOrdenAsync("ana", evento.Id, new Dictionary<int, int> { [general.Id] = 1 })).Orden!;
+
+        Assert.InRange((orden.FechaExpiracion - DateTime.UtcNow).TotalMinutes, 9.9, 10.01);
+    }
+
     [Fact]
     public async Task Las_reservas_vencidas_devuelven_el_aforo()
     {
@@ -331,27 +388,29 @@ public class ConcurrenciaAforoTests : IDisposable
             if (File.Exists(f)) File.Delete(f);
     }
 
-    [Fact]
-    public async Task Veinte_compras_simultaneas_por_cinco_entradas_venden_exactamente_cinco()
+    // Compras simultáneas de "compradores" entradas cuando quedan "capacidad"; con o sin el bloqueo compartido
+    // (sin él se simulan varias instancias de la app sin Redis: protege solo el RowVersion + UPDATE condicional)
+    private async Task<(int Exitos, TipoEntrada Zona, int Entradas)> CompraSimultaneaAsync(int compradores, int capacidad, bool bloqueoCompartido)
     {
         int generalId, eventoId;
-        var usuarios = Enumerable.Range(1, 20).Select(i => $"u{i}").ToArray();
+        var usuarios = Enumerable.Range(1, compradores).Select(i => $"u{i}").ToArray();
 
         using (var db = NuevoContexto())
         {
             db.Database.EnsureCreated();
             CompraServiceTests.CrearUsuarios(db, usuarios);
-            var (evento, general, _) = CompraServiceTests.CrearEvento(db, capacidadGeneral: 5);
+            var (evento, general, _) = CompraServiceTests.CrearEvento(db, capacidadGeneral: capacidad);
             generalId = general.Id;
             eventoId = evento.Id;
         }
 
+        var bloqueo = new BloqueoEnMemoria();
         var inicio = new TaskCompletionSource();
         var tareas = usuarios.Select(u => Task.Run(async () =>
         {
             await inicio.Task; // todas arrancan a la vez
             using var db = NuevoContexto();
-            var compras = Fabrica.Compras(db, new EmailFalso());
+            var compras = Fabrica.Compras(db, new EmailFalso(), bloqueo: bloqueoCompartido ? bloqueo : null);
             var r = await compras.CrearOrdenAsync(u, eventoId, new Dictionary<int, int> { [generalId] = 1 });
             if (r.Orden != null)
                 await compras.ConfirmarPagoAsync(r.Orden.Codigo, "Simulado", "SIM-" + u, r.Orden.Total, "https://x");
@@ -362,11 +421,33 @@ public class ConcurrenciaAforoTests : IDisposable
         var exitos = (await Task.WhenAll(tareas)).Count(ok => ok);
 
         using var verificacion = NuevoContexto();
-        var tipo = verificacion.TiposEntrada.AsNoTracking().Single(t => t.Id == generalId);
+        return (exitos, verificacion.TiposEntrada.AsNoTracking().Single(t => t.Id == generalId), verificacion.Entradas.Count());
+    }
+
+    // Criterio de HU11: dos compras simultáneas de la última entrada producen una sola venta
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Dos_compras_simultaneas_de_la_ultima_entrada_producen_una_sola_venta(bool bloqueoCompartido)
+    {
+        var (exitos, zona, entradas) = await CompraSimultaneaAsync(compradores: 2, capacidad: 1, bloqueoCompartido);
+
+        Assert.Equal(1, exitos);
+        Assert.Equal(1, zona.Vendidas);
+        Assert.Equal(1, entradas);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Veinte_compras_simultaneas_por_cinco_entradas_venden_exactamente_cinco(bool bloqueoCompartido)
+    {
+        var (exitos, zona, entradas) = await CompraSimultaneaAsync(compradores: 20, capacidad: 5, bloqueoCompartido);
 
         Assert.Equal(5, exitos);
-        Assert.Equal(5, tipo.Vendidas);
-        Assert.Equal(0, tipo.Reservadas);
-        Assert.Equal(5, verificacion.Entradas.Count());
+        Assert.Equal(5, zona.Vendidas);
+        Assert.Equal(0, zona.Reservadas);
+        Assert.Equal(5, entradas);
+        Assert.True(zona.RowVersion >= 10); // cada reserva y cada pago cambian la versión
     }
 }

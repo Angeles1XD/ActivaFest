@@ -1,41 +1,21 @@
 @model ActivaFest.Services.Panel.PanelEvento
 @using System.Globalization
+@using System.Text.Json
 @{
     var ev = Model.Evento;
     ViewData["Title"] = $"Panel · {ev.Titulo}";
     var inv = CultureInfo.InvariantCulture;
     string Pct(double v) => Math.Round(v * 100, 1).ToString(inv);
 
-    // ---------- Geometría del gráfico de columnas (SVG en el servidor) ----------
     var dias = Model.VentasPorDia;
-    // Lienzo ≈ ancho real de la tarjeta (escala ~1:1): las barras quedan en ≤24px y el texto del eje en su tamaño
-    const double ancho = 1100, alto = 280, margenIzq = 36, margenDer = 8, margenSup = 22, margenInf = 30;
-    var areaAncho = ancho - margenIzq - margenDer;
-    var areaAlto = alto - margenSup - margenInf;
-    var maximo = Math.Max(1, dias.Count == 0 ? 0 : dias.Max(d => d.Entradas));
-    var paso = PasoLimpio(maximo / 4.0);
-    var techo = Math.Ceiling(maximo / paso) * paso;
-    var ranura = areaAncho / Math.Max(1, dias.Count);
-    var grosor = Math.Min(24, ranura * 0.6);
-    var cadaCuanto = Math.Max(1, (int)Math.Ceiling(dias.Count / 8.0));
     var diaMaximo = dias.Where(d => d.Entradas > 0).OrderByDescending(d => d.Entradas).ThenByDescending(d => d.Dia).FirstOrDefault();
 
-    double Y(double v) => margenSup + areaAlto - v / techo * areaAlto;
-
-    static double PasoLimpio(double bruto)
+    // HU13: datos de los gráficos de Chart.js (los mismos de las tablas, que siguen disponibles)
+    var datosGraficos = JsonSerializer.Serialize(new
     {
-        if (bruto <= 1) return 1;
-        var potencia = Math.Pow(10, Math.Floor(Math.Log10(bruto)));
-        var n = bruto / potencia;
-        return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * potencia;
-    }
-
-    // Columna con extremo de datos redondeado (4px) y base recta
-    string Columna(double x, double y, double w, double baseY)
-    {
-        var r = Math.Min(4, Math.Min(w / 2, baseY - y));
-        return string.Create(inv, $"M{x:0.##},{baseY:0.##}V{y + r:0.##}Q{x:0.##},{y:0.##} {x + r:0.##},{y:0.##}H{x + w - r:0.##}Q{x + w:0.##},{y:0.##} {x + w:0.##},{y + r:0.##}V{baseY:0.##}Z");
-    }
+        dias = dias.Select(d => new { etiqueta = d.Dia.ToString("dd/MM"), entradas = d.Entradas, ingresos = d.Ingresos }),
+        zonas = Model.Zonas.Select(z => new { nombre = z.Nombre, vendidas = z.Vendidas, reservadas = z.Reservadas, disponibles = z.Disponibles })
+    });
 }
 
 @section Styles {
@@ -63,7 +43,11 @@
             }
             @if (ev.Estado == EstadoEvento.Aprobado && DateTime.Now <= ev.FinValidezEntradas)
             {
-                <a asp-controller="Acceso" asp-action="Escanear" asp-route-id="@ev.Id" class="cat-boton boton-chico">Escanear entradas</a>
+                @* HU08: el escáner es solo del personal de Control de Acceso *@
+                @if (User.IsInRole(Roles.ControlAcceso))
+                {
+                    <a asp-controller="Acceso" asp-action="Escanear" asp-route-id="@ev.Id" class="cat-boton boton-chico">Escanear entradas</a>
+                }
                 <a asp-controller="Destacados" asp-action="Contratar" asp-route-id="@ev.Id" class="boton-secundario boton-chico">⭐ Destacar</a>
             }
         </div>
@@ -116,51 +100,9 @@
         <h2>Entradas vendidas por día</h2>
         <p class="texto-tenue">Últimos @dias.Count días · hora de Perú</p>
 
-        <div class="grafico" id="graficoVentas">
-            <svg viewBox="0 0 @ancho.ToString(inv) @alto.ToString(inv)" role="img"
-                 aria-label="Columnas con las entradas vendidas por día. Máximo: @(diaMaximo == null ? "sin ventas" : $"{diaMaximo.Entradas} el {diaMaximo.Dia:dd/MM}")">
-                @for (var t = 0.0; t <= techo + 0.001; t += paso)
-                {
-                    var y = Y(t);
-                    <g>
-                        <line x1="@margenIzq.ToString(inv)" x2="@((ancho - margenDer).ToString(inv))" y1="@y.ToString("0.##", inv)" y2="@y.ToString("0.##", inv)" class="grilla" />
-                        <text x="@((margenIzq - 6).ToString(inv))" y="@((y + 4).ToString("0.##", inv))" class="eje" text-anchor="end">@t.ToString("0", inv)</text>
-                    </g>
-                }
-
-                @for (var i = 0; i < dias.Count; i++)
-                {
-                    var d = dias[i];
-                    var x = margenIzq + i * ranura + (ranura - grosor) / 2;
-                    var baseY = Y(0);
-                    var etiqueta = $"{Formato.Fecha(d.Dia, "ddd dd MMM")}: {d.Entradas} {(d.Entradas == 1 ? "entrada" : "entradas")} · {Formato.Monto(d.Ingresos)}";
-
-                    <g class="columna" tabindex="0" role="img" aria-label="@etiqueta" data-tooltip="@etiqueta">
-                        @* Zona de hover más grande que la barra *@
-                        <rect x="@((margenIzq + i * ranura).ToString("0.##", inv))" y="@margenSup.ToString(inv)" width="@ranura.ToString("0.##", inv)" height="@areaAlto.ToString(inv)" class="zona-hover" />
-                        @if (d.Entradas > 0)
-                        {
-                            <path d="@Columna(x, Y(d.Entradas), grosor, baseY)" class="barra" />
-                        }
-                    </g>
-
-                    @if (i % cadaCuanto == 0 || i == dias.Count - 1)
-                    {
-                        <g><text x="@((x + grosor / 2).ToString("0.##", inv))" y="@((alto - 8).ToString(inv))" class="eje" text-anchor="middle">@d.Dia.ToString("dd/MM")</text></g>
-                    }
-                }
-
-                @* Etiqueta directa solo en el máximo *@
-                @if (diaMaximo != null)
-                {
-                    var iMax = dias.IndexOf(diaMaximo);
-                    var xMax = margenIzq + iMax * ranura + ranura / 2;
-                    <g><text x="@xMax.ToString("0.##", inv)" y="@((Y(diaMaximo.Entradas) - 6).ToString("0.##", inv))" class="etiqueta-dato" text-anchor="middle">@diaMaximo.Entradas</text></g>
-                }
-
-                <line x1="@margenIzq.ToString(inv)" x2="@((ancho - margenDer).ToString(inv))" y1="@Y(0).ToString("0.##", inv)" y2="@Y(0).ToString("0.##", inv)" class="linea-base" />
-            </svg>
-            <div class="tooltip-grafico" id="tooltipGrafico" role="tooltip" hidden></div>
+        <!-- HU13: gráfico con Chart.js -->
+        <div class="grafico-chart">
+            <canvas id="graficoVentas" role="img" aria-label="Entradas vendidas por día. Máximo: @(diaMaximo == null ? "sin ventas" : $"{diaMaximo.Entradas} el {diaMaximo.Dia:dd/MM}")"></canvas>
         </div>
 
         <details class="vista-tabla">
@@ -197,6 +139,9 @@
     <!-- ===== Ocupación por zona (medidores) ===== -->
     <section class="tarjeta-panel">
         <h2>Por zona</h2>
+        <div class="grafico-chart grafico-zonas">
+            <canvas id="graficoZonas" role="img" aria-label="Entradas vendidas, en reserva y disponibles por zona"></canvas>
+        </div>
         <div class="tabla-contenedor">
             <table class="tabla-datos">
                 <thead>
@@ -264,5 +209,7 @@
 </div>
 
 @section Scripts {
+    <script type="application/json" id="datosPanel">@Html.Raw(datosGraficos)</script>
+    <partial name="_ChartJs" />
     <script src="~/js/panel.js" asp-append-version="true"></script>
 }

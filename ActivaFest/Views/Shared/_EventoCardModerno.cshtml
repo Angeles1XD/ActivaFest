@@ -27,7 +27,15 @@
         <p class="ev-dato">
             <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             @Model.Ubicacion
+            @if (Model.DistanciaKm != null)
+            {
+                <span class="ev-distancia">· @Model.DistanciaKm.Value.ToString(Model.DistanciaKm < 10 ? "0.0" : "0") km</span>
+            }
         </p>
+        @if (Model.Motivo != null)
+        {
+            <p class="ev-motivo">✨ @Model.Motivo</p>
+        }
 
         <div class="ev-pie">
             <span class="ev-precio">@(Model.PrecioDesde switch { null => "Por confirmar", 0 => "Gratis", var p => Formato.Precio(p.Value) })</span>

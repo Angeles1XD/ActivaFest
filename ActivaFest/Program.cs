@@ -39,7 +39,16 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         options.SignIn.RequireConfirmedAccount = false;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddSignInManager<SignInManagerActivaFest>()
     .AddDefaultTokenProviders();
+
+// HU18: el enlace de recuperación vence en 1 hora (Identity usa 1 día por defecto).
+// Es de un solo uso: al cambiar la contraseña se renueva el SecurityStamp y el token deja de ser válido.
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromHours(1));
+
+// HU19: al desactivar una cuenta o cambiar sus roles se renueva su SecurityStamp; las sesiones abiertas
+// se revalidan cada minuto (por defecto cada 30), así el cambio aplica casi de inmediato
+builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -56,7 +65,11 @@ builder.Services.ConfigureApplicationCookie(options =>
 // ✉️ CORREO (HU15)
 // =============================
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
-builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+// Los correos se encolan y se envían en segundo plano con reintentos (las entradas llegan en < 5 min, HU07)
+builder.Services.AddSingleton<IEnviadorCorreo, SmtpEnviador>();
+builder.Services.AddSingleton<ColaCorreos>();
+builder.Services.AddSingleton<IEmailService>(sp => sp.GetRequiredService<ColaCorreos>());
+builder.Services.AddHostedService<EnvioCorreosService>();
 
 // =============================
 // 📚 CATÁLOGO E IMÁGENES (HU02, HU03, HU05)
@@ -78,6 +91,7 @@ builder.Services.AddScoped<IAlmacenamientoImagenes>(sp =>
 // 🧑‍💼 ORGANIZADOR Y PUERTA (HU08, HU09, HU13)
 // =============================
 builder.Services.AddScoped<ActivaFest.Services.Eventos.IEventoEdicionService, ActivaFest.Services.Eventos.EventoEdicionService>();
+builder.Services.AddScoped<ActivaFest.Services.Eventos.ICancelacionEventoService, ActivaFest.Services.Eventos.CancelacionEventoService>();
 builder.Services.AddScoped<ActivaFest.Services.Acceso.IAccesoService, ActivaFest.Services.Acceso.AccesoService>();
 builder.Services.AddScoped<ActivaFest.Services.Panel.IPanelService, ActivaFest.Services.Panel.PanelService>();
 
@@ -96,6 +110,7 @@ builder.Services.Configure<PagosOptions>(builder.Configuration.GetSection("Pagos
 builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 
 builder.Services.AddSingleton<IQrEntradaService, QrEntradaService>();
+builder.Services.AddSingleton<BloqueoEnMemoria>();
 builder.Services.AddScoped<ICompraService, CompraService>();
 builder.Services.AddHostedService<ExpiracionReservasService>();
 
@@ -139,11 +154,28 @@ builder.Services.AddSession(options =>
 builder.Services.AddHttpContextAccessor();
 
 // =============================
-// 🔥 SERVICIOS DE IA
+// 🤖 ASISTENTE VIRTUAL Y 🎯 RECOMENDACIONES (HU14, HU17)
 // =============================
-builder.Services.AddScoped<ActivaFest.Services.AgentService>();
-
 builder.Services.AddSingleton<MachineLearningService>();
+builder.Services.Configure<ActivaFest.Services.Asistente.AsistenteOptions>(builder.Configuration.GetSection("Asistente"));
+builder.Services.AddScoped<ActivaFest.Services.Asistente.IAsistenteService, ActivaFest.Services.Asistente.AsistenteService>();
+builder.Services.AddScoped<ActivaFest.Services.Recomendaciones.IRecomendacionService, ActivaFest.Services.Recomendaciones.RecomendacionService>();
+
+// El LLM (Ollama) solo se usa si está habilitado: en Render no hay Ollama y el asistente funciona igual
+builder.Services.AddSingleton<ActivaFest.Services.Asistente.IRedactorLlm>(sp =>
+    sp.GetRequiredService<IOptions<ActivaFest.Services.Asistente.AsistenteOptions>>().Value.UsarLlm
+        ? ActivatorUtilities.CreateInstance<ActivaFest.Services.Asistente.RedactorOllama>(sp)
+        : new ActivaFest.Services.Asistente.RedactorDesactivado());
+
+// Límite de mensajes al chat por IP: evita abusos del asistente
+builder.Services.AddRateLimiter(opciones =>
+{
+    opciones.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    opciones.AddPolicy(ActivaFest.Controllers.ChatController.PoliticaLimite, contexto =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            contexto.Connection.RemoteIpAddress?.ToString() ?? "anonimo",
+            _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
+});
 
 // =============================
 // 🔥 REDIS (opcional, no romper en local)
@@ -166,10 +198,16 @@ if (!string.IsNullOrEmpty(redisHost))
         new Microsoft.Extensions.Caching.StackExchangeRedis.RedisCache(Options.Create(redisOptions)),
         new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(Options.Create(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions())),
         sp.GetRequiredService<ILogger<CacheResiliente>>()));
+
+    // HU11: bloqueo distribuido de aforo en el mismo Redis (con respaldo local si no responde)
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(_ =>
+        StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions.Configuration));
+    builder.Services.AddSingleton<IBloqueoDistribuido, BloqueoRedis>();
 }
 else
 {
     builder.Services.AddDistributedMemoryCache(); // local
+    builder.Services.AddSingleton<IBloqueoDistribuido>(sp => sp.GetRequiredService<BloqueoEnMemoria>());
 }
 
 var app = builder.Build();
@@ -217,6 +255,7 @@ app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // =============================
 // 🔥 RUTA PRINCIPAL
@@ -225,16 +264,9 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// =============================
-// 🔥 ENDPOINT DEL AGENTE IA
-// =============================
-app.MapPost("/api/chat", async (ActivaFest.Services.ChatRequest request, ActivaFest.Services.AgentService agentService) =>
-{
-    if (string.IsNullOrWhiteSpace(request.Message))
-        return Results.BadRequest("El mensaje no puede estar vacío.");
-
-    var response = await agentService.ProcessChatAsync(request.Message);
-    return Results.Ok(new { Reply = response });
-});
+// El asistente virtual (/api/chat) está en ChatController
 
 app.Run();
+
+// Expone Program a las pruebas de integración (WebApplicationFactory)
+public partial class Program { }

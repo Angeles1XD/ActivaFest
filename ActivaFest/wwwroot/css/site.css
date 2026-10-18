@@ -211,6 +211,16 @@ a:hover {
   max-width: 220px;
   color: var(--texto-2);
   font-size: 14px;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 3px 10px 3px 3px;
+  transition: background 0.2s;
+}
+
+.nav-usuario:hover,
+.nav-usuario.activo {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--texto);
 }
 
 .nav-usuario-correo {
@@ -698,6 +708,11 @@ input[type="checkbox"] {
 .badge-Pendiente { background: rgba(251, 191, 36, 0.15); color: #fde68a; }
 .badge-Aprobado { background: rgba(34, 197, 94, 0.15); color: #86efac; }
 .badge-Rechazado { background: rgba(248, 113, 113, 0.15); color: #fca5a5; }
+.badge-Cancelado { background: rgba(248, 113, 113, 0.22); color: #f87171; }
+
+/* Acción destructiva (cancelar un evento) */
+.btn-gris.boton-peligro { color: #fca5a5; border-color: rgba(248, 113, 113, 0.45); }
+.btn-gris.boton-peligro:hover { background: rgba(248, 113, 113, 0.15); color: #fff; }
 
 .acciones-moderacion {
   display: flex;
@@ -814,6 +829,50 @@ input[type="checkbox"] {
   border: 1px solid var(--borde);
   color: var(--texto);
   border-bottom-left-radius: 4px;
+}
+
+.chat-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  white-space: normal;
+}
+
+.chat-enlaces a {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--lila);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.chat-enlaces a:hover {
+  background: rgba(139, 92, 246, 0.3);
+}
+
+.chat-sugerencias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-sugerencias button {
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--borde-fuerte);
+  background: transparent;
+  color: var(--texto-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-sugerencias button:hover {
+  border-color: var(--morado);
+  color: var(--texto);
 }
 
 .typing-indicator {

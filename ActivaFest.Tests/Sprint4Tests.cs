@@ -117,7 +117,8 @@ public class AccesoServiceTests : BaseSprint4
     {
         var (evento, general, _) = EventoDe("org", horasHastaInicio: 1);
         var entrada = (await ComprarAsync("ana", evento.Id, new() { [general.Id] = 1 }))[0];
-        var alterado = _qr.CrearContenido(entrada.Codigo).Replace(entrada.Codigo, entrada.Codigo[..^1] + "X");
+        var original = _qr.CrearContenido(entrada.Codigo);
+        var alterado = original[..^3] + (original[^3] == 'A' ? "B" : "A") + original[^2..];
 
         Assert.Equal(TipoValidacion.Invalida, (await _acceso.ValidarAsync(evento.Id, alterado, "porteria", DateTime.Now)).Tipo);
         Assert.Equal(TipoValidacion.Invalida, (await _acceso.ValidarAsync(evento.Id, "https://otra-web.com", "porteria", DateTime.Now)).Tipo);
@@ -160,14 +161,26 @@ public class AccesoServiceTests : BaseSprint4
     }
 
     [Fact]
-    public async Task Un_organizador_solo_controla_sus_eventos_y_el_personal_de_acceso_todos()
+    public async Task Solo_el_personal_asignado_al_evento_puede_validar_sus_entradas()
     {
         var (propio, _, _) = EventoDe("org");
         var (ajeno, _, _) = EventoDe("otroOrg");
 
-        Assert.True(await _acceso.PuedeControlarAsync("org", true, propio.Id));
-        Assert.False(await _acceso.PuedeControlarAsync("org", true, ajeno.Id));
+        // Organizador: solo sus eventos
+        Assert.True(await _acceso.PuedeControlarAsync("org", false, propio.Id));
+        Assert.False(await _acceso.PuedeControlarAsync("org", false, ajeno.Id));
+
+        // Personal de control: nada hasta que el administrador lo asigna (HU19)
+        Assert.False(await _acceso.PuedeControlarAsync("porteria", false, ajeno.Id));
+        Db.AsignacionesAcceso.Add(new AsignacionAcceso { UsuarioId = "porteria", EventoId = ajeno.Id });
+        Db.SaveChanges();
         Assert.True(await _acceso.PuedeControlarAsync("porteria", false, ajeno.Id));
+        Assert.False(await _acceso.PuedeControlarAsync("porteria", false, propio.Id));
+        Assert.Equal(new[] { ajeno.Id }, (await _acceso.EventosControlablesAsync("porteria", false)).Select(e => e.Id));
+
+        // Administrador: todos
+        Assert.True(await _acceso.PuedeControlarAsync("admin", true, propio.Id));
+        Assert.True(await _acceso.PuedeControlarAsync("admin", true, ajeno.Id));
     }
 }
 

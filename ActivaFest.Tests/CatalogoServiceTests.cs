@@ -73,6 +73,82 @@ public class CatalogoServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task No_muestra_eventos_de_hoy_que_ya_empezaron()
+    {
+        Agregar("Mas tarde", dias: 2, precios: 50);
+        var empezado = Agregar("Ya empezo", precios: 50);
+        empezado.Fecha = DateTime.Now.AddMinutes(-30);
+        _db.SaveChanges();
+
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro { Desde = DateTime.Today });
+
+        Assert.Equal(new[] { "Mas tarde" }, Titulos(resultado));
+    }
+
+    [Theory]
+    [InlineData(OrdenCatalogo.FechaAsc)]
+    [InlineData(OrdenCatalogo.Recientes)]
+    [InlineData(OrdenCatalogo.PrecioAsc)]
+    [InlineData(OrdenCatalogo.PrecioDesc)]
+    public async Task Los_eventos_destacados_aparecen_primero(OrdenCatalogo orden)
+    {
+        CompraServiceTests.CrearUsuarios(_db, "org");
+        Agregar("Pronto y barato", dias: 1, precios: 10);
+        var destacado = Agregar("Destacado", dias: 30, precios: 90);
+        Agregar("Normal", dias: 5, precios: 40);
+
+        _db.ContratosDestacado.Add(new ContratoDestacado
+        {
+            Codigo = "DST-prueba", EventoId = destacado.Id, PaqueteId = 1, OrganizadorId = "org", Precio = 29.90m, Dias = 3, Prioridad = 1,
+            Estado = EstadoContrato.Activo, FechaInicio = DateTime.Now.AddDays(-1), FechaFin = DateTime.Now.AddDays(2)
+        });
+        _db.SaveChanges();
+
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro { Orden = orden });
+
+        Assert.Equal("Destacado", resultado.Eventos[0].Titulo);
+        Assert.True(resultado.Eventos[0].Destacado);
+    }
+
+    [Fact]
+    public async Task Un_destacado_vencido_vuelve_a_su_lugar_normal()
+    {
+        CompraServiceTests.CrearUsuarios(_db, "org");
+        Agregar("Pronto", dias: 1, precios: 10);
+        var vencido = Agregar("Fue destacado", dias: 30, precios: 90);
+        _db.ContratosDestacado.Add(new ContratoDestacado
+        {
+            Codigo = "DST-vencido", EventoId = vencido.Id, PaqueteId = 1, OrganizadorId = "org", Precio = 29.90m, Dias = 3, Prioridad = 1,
+            Estado = EstadoContrato.Activo, FechaInicio = DateTime.Now.AddDays(-5), FechaFin = DateTime.Now.AddDays(-2)
+        });
+        _db.SaveChanges();
+
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro());
+
+        Assert.Equal(new[] { "Pronto", "Fue destacado" }, Titulos(resultado));
+    }
+
+    // RNF02: el catálogo carga en menos de 3 s (se mide la consulta sin caché sobre 1 000 eventos)
+    [Fact]
+    public async Task El_catalogo_responde_en_menos_de_3_segundos_con_mil_eventos()
+    {
+        _db.Eventos.AddRange(Enumerable.Range(1, 1000).Select(i => new Evento
+        {
+            Titulo = $"Evento {i}", CategoriaId = 1 + i % 9, Ubicacion = "Lima", Fecha = DateTime.Today.AddDays(1 + i % 60).AddHours(20),
+            Estado = EstadoEvento.Aprobado,
+            TiposEntrada = { new TipoEntrada { Nombre = "General", Precio = i % 200, Capacidad = 100 } }
+        }));
+        _db.SaveChanges();
+
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro { Buscar = "evento", Orden = OrdenCatalogo.PrecioAsc });
+        reloj.Stop();
+
+        Assert.Equal(1000, resultado.Total);
+        Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(3), $"Tardó {reloj.Elapsed.TotalMilliseconds:N0} ms");
+    }
+
+    [Fact]
     public async Task Filtra_por_categoria()
     {
         Agregar("Rock Fest", Conciertos, precios: 80);
@@ -81,6 +157,39 @@ public class CatalogoServiceTests : IDisposable
         var resultado = await _servicio.BuscarAsync(new CatalogoFiltro { CategoriaId = Teatro });
 
         Assert.Equal(new[] { "Hamlet" }, Titulos(resultado));
+    }
+
+    // HU05: fecha, precio y categoría se combinan (cada evento descartado falla en un solo criterio)
+    [Fact]
+    public async Task Combina_filtros_de_fecha_precio_y_categoria()
+    {
+        Agregar("Cumple todo", Conciertos, dias: 5, precios: 50);
+        Agregar("Muy caro", Conciertos, dias: 5, precios: 120);
+        Agregar("Otra categoria", Teatro, dias: 5, precios: 50);
+        Agregar("Fuera de fecha", Conciertos, dias: 20, precios: 50);
+
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro
+        {
+            CategoriaId = Conciertos,
+            Desde = DateTime.Today.AddDays(3),
+            Hasta = DateTime.Today.AddDays(10),
+            PrecioMin = 30,
+            PrecioMax = 80
+        });
+
+        Assert.Equal(new[] { "Cumple todo" }, Titulos(resultado));
+    }
+
+    [Fact]
+    public async Task Combina_texto_categoria_y_solo_gratis()
+    {
+        Agregar("Rock gratis", Conciertos, precios: 0);
+        Agregar("Rock pagado", Conciertos, precios: 40);
+        Agregar("Teatro gratis rock", Teatro, precios: 0);
+
+        var resultado = await _servicio.BuscarAsync(new CatalogoFiltro { Buscar = "rock", CategoriaId = Conciertos, SoloGratis = true });
+
+        Assert.Equal(new[] { "Rock gratis" }, Titulos(resultado));
     }
 
     [Fact]

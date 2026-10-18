@@ -4,6 +4,7 @@ using ActivaFest.Models;
 using ActivaFest.Services.Catalogo;
 using ActivaFest.Services.Email;
 using ActivaFest.Services.Imagenes;
+using ActivaFest.Services.Plano;
 
 namespace ActivaFest.Services.Eventos;
 
@@ -50,6 +51,10 @@ public class EventoEdicionService : IEventoEdicionService
         if (evento == null)
             return ResultadoEdicion.Fallo("El evento no existe.");
 
+        // Un evento cancelado es un estado final (diagrama de estados): no se edita ni vuelve a revisión
+        if (evento.Estado == EstadoEvento.Cancelado)
+            return ResultadoEdicion.Fallo("Este evento fue cancelado y ya no se puede editar.");
+
         var errores = new List<string>();
 
         // ---------- Zonas de entrada ----------
@@ -73,8 +78,22 @@ public class EventoEdicionService : IEventoEdicionService
                 _db.TiposEntrada.Remove(tipo);
         }
 
-        foreach (var input in enviadas)
+        // ---------- Plano del recinto (HU25) ----------
+        // Cambiar la plantilla o la distribución de asientos regenera el plano: solo se permite sin compras
+        var plantilla = datos.Plantilla;
+        var cambiaDistribucion = plantilla != evento.PlantillaPlano
+            || evento.TiposEntrada.Any(t => !idsEnviados.Contains(t.Id))
+            || enviadas.Any(t => !t.Id.HasValue)
+            || (plantilla == PlantillaPlano.Teatro && enviadas.Any(t =>
+                    evento.TiposEntrada.First(z => z.Id == t.Id).Filas != t.Filas ||
+                    evento.TiposEntrada.First(z => z.Id == t.Id).AsientosPorFila != t.AsientosPorFila));
+
+        if (cambiaDistribucion && conCompras.Count > 0 && (plantilla == PlantillaPlano.Teatro || plantilla != evento.PlantillaPlano))
+            errores.Add("El evento ya tiene compras: no puedes cambiar la plantilla del plano ni la distribución de asientos.");
+
+        for (var i = 0; i < enviadas.Count; i++)
         {
+            var input = enviadas[i];
             if (input.Id is int id)
             {
                 var tipo = evento.TiposEntrada.First(t => t.Id == id);
@@ -88,10 +107,13 @@ public class EventoEdicionService : IEventoEdicionService
                 tipo.Nombre = input.Nombre.Trim();
                 tipo.Precio = Math.Round(input.Precio, 2); // solo afecta a compras futuras: cada orden guarda su precio
                 tipo.Capacidad = input.Capacidad;
+                PlanoService.AplicarZona(tipo, input, plantilla, i);
             }
             else
             {
-                evento.TiposEntrada.Add(new TipoEntrada { Nombre = input.Nombre.Trim(), Precio = Math.Round(input.Precio, 2), Capacidad = input.Capacidad });
+                evento.TiposEntrada.Add(PlanoService.AplicarZona(
+                    new TipoEntrada { Nombre = input.Nombre.Trim(), Precio = Math.Round(input.Precio, 2), Capacidad = input.Capacidad },
+                    input, plantilla, i));
             }
         }
 
@@ -127,6 +149,7 @@ public class EventoEdicionService : IEventoEdicionService
         evento.Latitud = Math.Round(datos.Latitud!.Value, 6);
         evento.Longitud = Math.Round(datos.Longitud!.Value, 6);
         evento.Aforo = evento.TiposEntrada.Sum(t => t.Capacidad);
+        evento.PlantillaPlano = plantilla;
 
         // Un evento publicado sigue publicado (tiene ventas en curso); uno pendiente o rechazado vuelve a revisión
         if (evento.Estado != EstadoEvento.Aprobado)
@@ -139,13 +162,26 @@ public class EventoEdicionService : IEventoEdicionService
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         try
         {
-            // La capacidad se fija con un UPDATE condicional: si justo entró una compra, no puede quedar por debajo de lo vendido
+            // Cada zona existente se actualiza con un UPDATE condicional que sube su RowVersion (HU11):
+            // si justo entró una compra, la capacidad no puede quedar por debajo de lo vendido
             foreach (var input in enviadas.Where(t => t.Id.HasValue))
             {
-                var nueva = input.Capacidad;
+                // Valores ya normalizados (en teatro la capacidad es filas x asientos)
+                var z = evento.TiposEntrada.First(t => t.Id == input.Id);
+                var (nueva, nombre, precio) = (z.Capacidad, z.Nombre, z.Precio);
+                var (color, puerta, numerados, filas, porFila) = (z.Color, z.PuertaIngreso, z.AsientosNumerados, z.Filas, z.AsientosPorFila);
                 var ok = await _db.TiposEntrada
                     .Where(t => t.Id == input.Id && t.Vendidas + t.Reservadas <= nueva)
-                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.Capacidad, nueva), ct);
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.Capacidad, nueva)
+                        .SetProperty(t => t.Nombre, nombre)
+                        .SetProperty(t => t.Precio, precio)
+                        .SetProperty(t => t.Color, color)
+                        .SetProperty(t => t.PuertaIngreso, puerta)
+                        .SetProperty(t => t.AsientosNumerados, numerados)
+                        .SetProperty(t => t.Filas, filas)
+                        .SetProperty(t => t.AsientosPorFila, porFila)
+                        .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
 
                 if (ok == 0)
                 {
@@ -162,18 +198,36 @@ public class EventoEdicionService : IEventoEdicionService
                 evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
             }
 
-            // Los contadores de venta los maneja solo CompraService: esta edición nunca los sobrescribe
+            // Las zonas existentes ya se guardaron arriba; los contadores de venta los maneja solo CompraService
             foreach (var tipo in evento.TiposEntrada.Where(t => _db.Entry(t).State == EntityState.Modified))
-            {
-                var entrada = _db.Entry(tipo);
-                entrada.Property(t => t.Vendidas).IsModified = false;
-                entrada.Property(t => t.Reservadas).IsModified = false;
-                entrada.Property(t => t.Capacidad).IsModified = false;
-            }
+                _db.Entry(tipo).State = EntityState.Unchanged;
 
             _db.EventoImagenes.RemoveRange(aEliminar);
             await _db.SaveChangesAsync(ct);
+
+            // HU25: si cambió la distribución, el plano se vuelve a generar desde la plantilla
+            if (cambiaDistribucion)
+            {
+                await _db.Asientos.Where(a => a.TipoEntrada!.EventoId == eventoId).ExecuteDeleteAsync(ct);
+                if (plantilla == PlantillaPlano.Teatro)
+                {
+                    var zonas = await _db.TiposEntrada.AsNoTracking().Where(t => t.EventoId == eventoId).OrderBy(t => t.Id).ToListAsync(ct);
+                    var asientos = PlanoService.GenerarAsientos(zonas);
+                    asientos.ForEach(a => a.TipoEntrada = null);
+                    _db.Asientos.AddRange(asientos);
+                    await _db.SaveChangesAsync(ct);
+                }
+            }
+
             await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Una zona que se quería eliminar recibió una compra mientras se editaba (su RowVersion cambió)
+            await tx.RollbackAsync(CancellationToken.None);
+            foreach (var ruta in rutasNuevas)
+                await _imagenes.EliminarAsync(ruta, CancellationToken.None);
+            return ResultadoEdicion.Fallo("Se vendieron entradas mientras editabas: revisa las zonas e inténtalo de nuevo.");
         }
         catch (Exception ex)
         {

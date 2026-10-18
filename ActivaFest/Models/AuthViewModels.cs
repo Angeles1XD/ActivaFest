@@ -47,6 +47,13 @@ namespace ActivaFest.Models
         [Required]
         [Display(Name = "Tipo de cuenta")]
         public string Rol { get; set; } = Roles.Asistente;
+
+        // Obligatorio (RNF07): sin consentimiento no se crea la cuenta
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar la política de privacidad para crear tu cuenta.")]
+        public bool AceptaTratamientoDatos { get; set; }
+
+        // Opcional y separado del anterior
+        public bool AceptaPromociones { get; set; }
     }
 
     public class OlvideContrasenaViewModel

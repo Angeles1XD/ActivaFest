@@ -26,14 +26,26 @@ public record ResultadoValidacion(
     int Vendidas = 0)
 {
     public bool PermiteIngreso => Tipo == TipoValidacion.Valida;
+
+    // Títulos que pide HU08: una segunda lectura es «ENTRADA YA UTILIZADA» y cualquier otro rechazo, «INGRESO RECHAZADO»
+    public string Titulo => Tipo switch
+    {
+        TipoValidacion.Valida => TituloPermitido,
+        TipoValidacion.YaUsada => TituloYaUtilizada,
+        _ => TituloRechazado
+    };
+
+    public const string TituloPermitido = "INGRESO PERMITIDO";
+    public const string TituloYaUtilizada = "ENTRADA YA UTILIZADA";
+    public const string TituloRechazado = "INGRESO RECHAZADO";
 }
 
 public interface IAccesoService
 {
     // Eventos que este usuario puede controlar en puerta
-    Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esOrganizadorSolamente, CancellationToken ct = default);
+    Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esAdministrador, CancellationToken ct = default);
 
-    Task<bool> PuedeControlarAsync(string usuarioId, bool esOrganizadorSolamente, int eventoId, CancellationToken ct = default);
+    Task<bool> PuedeControlarAsync(string usuarioId, bool esAdministrador, int eventoId, CancellationToken ct = default);
 
     Task<ResultadoValidacion> ValidarAsync(int eventoId, string contenidoQr, string validadorId, DateTime ahora, CancellationToken ct = default);
 
@@ -58,24 +70,28 @@ public class AccesoService : IAccesoService
         _logger = logger;
     }
 
-    // Administradores y personal de acceso controlan cualquier evento aprobado; un organizador solo los suyos
-    private IQueryable<Evento> EventosDe(string usuarioId, bool esOrganizadorSolamente)
+    // HU19: el administrador controla cualquier evento aprobado; los demás solo sus propios eventos
+    // (organizador) o aquellos a los que el administrador los asignó (personal de Control de Acceso)
+    private IQueryable<Evento> EventosDe(string usuarioId, bool esAdministrador)
     {
         var query = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado);
-        return esOrganizadorSolamente ? query.Where(e => e.OrganizadorId == usuarioId) : query;
+        return esAdministrador
+            ? query
+            : query.Where(e => e.OrganizadorId == usuarioId ||
+                               _db.AsignacionesAcceso.Any(a => a.EventoId == e.Id && a.UsuarioId == usuarioId));
     }
 
-    public Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esOrganizadorSolamente, CancellationToken ct = default)
+    public Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esAdministrador, CancellationToken ct = default)
     {
         var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
-        return EventosDe(usuarioId, esOrganizadorSolamente)
+        return EventosDe(usuarioId, esAdministrador)
             .Where(e => e.Fecha >= desde)
             .OrderBy(e => e.Fecha)
             .ToListAsync(ct);
     }
 
-    public Task<bool> PuedeControlarAsync(string usuarioId, bool esOrganizadorSolamente, int eventoId, CancellationToken ct = default) =>
-        EventosDe(usuarioId, esOrganizadorSolamente).AnyAsync(e => e.Id == eventoId, ct);
+    public Task<bool> PuedeControlarAsync(string usuarioId, bool esAdministrador, int eventoId, CancellationToken ct = default) =>
+        EventosDe(usuarioId, esAdministrador).AnyAsync(e => e.Id == eventoId, ct);
 
     public async Task<ResultadoValidacion> ValidarAsync(int eventoId, string contenidoQr, string validadorId, DateTime ahora,
         CancellationToken ct = default)
@@ -108,7 +124,7 @@ public class AccesoService : IAccesoService
             return await ConAsistenciaAsync(eventoId, Resultado(TipoValidacion.Anulada, "Entrada anulada."), ct);
 
         if (entrada.Estado == EstadoEntrada.Usada)
-            return await ConAsistenciaAsync(eventoId, Resultado(TipoValidacion.YaUsada, "Esta entrada YA FUE USADA.", entrada.FechaUso), ct);
+            return await ConAsistenciaAsync(eventoId, Resultado(TipoValidacion.YaUsada, "Esta entrada ya se usó para ingresar.", entrada.FechaUso), ct);
 
         var evento = entrada.Evento!;
         if (ahora < evento.InicioIngreso)
@@ -130,7 +146,7 @@ public class AccesoService : IAccesoService
         if (marcadas == 0)
         {
             var uso = await _db.Entradas.Where(e => e.Id == entrada.Id).Select(e => e.FechaUso).FirstAsync(ct);
-            return await ConAsistenciaAsync(eventoId, Resultado(TipoValidacion.YaUsada, "Esta entrada YA FUE USADA.", uso), ct);
+            return await ConAsistenciaAsync(eventoId, Resultado(TipoValidacion.YaUsada, "Esta entrada ya se usó para ingresar.", uso), ct);
         }
 
         _logger.LogInformation("🚪 Ingreso validado: entrada {Entrada} del evento {Evento} por {Validador}", entrada.Id, eventoId, validadorId);

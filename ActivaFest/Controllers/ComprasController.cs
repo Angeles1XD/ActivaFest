@@ -146,10 +146,7 @@ namespace ActivaFest.Controllers
                 return NotFound();
 
             if (!aprobar)
-            {
-                TempData["Error"] = "El pago fue rechazado. Puedes intentarlo otra vez mientras dure tu reserva.";
-                return RedirectToAction(nameof(Checkout), new { codigo });
-            }
+                return await PagoRechazadoAsync(orden, ct);
 
             var resultado = await _compras.ConfirmarPagoAsync(codigo, Services.Pagos.PasarelaSimulada.NombreProveedor,
                 "SIM-" + CodigoSeguro.Generar(6), orden.Total, UrlMisEntradas, ct);
@@ -184,6 +181,10 @@ namespace ActivaFest.Controllers
                     TempData["Mensaje"] = "Tu pago está en proceso. Te enviaremos tus entradas por correo apenas se confirme.";
                     return RedirectToAction(nameof(Checkout), new { codigo = orden.Codigo });
                 }
+
+                // Rechazo confirmado por la API (no por la URL, que se puede manipular)
+                if (pago != null && pago.CodigoOrden == orden.Codigo && EsRechazo(pago.Estado))
+                    return await PagoRechazadoAsync(orden, ct);
             }
 
             TempData["Error"] = status == "pending"
@@ -235,8 +236,23 @@ namespace ActivaFest.Controllers
                     await _compras.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, urlEntradas, ct);
                 }
             }
+            else if (pago is { CodigoOrden: not null } && EsRechazo(pago.Estado)
+                     && !pago.CodigoOrden.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal))
+            {
+                await _compras.RechazarPagoAsync(pago.CodigoOrden, ct);
+            }
 
             return Ok();
+        }
+
+        private static bool EsRechazo(string estado) => estado is "rejected" or "cancelled";
+
+        // HU06: un pago rechazado no descuenta aforo. Se liberan las entradas y el usuario vuelve a la ficha para elegirlas otra vez
+        private async Task<IActionResult> PagoRechazadoAsync(Orden orden, CancellationToken ct)
+        {
+            await _compras.RechazarPagoAsync(orden.Codigo, ct);
+            TempData["Error"] = "El pago fue rechazado y no se te cobró nada. Liberamos las entradas que tenías reservadas; puedes volver a elegirlas e intentarlo con otro medio de pago.";
+            return RedirectToAction("Detalle", "Eventos", new { id = orden.EventoId }, "comprar");
         }
 
         // Paso 5: confirmación con las entradas

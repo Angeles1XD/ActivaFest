@@ -95,10 +95,11 @@
 @if (r.Eventos.Count == 0)
 {
     <div class="vacio">
-        <p>😕 No hay eventos que coincidan.</p>
+        @* HU05: sin resultados se muestra un mensaje y la opción de limpiar filtros *@
+        <p>😕 No hay eventos que coincidan@(f.TieneFiltros ? " con los filtros elegidos" : "").</p>
         @if (f.TieneFiltros)
         {
-            <a asp-action="Index" class="btn-rosa">Ver todos los eventos</a>
+            <a asp-action="Index" class="btn-rosa">🧹 Limpiar filtros</a>
         }
     </div>
 }

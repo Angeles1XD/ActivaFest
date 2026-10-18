@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using ActivaFest.Models;
 using ActivaFest.Services.Catalogo;
+using ActivaFest.Services.Recomendaciones;
 
 namespace ActivaFest.Controllers;
 
@@ -13,17 +14,20 @@ public class HomeController : Controller
 
     private readonly ICatalogoService _catalogo;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IRecomendacionService _recomendaciones;
 
-    public HomeController(ICatalogoService catalogo, UserManager<ApplicationUser> userManager)
+    public HomeController(ICatalogoService catalogo, UserManager<ApplicationUser> userManager, IRecomendacionService recomendaciones)
     {
         _catalogo = catalogo;
         _userManager = userManager;
+        _recomendaciones = recomendaciones;
     }
 
     // =============================
     // 🏠 PÁGINA DE BIENVENIDA
     // =============================
-    public async Task<IActionResult> Index(CancellationToken ct)
+    // lat/lng llegan solo si el usuario pulsa "Usar mi ubicación"; no se guardan
+    public async Task<IActionResult> Index(double? lat, double? lng, CancellationToken ct)
     {
         var categorias = await _catalogo.ObtenerCategoriasAsync(ct);
         var conteo = await _catalogo.ContarPorCategoriaAsync(ct);
@@ -43,7 +47,19 @@ public class HomeController : Controller
         };
 
         if (User.Identity?.IsAuthenticated == true)
-            modelo.NombreUsuario = (await _userManager.GetUserAsync(User))?.NombreCompleto;
+        {
+            var usuario = await _userManager.GetUserAsync(User);
+            modelo.NombreUsuario = usuario?.NombreCompleto;
+
+            // HU17: hasta 6 recomendados según historial y ubicación; sin historial, los más populares cercanos
+            if (usuario != null)
+            {
+                Ubicacion? ubicacion = lat is >= -90 and <= 90 && lng is >= -180 and <= 180 ? new Ubicacion(lat.Value, lng.Value) : null;
+                modelo.UsaUbicacion = ubicacion != null;
+                modelo.RecomendacionesPersonalizadas = await _recomendaciones.ContarHistorialAsync(usuario.Id, ct) > 0;
+                modelo.Recomendados = await _recomendaciones.RecomendarAsync(usuario.Id, ubicacion, RecomendacionService.MaximoRecomendaciones, ct);
+            }
+        }
 
         return View(modelo);
     }

@@ -17,9 +17,13 @@ public class FilaComisionEvento
 
     // Del periodo filtrado
     public int Ordenes { get; set; }
+    public int EntradasVendidas { get; set; }
     public decimal Bruto { get; set; }
     public decimal Comision { get; set; }
     public decimal Neto => Bruto - Comision;
+
+    // Porcentaje efectivo cobrado (cada orden congela el porcentaje vigente al pagarse)
+    public decimal PorcentajeComision => Bruto == 0 ? 0 : Math.Round(Comision / Bruto * 100, 2);
 
     // Acumulados al día de hoy (no dependen del filtro)
     public decimal NetoTotal { get; set; }
@@ -87,7 +91,11 @@ public class ComisionService : IComisionService
 
         var ventasPeriodo = await periodo
             .GroupBy(o => o.EventoId)
-            .Select(g => new { EventoId = g.Key, Ordenes = g.Count(), Bruto = g.Sum(o => o.Total), Comision = g.Sum(o => o.Comision) })
+            .Select(g => new
+            {
+                EventoId = g.Key, Ordenes = g.Count(), Entradas = g.Sum(o => o.Items.Sum(i => i.Cantidad)),
+                Bruto = g.Sum(o => o.Total), Comision = g.Sum(o => o.Comision)
+            })
             .ToListAsync(ct);
 
         var netoTotal = await pagadas
@@ -125,6 +133,7 @@ public class ComisionService : IComisionService
             Organizador = e.Nombre,
             CorreoOrganizador = e.Correo ?? "",
             Ordenes = porEvento.TryGetValue(e.Id, out var v) ? v.Ordenes : 0,
+            EntradasVendidas = v?.Entradas ?? 0,
             Bruto = v?.Bruto ?? 0,
             Comision = v?.Comision ?? 0,
             NetoTotal = netoTotal.GetValueOrDefault(e.Id),
@@ -212,18 +221,18 @@ public class ComisionService : IComisionService
         string Num(decimal v) => v.ToString("0.00", CultureInfo.InvariantCulture).Replace('.', ',');
 
         var sb = new StringBuilder();
-        sb.AppendLine("Organizador;Correo;Evento;Fecha del evento;Órdenes del periodo;Ventas brutas;Comisión;Neto organizador;Neto acumulado;Liquidado;Saldo por liquidar");
+        sb.AppendLine("Organizador;Correo;Evento;Fecha del evento;Órdenes del periodo;Entradas vendidas;Ventas brutas;% comisión;Comisión;Neto organizador;Neto acumulado;Liquidado;Saldo por liquidar");
         foreach (var f in r.Eventos)
         {
             sb.AppendLine(string.Join(";",
                 Celda(f.Organizador), Celda(f.CorreoOrganizador), Celda(f.Evento), f.FechaEvento.ToString("dd/MM/yyyy HH:mm", peru),
-                f.Ordenes, Num(f.Bruto), Num(f.Comision), Num(f.Neto), Num(f.NetoTotal), Num(f.Liquidado), Num(f.Saldo)));
+                f.Ordenes, f.EntradasVendidas, Num(f.Bruto), Num(f.PorcentajeComision), Num(f.Comision), Num(f.Neto), Num(f.NetoTotal), Num(f.Liquidado), Num(f.Saldo)));
         }
 
         sb.AppendLine();
-        sb.AppendLine($"Totales;;;;{r.Eventos.Sum(e => e.Ordenes)};{Num(r.Bruto)};{Num(r.Comisiones)};{Num(r.Bruto - r.Comisiones)};;;{Num(r.SaldoPorLiquidar)}");
-        sb.AppendLine($"Ingresos por publicidad;;;;{r.ContratosPublicidad};{Num(r.IngresosPublicidad)}");
-        sb.AppendLine($"Ingresos de la plataforma (comisiones + publicidad);;;;;{Num(r.IngresosPlataforma)}");
+        sb.AppendLine($"Totales;;;;{r.Eventos.Sum(e => e.Ordenes)};{r.Eventos.Sum(e => e.EntradasVendidas)};{Num(r.Bruto)};;{Num(r.Comisiones)};{Num(r.Bruto - r.Comisiones)};;;{Num(r.SaldoPorLiquidar)}");
+        sb.AppendLine($"Ingresos por publicidad;;;;{r.ContratosPublicidad};;{Num(r.IngresosPublicidad)}");
+        sb.AppendLine($"Ingresos de la plataforma (comisiones + publicidad);;;;;;{Num(r.IngresosPlataforma)}");
 
         var bom = Encoding.UTF8.GetPreamble();
         return bom.Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();

@@ -312,3 +312,17 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* "Usar mi ubicación" en Recomendados (HU17) */
+.boton-ubicacion {
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.inicio-aviso {
+  color: var(--alerta);
+  margin: -12px 0 16px;
+}

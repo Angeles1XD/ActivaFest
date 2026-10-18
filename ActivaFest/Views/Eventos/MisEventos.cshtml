@@ -53,6 +53,10 @@
         {
             <p class="texto-suave">En revisión por el equipo de ActivaFest.</p>
         }
+        else if (item.Estado == EstadoEvento.Cancelado)
+        {
+            <p class="aviso-vencido">🚫 Cancelado. Motivo: @item.MotivoCancelacion</p>
+        }
         else if (item.Estado == EstadoEvento.Rechazado)
         {
             <p class="texto-suave">Motivo: @item.MotivoRechazo</p>
@@ -60,16 +64,17 @@
 
         <div class="acciones-evento">
             <a asp-action="Detalle" asp-route-id="@item.Id" class="btn-rosa">Ver más →</a>
-            @if (!finalizado)
+            @if (!finalizado && item.Estado != EstadoEvento.Cancelado)
             {
                 <a asp-action="Editar" asp-route-id="@item.Id" class="btn-gris enlace-boton">✏️ Editar</a>
             }
             @if (item.Estado == EstadoEvento.Aprobado)
             {
                 <a asp-controller="Panel" asp-action="Evento" asp-route-id="@item.Id" class="btn-gris enlace-boton">📊 Panel</a>
-                @if (!finalizado)
+                @if (!finalizado && item.Estado != EstadoEvento.Cancelado)
                 {
                     <a asp-controller="Destacados" asp-action="Contratar" asp-route-id="@item.Id" class="btn-gris enlace-boton">⭐ Destacar</a>
+                    <a asp-action="Cancelar" asp-route-id="@item.Id" class="btn-gris enlace-boton boton-peligro">🚫 Cancelar evento</a>
                 }
             }
         </div>

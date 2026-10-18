@@ -380,6 +380,14 @@
   margin-bottom: 12px;
 }
 
+/* Si la librería del mapa no carga, se muestra la dirección en lugar de un recuadro vacío */
+.mapa.mapa-no-disponible {
+  height: auto;
+  padding: 24px;
+  border: 1px dashed var(--borde-fuerte);
+  color: var(--texto-2);
+}
+
 .ruta-info {
   min-height: 22px;
   color: var(--lila);
@@ -539,6 +547,28 @@
 .form-compra .col-cantidad {
   text-align: right;
   width: 90px;
+}
+
+/* Aforo disponible por zona (HU03) */
+.ficha-precios .col-disponibles {
+  text-align: center;
+  color: var(--texto-2);
+  white-space: nowrap;
+}
+
+.col-disponibles .quedan {
+  display: inline;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.aforo-disponible {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.aforo-disponible.agotado {
+  color: var(--error);
 }
 
 .selector-cantidad {

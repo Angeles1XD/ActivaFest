@@ -25,6 +25,15 @@ namespace ActivaFest.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AceptaPromociones")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AceptaTratamientoDatos")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
@@ -86,6 +95,66 @@ namespace ActivaFest.Migrations
                         .HasDatabaseName("UserNameIndex");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.Asiento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Fila")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PosX")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PosY")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TipoEntradaId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TipoEntradaId", "Fila", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("Asientos");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.AsignacionAcceso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("FechaAsignacion")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.HasIndex("UsuarioId", "EventoId")
+                        .IsUnique();
+
+                    b.ToTable("AsignacionesAcceso");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.Categoria", b =>
@@ -360,11 +429,20 @@ namespace ActivaFest.Migrations
                     b.Property<double?>("Longitud")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("MotivoCancelacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("MotivoRechazo")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("OrganizadorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PlantillaPlano")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Titulo")
@@ -415,6 +493,31 @@ namespace ActivaFest.Migrations
                     b.HasIndex("EventoId");
 
                     b.ToTable("EventoImagenes");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.HistorialBusqueda", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Termino")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "Fecha");
+
+                    b.ToTable("HistorialBusquedas");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.Liquidacion", b =>
@@ -623,10 +726,23 @@ namespace ActivaFest.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AsientosNumerados")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("AsientosPorFila")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Capacidad")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Filas")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Nombre")
@@ -638,7 +754,15 @@ namespace ActivaFest.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("REAL");
 
+                    b.Property<string>("PuertaIngreso")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Reservadas")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Vendidas")
@@ -649,6 +773,31 @@ namespace ActivaFest.Migrations
                     b.HasIndex("EventoId");
 
                     b.ToTable("TiposEntrada");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.VisualizacionEvento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.HasIndex("UsuarioId", "Fecha");
+
+                    b.ToTable("VisualizacionesEvento");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -779,6 +928,36 @@ namespace ActivaFest.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.Asiento", b =>
+                {
+                    b.HasOne("ActivaFest.Models.TipoEntrada", "TipoEntrada")
+                        .WithMany("Asientos")
+                        .HasForeignKey("TipoEntradaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TipoEntrada");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.AsignacionAcceso", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.ContratoDestacado", b =>
                 {
                     b.HasOne("ActivaFest.Models.Evento", "Evento")
@@ -862,6 +1041,15 @@ namespace ActivaFest.Migrations
                     b.Navigation("Evento");
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.HistorialBusqueda", b =>
+                {
+                    b.HasOne("ActivaFest.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ActivaFest.Models.Liquidacion", b =>
                 {
                     b.HasOne("ActivaFest.Models.Evento", "Evento")
@@ -928,6 +1116,21 @@ namespace ActivaFest.Migrations
                         .IsRequired();
 
                     b.Navigation("Evento");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.VisualizacionEvento", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", null)
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -998,6 +1201,11 @@ namespace ActivaFest.Migrations
                     b.Navigation("Entradas");
 
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.TipoEntrada", b =>
+                {
+                    b.Navigation("Asientos");
                 });
 #pragma warning restore 612, 618
         }

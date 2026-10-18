@@ -13,6 +13,10 @@ public class ResumenEventoPanel
     public int Aforo { get; set; }
     public int Vendidas { get; set; }
     public decimal Ingresos { get; set; }
+    public int Reservadas { get; set; }
+
+    // HU13: aforo restante = lo que aún se puede vender (un evento cancelado ya no vende)
+    public int AforoRestante => Estado == EstadoEvento.Cancelado ? 0 : Math.Max(0, Aforo - Vendidas - Reservadas);
 
     public double Ocupacion => Aforo == 0 ? 0 : (double)Vendidas / Aforo;
 }
@@ -99,7 +103,8 @@ public class PanelService : IPanelService
                 Titulo = e.Titulo,
                 Fecha = e.Fecha,
                 Estado = e.Estado,
-                Aforo = e.TiposEntrada.Sum(t => t.Capacidad)
+                Aforo = e.TiposEntrada.Sum(t => t.Capacidad),
+                Reservadas = e.TiposEntrada.Sum(t => t.Reservadas)
             })
             .ToListAsync(ct);
 

@@ -6,12 +6,22 @@
     'use strict';
 
     const contenedor = document.getElementById('mapaEvento');
-    if (!contenedor || typeof L === 'undefined') return;
+    if (!contenedor) return;
 
-    const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
-    const destino = L.latLng(parseFloat(contenedor.dataset.lat), parseFloat(contenedor.dataset.lng));
     const info = document.getElementById('rutaInfo');
     const boton = document.getElementById('btnRuta');
+
+    // Sin la librería del mapa (CDN caído o bloqueado) la página sigue funcionando con Google Maps
+    if (typeof L === 'undefined') {
+        contenedor.classList.add('mapa-no-disponible');
+        contenedor.textContent = '📍 ' + contenedor.dataset.direccion + ' — el mapa no está disponible en este momento. Usa "Abrir en Google Maps".';
+        boton.hidden = true;
+        return;
+    }
+
+    const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
+    const TIEMPO_MAXIMO_RUTA_MS = 10000;
+    const destino = L.latLng(parseFloat(contenedor.dataset.lat), parseFloat(contenedor.dataset.lng));
 
     const mapa = L.map(contenedor, { scrollWheelZoom: false }).setView(destino, 16);
 
@@ -25,7 +35,15 @@
     const titulo = document.createElement('strong');
     titulo.textContent = contenedor.dataset.titulo;
     popup.append(titulo, document.createElement('br'), contenedor.dataset.direccion);
-    L.marker(destino).addTo(mapa).bindPopup(popup).openPopup();
+    const marcadorEvento = L.marker(destino).addTo(mapa).bindPopup(popup).openPopup();
+
+    // Vuelve a mostrar solo el recinto (sin ruta ni marcador del usuario)
+    function soloMarcador() {
+        if (capaRuta) { mapa.removeLayer(capaRuta); capaRuta = null; }
+        if (marcadorUsuario) { mapa.removeLayer(marcadorUsuario); marcadorUsuario = null; }
+        mapa.setView(destino, 16);
+        marcadorEvento.openPopup();
+    }
 
     let capaRuta = null;
     let marcadorUsuario = null;
@@ -47,7 +65,15 @@
 
     async function trazarRuta(origen) {
         const coords = `${origen.lng},${origen.lat};${destino.lng},${destino.lat}`;
-        const respuesta = await fetch(`${OSRM_URL}${coords}?overview=full&geometries=geojson`);
+        // Si el servicio de rutas no responde, no se deja al usuario esperando indefinidamente
+        const limite = new AbortController();
+        const temporizador = setTimeout(() => limite.abort(), TIEMPO_MAXIMO_RUTA_MS);
+        let respuesta;
+        try {
+            respuesta = await fetch(`${OSRM_URL}${coords}?overview=full&geometries=geojson`, { signal: limite.signal });
+        } finally {
+            clearTimeout(temporizador);
+        }
         if (!respuesta.ok) throw new Error('OSRM ' + respuesta.status);
 
         const datos = await respuesta.json();
@@ -83,19 +109,22 @@
                     await trazarRuta(L.latLng(pos.coords.latitude, pos.coords.longitude));
                 } catch (e) {
                     console.error(e);
+                    soloMarcador();
                     mostrar('No se pudo calcular la ruta en este momento. Intenta con "Abrir en Google Maps".', true);
                 } finally {
                     boton.disabled = false;
                 }
             },
+            // HU04: si el usuario niega (o no se obtiene) su ubicación se muestra solo el marcador, sin error
             function (err) {
                 boton.disabled = false;
+                soloMarcador();
                 const mensajes = {
-                    1: 'Necesitamos permiso para usar tu ubicación. Actívalo en el navegador e inténtalo otra vez.',
-                    2: 'No pudimos determinar tu ubicación.',
-                    3: 'Se agotó el tiempo para obtener tu ubicación.'
+                    1: 'Te mostramos la ubicación del evento. Si quieres ver la ruta, permite el acceso a tu ubicación en el navegador.',
+                    2: 'Te mostramos la ubicación del evento; no pudimos determinar la tuya para trazar la ruta.',
+                    3: 'Te mostramos la ubicación del evento; tu ubicación tardó demasiado en obtenerse.'
                 };
-                mostrar(mensajes[err.code] || 'No se pudo obtener tu ubicación.', true);
+                mostrar(mensajes[err.code] || 'Te mostramos la ubicación del evento.', false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
         );

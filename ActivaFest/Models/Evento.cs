@@ -7,7 +7,9 @@ namespace ActivaFest.Models
     {
         Pendiente = 0,
         Aprobado = 1,
-        Rechazado = 2
+        Rechazado = 2,
+        // Diagrama de estados: un evento Aprobado puede cancelarse; sus entradas pasan a Anulada (HU15)
+        Cancelado = 3
     }
 
     public class Evento
@@ -48,6 +50,9 @@ namespace ActivaFest.Models
         [Display(Name = "Aforo")]
         public int Aforo { get; set; }
 
+        // Plantilla con la que se genera el plano del recinto (HU25)
+        public PlantillaPlano PlantillaPlano { get; set; } = PlantillaPlano.CampoAbierto;
+
         public ICollection<TipoEntrada> TiposEntrada { get; set; } = new List<TipoEntrada>();
 
         public ICollection<EventoImagen> Imagenes { get; set; } = new List<EventoImagen>();
@@ -62,6 +67,9 @@ namespace ActivaFest.Models
 
         [StringLength(500)]
         public string? MotivoRechazo { get; set; }
+
+        [StringLength(500)]
+        public string? MotivoCancelacion { get; set; }
 
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 

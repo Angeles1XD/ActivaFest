@@ -87,6 +87,38 @@ public class ComisionesTests : BaseSprint4
         Assert.Equal((100m, 8m, 92m, 92m), (fila.Bruto, fila.Comision, fila.Neto, fila.Saldo));
     }
 
+    // HU16: por evento se ven las entradas vendidas, el porcentaje y el monto de comisión y el saldo a liquidar
+    [Fact]
+    public async Task El_reporte_muestra_entradas_vendidas_y_porcentaje_de_comision_por_evento()
+    {
+        var (evento, general, vip) = EventoDe("org");
+        await ComprarAsync("ana", evento.Id, new() { [general.Id] = 3 });            // 3 x 50 = 150 al 8 %  → 12
+        var compras = Fabrica.Compras(Db, Email, comision: 10m);
+        var orden = (await compras.CrearOrdenAsync("beto", evento.Id, new Dictionary<int, int> { [general.Id] = 1 })).Orden!;
+        await compras.ConfirmarPagoAsync(orden.Codigo, "Simulado", "SIM", orden.Total, Url); // 1 x 50 = 50 al 10 % → 5
+
+        var fila = (await _comisiones.ReporteAsync(null, null)).Eventos.Single();
+
+        Assert.Equal(4, fila.EntradasVendidas);
+        Assert.Equal(2, fila.Ordenes);
+        Assert.Equal(17m, fila.Comision);
+        Assert.Equal(8.5m, fila.PorcentajeComision); // efectivo: 17 / 200
+        Assert.Equal(183m, fila.Saldo);
+    }
+
+    [Fact]
+    public async Task Un_evento_cancelado_no_genera_comision()
+    {
+        var (evento, general, _) = EventoDe("org");
+        await ComprarAsync("ana", evento.Id, new() { [general.Id] = 2 });
+        await Db.Ordenes.Where(o => o.EventoId == evento.Id).ExecuteUpdateAsync(s => s.SetProperty(o => o.Estado, EstadoOrden.RequiereReembolso));
+
+        var r = await _comisiones.ReporteAsync(null, null);
+
+        Assert.Equal(0m, r.Comisiones);
+        Assert.Empty(r.Eventos);
+    }
+
     [Fact]
     public async Task Una_liquidacion_reduce_el_saldo_y_queda_registrada_con_quien_la_hizo()
     {
@@ -145,7 +177,8 @@ public class ComisionesTests : BaseSprint4
         Assert.Equal(Encoding.UTF8.GetPreamble(), bytes.Take(3));
         Assert.Contains("Organizador;Correo;Evento", texto);
         Assert.Contains("\"'=HYPERLINK(\"\"http://malo\"\";\"\"x\"\")\"", texto);
-        Assert.Contains(";50,00;4,00;46,00;", texto);
+        Assert.Contains("Entradas vendidas;Ventas brutas;% comisión;Comisión", texto);
+        Assert.Contains(";1;50,00;8,00;4,00;46,00;", texto); // 1 entrada, S/ 50, 8 %, S/ 4 de comisión
     }
 
     [Theory]

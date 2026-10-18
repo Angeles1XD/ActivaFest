@@ -10,36 +10,62 @@ using ActivaFest.Services.Pagos;
 namespace ActivaFest.Tests;
 
 // =============================
-// 🔐 QR FIRMADO (HU07)
+// 🔐 QR CIFRADO (HU07)
 // =============================
 public class QrEntradaServiceTests
 {
     private readonly QrEntradaService _qr = Fabrica.Qr();
 
     [Fact]
-    public void El_contenido_firmado_se_lee_de_vuelta()
+    public void El_token_cifrado_se_lee_de_vuelta()
     {
         var codigo = CodigoSeguro.Generar();
 
         var contenido = _qr.CrearContenido(codigo);
 
-        Assert.StartsWith("AF1.", contenido);
+        Assert.StartsWith("AF2.", contenido);
         Assert.Equal(codigo, _qr.LeerContenido(contenido));
     }
 
+    // HU07: el token es cifrado: el código de la entrada no se puede leer dentro del QR
     [Fact]
-    public void Detecta_un_codigo_alterado()
+    public void El_codigo_de_la_entrada_no_es_visible_en_el_qr()
+    {
+        var codigo = CodigoSeguro.Generar();
+
+        var contenido = _qr.CrearContenido(codigo);
+
+        Assert.DoesNotContain(codigo, contenido);
+    }
+
+    // Cada emisión produce un token distinto (nonce aleatorio) aunque sea la misma entrada
+    [Fact]
+    public void Cada_token_es_unico()
+    {
+        var tokens = Enumerable.Range(0, 100).Select(_ => _qr.CrearContenido("misma-entrada")).ToList();
+
+        Assert.Equal(100, tokens.Distinct().Count());
+        Assert.All(tokens, t => Assert.Equal("misma-entrada", _qr.LeerContenido(t)));
+    }
+
+    [Fact]
+    public void Detecta_un_token_alterado()
     {
         var contenido = _qr.CrearContenido("codigoOriginal");
-        var alterado = contenido.Replace("codigoOriginal", "codigoFalsoXX");
 
-        Assert.Null(_qr.LeerContenido(alterado));
+        for (var i = 4; i < contenido.Length; i++)
+        {
+            var alterado = contenido[..i] + (contenido[i] == 'A' ? 'B' : 'A') + contenido[(i + 1)..];
+            Assert.NotEqual("codigoOriginal", _qr.LeerContenido(alterado));
+        }
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("hola mundo")]
     [InlineData("AF1.solo-dos-partes")]
+    [InlineData("AF2.no-es-base64!!")]
+    [InlineData("AF2.YWJj")]
     [InlineData("XX9.abc.def")]
     public void Rechaza_contenido_que_no_es_de_activafest(string contenido)
     {
@@ -47,11 +73,22 @@ public class QrEntradaServiceTests
     }
 
     [Fact]
-    public void Un_qr_firmado_con_otra_clave_no_es_valido()
+    public void Un_qr_cifrado_con_otra_clave_no_es_valido()
     {
         var falsificado = Fabrica.Qr("otra-clave").CrearContenido("abc123");
 
         Assert.Null(_qr.LeerContenido(falsificado));
+    }
+
+    // Las entradas emitidas antes (formato firmado AF1) siguen entrando por la puerta
+    [Fact]
+    public void Acepta_las_entradas_firmadas_con_el_formato_anterior()
+    {
+        var codigo = CodigoSeguro.Generar();
+        var anterior = $"AF1.{codigo}.{_qr.Firmar(codigo)}";
+
+        Assert.Equal(codigo, _qr.LeerContenido(anterior));
+        Assert.Null(_qr.LeerContenido($"AF1.{codigo}.{_qr.Firmar("otro")}"));
     }
 
     [Fact]

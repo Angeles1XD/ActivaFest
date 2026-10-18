@@ -19,6 +19,17 @@ namespace ActivaFest.Models
 
         [Range(1, 1000000, ErrorMessage = "La capacidad debe ser al menos 1.")]
         public int Capacidad { get; set; } = 100;
+
+        // 🗺️ Plano del recinto (HU25)
+        [StringLength(7)]
+        public string? Color { get; set; }
+
+        [StringLength(40)]
+        public string? Puerta { get; set; }
+
+        // Solo en teatro: la capacidad es Filas x AsientosPorFila
+        public int? Filas { get; set; }
+        public int? AsientosPorFila { get; set; }
     }
 
     // =============================
@@ -61,6 +72,9 @@ namespace ActivaFest.Models
         [Range(-180, 180)]
         public double? Longitud { get; set; }
 
+        [Display(Name = "Plantilla del plano")]
+        public PlantillaPlano Plantilla { get; set; } = PlantillaPlano.CampoAbierto;
+
         public List<TipoEntradaInput> TiposEntrada { get; set; } = new() { new TipoEntradaInput() };
 
         [Display(Name = "Fotos del recinto")]
@@ -80,6 +94,41 @@ namespace ActivaFest.Models
 
         public List<int> ImagenesActualesIds { get; set; } = new();
 
+        // HU25: cada plantilla tiene un máximo de zonas legible y en teatro la capacidad sale de filas x asientos
+        private IEnumerable<ValidationResult> ValidarPlano()
+        {
+            if (!Enum.IsDefined(Plantilla))
+            {
+                yield return new ValidationResult("Elige una plantilla válida.", new[] { nameof(Plantilla) });
+                yield break;
+            }
+
+            var maxZonas = Services.Plano.PlanoService.MaxZonas[Plantilla];
+            if (TiposEntrada.Count > maxZonas)
+                yield return new ValidationResult($"La plantilla {Services.Plano.PlanoService.Nombre(Plantilla)} admite como máximo {maxZonas} zonas.", new[] { nameof(TiposEntrada) });
+
+            if (Plantilla != PlantillaPlano.Teatro)
+                yield break;
+
+            foreach (var zona in TiposEntrada)
+            {
+                if (zona.Filas is not (>= 1 and <= Services.Plano.PlanoService.MaxFilasTeatro) ||
+                    zona.AsientosPorFila is not (>= 2 and <= Services.Plano.PlanoService.MaxAsientosPorFila))
+                {
+                    yield return new ValidationResult(
+                        $"En la zona \"{zona.Nombre}\" indica entre 1 y {Services.Plano.PlanoService.MaxFilasTeatro} filas y entre 2 y {Services.Plano.PlanoService.MaxAsientosPorFila} asientos por fila.",
+                        new[] { nameof(TiposEntrada) });
+                }
+                else if (zona.Capacidad != zona.Filas * zona.AsientosPorFila)
+                {
+                    yield return new ValidationResult($"La capacidad de la zona \"{zona.Nombre}\" debe ser filas × asientos por fila ({zona.Filas * zona.AsientosPorFila}).", new[] { nameof(TiposEntrada) });
+                }
+            }
+
+            if (TiposEntrada.Sum(z => z.Filas ?? 0) > Services.Plano.PlanoService.MaxFilasTeatro)
+                yield return new ValidationResult($"El teatro admite como máximo {Services.Plano.PlanoService.MaxFilasTeatro} filas en total.", new[] { nameof(TiposEntrada) });
+        }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             if (Fecha.HasValue && Fecha.Value <= DateTime.Now)
@@ -90,6 +139,9 @@ namespace ActivaFest.Models
 
             if (TiposEntrada.Count > MaxTiposEntrada)
                 yield return new ValidationResult($"Máximo {MaxTiposEntrada} tipos de entrada.", new[] { nameof(TiposEntrada) });
+
+            foreach (var error in ValidarPlano())
+                yield return error;
 
             var nombres = TiposEntrada.Select(t => t.Nombre?.Trim().ToLowerInvariant()).ToList();
             if (nombres.Distinct().Count() != nombres.Count)

@@ -3,6 +3,13 @@
     ViewData["Title"] = "Panel de ventas";
     var ahora = DateTime.Now;
     var proximos = Model.Where(e => e.Fecha >= ahora).ToList();
+
+    // HU13: gráfico Chart.js de los eventos próximos (vendidas y aforo restante)
+    var datosGraficos = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        eventos = proximos.Where(e => e.Estado == EstadoEvento.Aprobado).Take(10)
+            .Select(e => new { titulo = e.Titulo, vendidas = e.Vendidas, restante = e.AforoRestante, ingresos = e.Ingresos })
+    });
 }
 
 @section Styles {
@@ -41,6 +48,16 @@
     }
     else
     {
+        @if (proximos.Any(e => e.Estado == EstadoEvento.Aprobado))
+        {
+            <section class="tarjeta-panel">
+                <h2>Próximos eventos: vendidas y aforo restante</h2>
+                <div class="grafico-chart grafico-zonas">
+                    <canvas id="graficoEventos" role="img" aria-label="Entradas vendidas y aforo restante de tus próximos eventos"></canvas>
+                </div>
+            </section>
+        }
+
         <div class="tabla-contenedor">
             <table class="tabla-datos">
                 <thead>
@@ -48,6 +65,7 @@
                         <th>Evento</th>
                         <th>Estado</th>
                         <th class="derecha">Vendidas</th>
+                        <th class="derecha">Aforo restante</th>
                         <th class="col-meter">Ocupación</th>
                         <th class="derecha">Ingresos</th>
                         <th></th>
@@ -64,6 +82,7 @@
                             </td>
                             <td><span class="chip-estado chip-@e.Estado">@e.Estado</span></td>
                             <td class="derecha num">@e.Vendidas / @e.Aforo</td>
+                            <td class="derecha num">@(e.Estado == EstadoEvento.Cancelado ? "—" : e.AforoRestante.ToString("N0"))</td>
                             <td class="col-meter">
                                 <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Math.Round(e.Ocupacion * 100)"
                                      aria-label="Ocupación de @e.Titulo">
@@ -80,3 +99,9 @@
         </div>
     }
 </div>
+
+@section Scripts {
+    <script type="application/json" id="datosPanel">@Html.Raw(datosGraficos)</script>
+    <partial name="_ChartJs" />
+    <script src="~/js/panel.js" asp-append-version="true"></script>
+}

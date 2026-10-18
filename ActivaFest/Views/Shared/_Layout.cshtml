@@ -66,10 +66,10 @@
             <div class="nav-cuenta">
                 @if (autenticado)
                 {
-                    <span class="nav-usuario" title="@User.Identity!.Name">
+                    <a asp-controller="Perfil" asp-action="Index" class="nav-usuario @Activo("Perfil")" title="Mi perfil (@User.Identity!.Name)">
                         <span class="avatar" aria-hidden="true">@(User.Identity.Name?.Substring(0, 1).ToUpperInvariant())</span>
                         <span class="nav-usuario-correo">@User.Identity.Name</span>
-                    </span>
+                    </a>
                     <form asp-controller="Auth" asp-action="Logout" method="post">
                         <button type="submit" class="boton-contorno">Salir</button>
                     </form>
