@@ -1,52 +1,24 @@
-@model ActivaFest.Models.Evento
+@model EventoFormViewModel
+@{
+    ViewData["Title"] = "Crear evento";
+}
 
-<h2>Crear Evento</h2>
+@section Styles {
+    <partial name="_LeafletCss" />
+    <link rel="stylesheet" href="~/css/plano.css" asp-append-version="true" />
+}
 
-<form method="post">
+<a asp-action="MisEventos" class="enlace-volver">← Mis eventos</a>
+<header class="cat-encabezado">
+    <p class="cat-migas">Activa-Fest / Organizador</p>
+    <h1>Publica tu <span class="degradado">evento</span></h1>
+    <p class="cat-subtitulo">Completa los 4 pasos. El evento quedará pendiente hasta que un administrador lo apruebe.</p>
+</header>
 
-    <!-- Validación general -->
-    <div asp-validation-summary="All" class="text-danger"></div>
-
-    <!-- Título -->
-    <div class="mb-3">
-        <label asp-for="Titulo" class="form-label"></label>
-        <input asp-for="Titulo" class="form-control" />
-        <span asp-validation-for="Titulo" class="text-danger"></span>
-    </div>
-
-    <!-- Categoría -->
-    <div class="mb-3">
-        <label asp-for="Categoria" class="form-label"></label>
-        <input asp-for="Categoria" class="form-control" />
-        <span asp-validation-for="Categoria" class="text-danger"></span>
-    </div>
-
-    <!-- Ubicación -->
-    <div class="mb-3">
-        <label asp-for="Ubicacion" class="form-label"></label>
-        <input asp-for="Ubicacion" class="form-control" />
-        <span asp-validation-for="Ubicacion" class="text-danger"></span>
-    </div>
-
-    <!-- Fecha -->
-    <div class="mb-3">
-        <label asp-for="Fecha" class="form-label"></label>
-        <input asp-for="Fecha" type="datetime-local" class="form-control" />
-        <span asp-validation-for="Fecha" class="text-danger"></span>
-    </div>
-
-    <!-- Asistentes -->
-    <div class="mb-3">
-        <label asp-for="Asistentes" class="form-label"></label>
-        <input asp-for="Asistentes" type="number" class="form-control" />
-        <span asp-validation-for="Asistentes" class="text-danger"></span>
-    </div>
-
-    <!-- Botón -->
-    <button type="submit" class="btn btn-primary">Guardar</button>
-
-</form>
+<partial name="_FormularioEvento" model="Model" />
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <partial name="_LeafletJs" />
+    <script src="~/js/crear-evento.js" asp-append-version="true"></script>
 }

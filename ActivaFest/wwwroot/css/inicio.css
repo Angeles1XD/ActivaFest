@@ -1,0 +1,328 @@
+/* ============================= */
+/* PÁGINA DE INICIO (BIENVENIDA) */
+/* Reutiliza los tokens y componentes de categorias.css */
+/* ============================= */
+
+/* La portada ocupa todo el ancho; el resto del contenido mantiene el ancho máximo */
+.pagina-inicio {
+  max-width: none;
+}
+
+.inicio-seccion,
+.inicio-organiza {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- Portada a todo el ancho ---------- */
+.inicio-hero {
+  position: relative;
+  /* Ancho completo aunque el contenido tenga ancho máximo */
+  margin: -40px calc(50% - 50vw) 0;
+  min-height: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px 120px;
+  text-align: center;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Foto oscurecida que se desvanece hacia el fondo de la página (la máscara solo afecta al fondo, no al texto) */
+.inicio-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at center, rgba(10, 10, 15, 0.55) 0%, rgba(10, 10, 15, 0.82) 70%),
+    linear-gradient(180deg, rgba(10, 10, 15, 0.3) 0%, rgba(10, 10, 15, 0.6) 100%),
+    url("/img/hero.jpg") center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
+}
+
+.inicio-hero-contenido {
+  max-width: 900px;
+  animation: fadeInUp 0.8s ease;
+}
+
+.inicio-insignia,
+.inicio-saludo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  margin-bottom: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  background: rgba(139, 92, 246, 0.18);
+  color: #d8b4fe;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inicio-saludo {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 15px;
+}
+
+.inicio-insignia span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+}
+
+.inicio-hero h1 {
+  font-size: clamp(42px, 7.5vw, 92px);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  margin-bottom: 24px;
+}
+
+.inicio-lema {
+  max-width: 640px;
+  margin: 0 auto 36px;
+  color: #d4d4d8;
+  font-size: clamp(16px, 2vw, 20px);
+  line-height: 1.6;
+}
+
+.inicio-acciones {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.inicio-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 30px;
+  font-size: 17px;
+  box-shadow: 0 10px 30px -8px rgba(139, 92, 246, 0.6);
+}
+
+.inicio-boton-secundario {
+  display: inline-flex;
+  align-items: center;
+  padding: 15px 30px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  color: white;
+  font-weight: 700;
+  font-size: 17px;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.inicio-boton-secundario:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: white;
+}
+
+.inicio-cifras {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  list-style: none;
+  padding: 0;
+  margin: 40px 0 0;
+  color: #a1a1aa;
+  font-size: 15px;
+}
+
+.inicio-cifras strong {
+  color: white;
+  margin-right: 4px;
+}
+
+/* ---------- Búsqueda rápida flotante ---------- */
+.inicio-busqueda {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+  gap: 16px;
+  align-items: end;
+  max-width: 1060px;
+  margin: -60px auto 70px;
+  padding: 24px;
+  border-radius: 20px;
+  border: 1px solid var(--borde);
+  background: rgba(18, 18, 26, 0.88);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+}
+
+.inicio-campo label {
+  display: block;
+  margin-bottom: 8px;
+  color: #c084fc;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.inicio-campo input,
+.inicio-campo select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--borde);
+  background: #1a1a25;
+  color: white;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.inicio-campo input:focus,
+.inicio-campo select:focus {
+  outline: none;
+  border-color: var(--morado);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+}
+
+.inicio-busqueda .cat-boton {
+  padding: 13px 26px;
+}
+
+/* ---------- Secciones ---------- */
+.inicio-seccion {
+  margin-bottom: 70px;
+}
+
+.inicio-seccion-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+
+.inicio-seccion-titulo h2 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.inicio-seccion-titulo p {
+  color: var(--texto-2);
+  margin: 0;
+}
+
+.inicio-ver-todo {
+  color: #c4b5fd;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.inicio-ver-todo:hover {
+  color: white;
+}
+
+.inicio-cat-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  margin-bottom: 0;
+}
+
+/* ---------- Llamado a organizadores ---------- */
+.inicio-organiza {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 36px 40px;
+  margin-bottom: 30px;
+  border-radius: 20px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: linear-gradient(120deg, rgba(139, 92, 246, 0.22), rgba(59, 130, 246, 0.12) 60%, rgba(6, 182, 212, 0.1));
+}
+
+.inicio-organiza h2 {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.inicio-organiza p {
+  color: #d4d4d8;
+  max-width: 620px;
+  margin: 0;
+}
+
+.inicio-organiza-nota {
+  color: var(--texto-2) !important;
+  font-size: 14px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .inicio-busqueda {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .inicio-campo-texto {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .inicio-hero {
+    margin-top: -24px;
+    min-height: 480px;
+    padding: 60px 18px 100px;
+  }
+}
+
+@media (max-width: 600px) {
+  .inicio-busqueda {
+    grid-template-columns: 1fr;
+    margin-top: -50px;
+    padding: 18px;
+  }
+
+  .inicio-boton,
+  .inicio-boton-secundario {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .inicio-organiza {
+    padding: 26px 22px;
+  }
+
+  .inicio-cat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* "Usar mi ubicación" en Recomendados (HU17) */
+.boton-ubicacion {
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.inicio-aviso {
+  color: var(--alerta);
+  margin: -12px 0 16px;
+}

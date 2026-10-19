@@ -1,0 +1,192 @@
+@model ActivaFest.Services.Analitica.DashboardAnalitica
+@using System.Text.Json
+@using ActivaFest.Services.Analitica
+@{
+    ViewData["Title"] = "Dashboard de la plataforma";
+    var categorias = (List<Categoria>)ViewBag.Categorias;
+    var desde = Model.Desde.ToString("yyyy-MM-dd");
+    var hasta = Model.Hasta.ToString("yyyy-MM-dd");
+    var minutos = (int)Math.Floor((DateTime.Now - Model.CalculadoEn).TotalMinutes);
+
+    string Pct(double? v) => v == null ? "—" : $"{v.Value:0.#} %";
+
+    // Variación frente al período anterior: subida en verde, bajada en rojo (con flecha, no solo color)
+    string Variacion(decimal actual, decimal anterior)
+    {
+        var v = DashboardAnalitica.Variacion(actual, anterior);
+        return v == null ? "sin datos del período anterior" : $"{(v >= 0 ? "▲ +" : "▼ ")}{v:0.#} % vs. período anterior";
+    }
+    string Clase(decimal actual, decimal anterior) => DashboardAnalitica.Variacion(actual, anterior) switch { null => "", >= 0 => "sube", _ => "baja" };
+
+    // Datos de los gráficos (Chart.js)
+    var datosGraficos = JsonSerializer.Serialize(new
+    {
+        semanas = Model.IngresosPorSemana.Select(s => new { etiqueta = s.Etiqueta, ingresos = s.Ingresos }),
+        categorias = Model.VentasPorCategoria.Select(c => new { nombre = c.Categoria, entradas = c.Entradas, ingresos = c.Ingresos, color = c.Color })
+    });
+}
+
+@section Styles {
+    <partial name="_EstilosCompra" />
+    <link rel="stylesheet" href="~/css/organizador.css" asp-append-version="true" />
+}
+
+<div class="pagina-categorias pagina-panel viz-root">
+    <header class="cat-encabezado catalogo-encabezado">
+        <div>
+            <p class="cat-migas">Activa-Fest / Administración / Analítica</p>
+            <h1>Dashboard de la <span class="degradado">plataforma</span></h1>
+            <p class="cat-subtitulo">Actualizado @(minutos < 1 ? "hace menos de 1 min" : $"hace {minutos} min") · se recalcula cada 5 minutos.</p>
+        </div>
+        <div class="panel-acciones">
+            <a asp-action="Variabilidad" class="btn-gris enlace-boton">📈 Variabilidad</a>
+            <a asp-action="Asistente" class="btn-gris enlace-boton">💬 Asistente</a>
+            <a asp-action="Clientes" class="btn-gris enlace-boton">👥 Clientes</a>
+            <a asp-controller="Admin" asp-action="Index" class="btn-gris enlace-boton">← Moderación</a>
+        </div>
+    </header>
+
+    <!-- Filtros: período (fecha de pago) y categoría -->
+    <form method="get" class="filtros filtros-reporte">
+        <div class="filtro">
+            <label for="desde">Desde</label>
+            <input id="desde" name="desde" type="date" value="@desde" />
+        </div>
+        <div class="filtro">
+            <label for="hasta">Hasta</label>
+            <input id="hasta" name="hasta" type="date" value="@hasta" />
+        </div>
+        <div class="filtro">
+            <label for="categoriaId">Categoría</label>
+            <select id="categoriaId" name="categoriaId">
+                <option value="">Todas las categorías</option>
+                @foreach (var c in categorias)
+                {
+                    <option value="@c.Id" selected="@(Model.CategoriaId == c.Id)">@c.Icono @c.Nombre</option>
+                }
+            </select>
+        </div>
+        <div class="filtro-acciones">
+            <button type="submit" class="btn-rosa">Filtrar</button>
+            <a asp-action="Exportar" asp-route-desde="@desde" asp-route-hasta="@hasta" asp-route-categoriaId="@Model.CategoriaId" class="btn-gris enlace-boton">⬇ Exportar</a>
+        </div>
+    </form>
+
+    <!-- 📊 Indicadores (HU21) -->
+    <section class="fila-kpi fila-kpi-dashboard" aria-label="Indicadores del período">
+        <div class="kpi kpi-hero">
+            <span class="kpi-etiqueta">Ingresos</span>
+            <span class="kpi-valor" data-kpi="ingresos">@Formato.Monto(Model.Ingresos)</span>
+            <span class="kpi-nota kpi-variacion @Clase(Model.Ingresos, Model.IngresosAnterior)">@Variacion(Model.Ingresos, Model.IngresosAnterior)</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Entradas vendidas</span>
+            <span class="kpi-valor" data-kpi="entradas">@Model.EntradasVendidas.ToString("N0")</span>
+            <span class="kpi-nota kpi-variacion @Clase(Model.EntradasVendidas, Model.EntradasAnterior)">@Variacion(Model.EntradasVendidas, Model.EntradasAnterior)</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Ticket promedio</span>
+            <span class="kpi-valor" data-kpi="ticket">@Formato.Monto(Model.TicketPromedio)</span>
+            <span class="kpi-nota">@Model.Compras.ToString("N0") @(Model.Compras == 1 ? "compra" : "compras")</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Ocupación</span>
+            <span class="kpi-valor" data-kpi="ocupacion">@Pct(Model.Ocupacion)</span>
+            <span class="kpi-nota">@Model.VendidasEventos.ToString("N0") de @Model.AforoEventos.ToString("N0") lugares</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Asistencia</span>
+            <span class="kpi-valor" data-kpi="asistencia">@Pct(Model.Asistencia)</span>
+            <span class="kpi-nota">entradas validadas en puerta</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Comisiones</span>
+            <span class="kpi-valor" data-kpi="comisiones">@Formato.Monto(Model.Comisiones)</span>
+            <span class="kpi-nota">ingresos de la plataforma</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Conversión</span>
+            <span class="kpi-valor" data-kpi="conversion">@Pct(Model.Conversion)</span>
+            <span class="kpi-nota">compras ÷ visitas a las fichas</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-etiqueta">Usuarios activos</span>
+            <span class="kpi-valor" data-kpi="activos">@Model.UsuariosActivos.ToString("N0")</span>
+            <span class="kpi-nota">con compras en los últimos 90 días</span>
+        </div>
+    </section>
+    <p class="texto-tenue nota-reporte">
+        Ingresos, entradas, ticket y comisiones: compras pagadas entre el @Model.Desde.ToString("dd/MM/yyyy") y el @Model.Hasta.ToString("dd/MM/yyyy").
+        Ocupación, asistencia y conversión: eventos que se realizan en ese período (la asistencia, solo de los que ya ocurrieron).
+    </p>
+
+    <div class="graficos-dashboard">
+        <section class="tarjeta-panel">
+            <h2>Ingresos por semana</h2>
+            <p class="texto-tenue">Soles, últimas @AnaliticaService.SemanasTendencia semanas</p>
+            <div class="grafico-chart"><canvas id="graficoSemanas" role="img" aria-label="Ingresos por semana"></canvas></div>
+            <details class="vista-tabla">
+                <summary>Ver como tabla</summary>
+                <table class="tabla-datos">
+                    <thead><tr><th>Semana</th><th class="derecha">Ingresos</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in Model.IngresosPorSemana)
+                        {
+                            <tr><td>@s.Etiqueta</td><td class="derecha num">@Formato.Monto(s.Ingresos)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+        </section>
+
+        <section class="tarjeta-panel">
+            <h2>Ventas por categoría</h2>
+            <p class="texto-tenue">Entradas vendidas en el período</p>
+            @if (Model.VentasPorCategoria.Count == 0)
+            {
+                <p class="texto-tenue">No hay ventas en este período.</p>
+            }
+            else
+            {
+                <div class="grafico-chart"><canvas id="graficoCategorias" role="img" aria-label="Entradas vendidas por categoría"></canvas></div>
+                <details class="vista-tabla">
+                    <summary>Ver como tabla</summary>
+                    <table class="tabla-datos">
+                        <thead><tr><th>Categoría</th><th class="derecha">Entradas</th><th class="derecha">Ingresos</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in Model.VentasPorCategoria)
+                            {
+                                <tr><td>@c.Categoria</td><td class="derecha num">@c.Entradas</td><td class="derecha num">@Formato.Monto(c.Ingresos)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </details>
+            }
+        </section>
+    </div>
+
+    <!-- 🤖 Consultas a la IA (HU24): la IA solo lee datos agregados y siempre muestra las cifras fuente -->
+    <section class="tarjeta-panel panel-ia" aria-labelledby="tituloIa">
+        <h2 id="tituloIa">🤖 Pregúntale a la IA</h2>
+        <p class="texto-tenue">Responde con datos reales de la plataforma: cada respuesta muestra la tabla de cifras fuente y el período consultado. Las consultas quedan en la auditoría.</p>
+        <div id="iaConversacion" class="ia-conversacion" aria-live="polite"></div>
+        <form id="iaFormulario" class="ia-formulario" data-url="@Url.Action("ConsultarIA", "Analitica")">
+            @Html.AntiForgeryToken()
+            <input type="text" id="iaPregunta" maxlength="300" autocomplete="off" placeholder="Ej.: ¿Cuáles fueron los 5 eventos más vendidos este mes?" aria-label="Pregunta para la IA" />
+            <button type="submit" class="btn-rosa">Preguntar</button>
+        </form>
+        <div class="ia-ejemplos">
+            @foreach (var ejemplo in AsistenteAnaliticoService.Ejemplos)
+            {
+                <button type="button" class="ia-ejemplo">@ejemplo</button>
+            }
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script type="application/json" id="datosDashboard">@Html.Raw(datosGraficos)</script>
+    <partial name="_ChartJs" />
+    <script src="~/js/dashboard.js" asp-append-version="true"></script>
+    <script src="~/js/ia-analitica.js" asp-append-version="true"></script>
+}

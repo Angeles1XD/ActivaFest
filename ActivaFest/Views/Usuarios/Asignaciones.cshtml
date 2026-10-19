@@ -1,0 +1,46 @@
+@model ActivaFest.Controllers.AsignacionesViewModel
+@{
+    ViewData["Title"] = "Asignar eventos";
+}
+
+@section Styles {
+    <partial name="_EstilosCompra" />
+    <link rel="stylesheet" href="~/css/organizador.css" asp-append-version="true" />
+}
+
+<div class="pagina-categorias pagina-entradas">
+    <a asp-action="Index" class="enlace-volver">← Usuarios</a>
+
+    <header class="cat-encabezado">
+        <p class="cat-migas">Activa-Fest / Administración / Personal de control</p>
+        <h1>Eventos de <span class="degradado">@Model.Nombre</span></h1>
+        <p class="cat-subtitulo">@Model.Email solo podrá validar en puerta las entradas de los eventos que marques.</p>
+    </header>
+
+    @if (Model.Eventos.Count == 0)
+    {
+        <div class="cat-vacio">
+            <p>No hay eventos aprobados próximos.</p>
+        </div>
+    }
+    else
+    {
+        <form asp-action="Asignaciones" asp-route-id="@Model.UsuarioId" method="post">
+            <ul class="lista-asignacion">
+                @foreach (var e in Model.Eventos)
+                {
+                    <li>
+                        <label class="campo-check">
+                            <input type="checkbox" name="eventos" value="@e.Id" checked="@Model.Asignados.Contains(e.Id)" />
+                            <span>
+                                <strong>@e.Titulo</strong><br />
+                                <span class="texto-tenue">📅 @Formato.Fecha(e.Fecha, "ddd dd MMM yyyy · HH:mm") · 📍 @e.Ubicacion</span>
+                            </span>
+                        </label>
+                    </li>
+                }
+            </ul>
+            <button type="submit" class="cat-boton">Guardar asignaciones</button>
+        </form>
+    }
+</div>
