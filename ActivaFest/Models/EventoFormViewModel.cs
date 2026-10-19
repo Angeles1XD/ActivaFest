@@ -80,6 +80,14 @@ namespace ActivaFest.Models
         [Display(Name = "Fotos del recinto")]
         public List<IFormFile> Fotos { get; set; } = new();
 
+        // Plano oficial del recinto (imagen opcional que sube el organizador)
+        [Display(Name = "Plano oficial del recinto")]
+        public IFormFile? PlanoOficialArchivo { get; set; }
+
+        public string? PlanoOficialActual { get; set; }
+
+        public bool QuitarPlanoOficial { get; set; }
+
         // =============================
         // ✏️ EDICIÓN (HU09)
         // =============================

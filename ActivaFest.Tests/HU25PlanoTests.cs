@@ -56,7 +56,7 @@ public class PlanoServiceTests
     // Criterio: el plano se genera desde cualquiera de las 4 plantillas sin dibujar a mano
     [Theory]
     [InlineData(PlantillaPlano.Teatro, "asiento")]
-    [InlineData(PlantillaPlano.Estadio, "plano-campo")]
+    [InlineData(PlantillaPlano.Estadio, "plano-cancha")]
     [InlineData(PlantillaPlano.CampoAbierto, "plano-escenario")]
     [InlineData(PlantillaPlano.Feria, "plano-stand")]
     public void Genera_el_plano_svg_de_cada_plantilla(PlantillaPlano plantilla, string elemento)
@@ -75,7 +75,7 @@ public class PlanoServiceTests
         Assert.Contains("🚪 Puerta 1", svg);
         Assert.Contains("🚪 Puerta 2", svg);
         if (plantilla == PlantillaPlano.Teatro)
-            Assert.Equal(100, Regex.Matches(svg, "<circle[^>]*class=\"asiento").Count);
+            Assert.Equal(100, Regex.Matches(svg, "<g[^>]*class=\"asiento").Count);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class HU25PlanoTests : IClassFixture<AppDePrueba>
 
         // La ficha muestra el plano con todos los asientos
         var ficha = await organizador.GetStringAsync($"/Eventos/Detalle/{evento.Id}");
-        Assert.Equal(216, Regex.Matches(ficha, "<circle[^>]*class=\"asiento").Count);
+        Assert.Equal(216, Regex.Matches(ficha, "<g[^>]*class=\"asiento").Count);
         Assert.Contains("Plano del recinto", ficha);
     }
 

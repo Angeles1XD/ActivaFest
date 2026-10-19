@@ -256,7 +256,39 @@
         {
             <p class="texto-suave">@(Model.PlantillaPlano == PlantillaPlano.Teatro ? "Toca los asientos libres para elegirlos; los grises ya no están disponibles." : "Toca una zona para elegir cuántas entradas quieres.")</p>
         }
-        <div class="plano-lienzo @(planoInteractivo ? "plano-interactivo" : "")">@Html.Raw((string)ViewBag.PlanoSvg)</div>
+        @* Pestañas: el plano interactivo (para elegir) y, si el organizador lo subió, el plano oficial del recinto *@
+        @if (!string.IsNullOrEmpty(Model.PlanoOficial))
+        {
+            <div class="plano-pestanas" role="tablist" aria-label="Vistas del plano">
+                <button type="button" role="tab" id="tabPlanoInteractivo" aria-controls="panelPlanoInteractivo" aria-selected="true" class="activa">🪑 Plano interactivo</button>
+                <button type="button" role="tab" id="tabPlanoOficial" aria-controls="panelPlanoOficial" aria-selected="false">🗺️ Plano oficial del recinto</button>
+            </div>
+        }
+        <div id="panelPlanoInteractivo" role="tabpanel" aria-labelledby="tabPlanoInteractivo">
+            <div class="plano-zoom" aria-label="Zoom del plano">
+                <button type="button" data-zoom="-1" aria-label="Alejar">−</button>
+                <button type="button" data-zoom="0" aria-label="Ajustar al ancho">Ajustar</button>
+                <button type="button" data-zoom="1" aria-label="Acercar">+</button>
+            </div>
+            <div class="plano-lienzo @(planoInteractivo ? "plano-interactivo" : "")">@Html.Raw((string)ViewBag.PlanoSvg)</div>
+            @if (Model.PlantillaPlano == PlantillaPlano.Teatro)
+            {
+                <ul class="plano-leyenda plano-leyenda-estados" aria-label="Estados de los asientos">
+                    <li><svg viewBox="-12 -10 24 22" class="butaca-icono" aria-hidden="true"><g fill="#6366f1"><rect x="-10.5" y="5" width="21" height="6" rx="3" fill-opacity=".6"/><rect x="-8.5" y="-9" width="17" height="14" rx="4"/></g></svg> Disponible (color de su zona)</li>
+                    <li><svg viewBox="-12 -10 24 22" class="butaca-icono" aria-hidden="true"><g fill="#3f3f46"><rect x="-10.5" y="5" width="21" height="6" rx="3" fill-opacity=".6"/><rect x="-8.5" y="-9" width="17" height="14" rx="4"/></g></svg> Ocupado</li>
+                    <li><svg viewBox="-12 -10 24 22" class="butaca-icono" aria-hidden="true"><g fill="#ec4899"><rect x="-10.5" y="5" width="21" height="6" rx="3" fill-opacity=".6"/><rect x="-8.5" y="-9" width="17" height="14" rx="4" stroke="#fff" stroke-width="2"/></g></svg> Tu selección</li>
+                </ul>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(Model.PlanoOficial))
+        {
+            <div id="panelPlanoOficial" role="tabpanel" aria-labelledby="tabPlanoOficial" hidden>
+                <a href="@Model.PlanoOficial" target="_blank" rel="noopener" class="plano-oficial">
+                    <img src="@Model.PlanoOficial" alt="Plano oficial de @Model.Ubicacion" loading="lazy" />
+                </a>
+                <p class="texto-suave">Plano proporcionado por el organizador. Ábrelo para verlo en tamaño completo. Para elegir tu zona o asiento usa el plano interactivo.</p>
+            </div>
+        }
         <ul class="plano-leyenda">
             @for (var i = 0; i < zonasPlano.Count; i++)
             {
@@ -316,6 +348,7 @@
 @section Scripts {
     <script src="~/js/compra.js" asp-append-version="true"></script>
     <script src="~/js/plano-compra.js" asp-append-version="true"></script>
+    <script src="~/js/plano-vista.js" asp-append-version="true"></script>
     @if (Model.TieneUbicacion)
     {
         <partial name="_LeafletJs" />

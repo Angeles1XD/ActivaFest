@@ -150,6 +150,24 @@
             <div id="vistaPreviaPlano" class="plano-lienzo" aria-live="polite"
                  data-url="@Url.Action("VistaPreviaPlano", "Eventos")"></div>
         </div>
+
+        <!-- Plano oficial: la imagen real del recinto, como referencia para el asistente -->
+        <div class="campo plano-oficial-campo">
+            <label asp-for="PlanoOficialArchivo">🗺️ Plano oficial del recinto <span class="texto-suave">(opcional)</span></label>
+            <p class="texto-suave">
+                Si el recinto tiene su propio plano (el del teatro, estadio o local), súbelo como imagen JPG, PNG o WEBP (máx. 5 MB).
+                Se mostrará en la ficha junto al plano interactivo para que el asistente reconozca el lugar; la compra se sigue haciendo en el plano interactivo.
+            </p>
+            @if (!string.IsNullOrEmpty(Model.PlanoOficialActual))
+            {
+                <div class="plano-oficial-actual">
+                    <a href="@Model.PlanoOficialActual" target="_blank" rel="noopener"><img src="@Model.PlanoOficialActual" alt="Plano oficial actual del recinto" /></a>
+                    <label class="opcion-quitar"><input type="checkbox" asp-for="QuitarPlanoOficial" /> Quitar el plano oficial</label>
+                </div>
+            }
+            <input asp-for="PlanoOficialArchivo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
+            <span asp-validation-for="PlanoOficialArchivo" class="text-danger"></span>
+        </div>
     </fieldset>
 
     <!-- 4. FOTOS (HU03) -->

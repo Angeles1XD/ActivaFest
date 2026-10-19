@@ -134,6 +134,12 @@ public class EventoEdicionService : IEventoEdicionService
                 errores.Add(error);
         }
 
+        // ---------- Plano oficial del recinto (imagen opcional) ----------
+        var planoNuevo = datos.PlanoOficialArchivo is { Length: > 0 } archivoPlano ? archivoPlano : null;
+        if (planoNuevo != null && ValidadorImagenes.Validar(planoNuevo) is { } errorPlano)
+            errores.Add($"Plano oficial: {errorPlano}");
+        var planoAnterior = planoNuevo != null || datos.QuitarPlanoOficial ? evento.PlanoOficial : null;
+
         if (errores.Count > 0)
             return new ResultadoEdicion(false, errores);
 
@@ -198,6 +204,16 @@ public class EventoEdicionService : IEventoEdicionService
                 evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
             }
 
+            if (planoNuevo != null)
+            {
+                evento.PlanoOficial = await _imagenes.GuardarAsync(planoNuevo, "planos", ct);
+                rutasNuevas.Add(evento.PlanoOficial);
+            }
+            else if (datos.QuitarPlanoOficial)
+            {
+                evento.PlanoOficial = null;
+            }
+
             // Las zonas existentes ya se guardaron arriba; los contadores de venta los maneja solo CompraService
             foreach (var tipo in evento.TiposEntrada.Where(t => _db.Entry(t).State == EntityState.Modified))
                 _db.Entry(tipo).State = EntityState.Unchanged;
@@ -241,6 +257,8 @@ public class EventoEdicionService : IEventoEdicionService
         // Los archivos quitados se borran recién cuando la BD ya no los referencia
         foreach (var imagen in aEliminar)
             await _imagenes.EliminarAsync(imagen.Ruta, CancellationToken.None);
+        if (!string.IsNullOrEmpty(planoAnterior))
+            await _imagenes.EliminarAsync(planoAnterior, CancellationToken.None);
 
         if (evento.Estado == EstadoEvento.Aprobado)
             await _catalogo.InvalidarAsync(ct);

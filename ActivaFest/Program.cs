@@ -226,6 +226,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 
     await DbInitializer.SeedAsync(scope.ServiceProvider, app.Configuration, app.Logger);
+    await DbInitializer.ReubicarAsientosAsync(db, app.Logger);
 
     // Falla al arrancar (y no al primer pago) si falta la clave para firmar los QR en producción
     scope.ServiceProvider.GetRequiredService<IQrEntradaService>();

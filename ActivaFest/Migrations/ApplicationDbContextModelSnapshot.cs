@@ -523,6 +523,10 @@ namespace ActivaFest.Migrations
                     b.Property<string>("OrganizadorId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PlanoOficial")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PlantillaPlano")
                         .IsRequired()
                         .HasMaxLength(20)

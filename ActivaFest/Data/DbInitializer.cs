@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using ActivaFest.Models;
 
 namespace ActivaFest.Data
@@ -41,6 +42,30 @@ namespace ActivaFest.Data
             {
                 logger.LogError("No se pudo crear el administrador inicial: {Errores}",
                     string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+
+        // Los teatros creados con una versión anterior del plano se reacomodan a la geometría actual (filas en arco).
+        // Solo cambian PosX/PosY: filas, números, estados y entradas vendidas quedan igual. Es idempotente.
+        public static async Task ReubicarAsientosAsync(ApplicationDbContext db, ILogger logger)
+        {
+            var teatros = await db.Eventos
+                .Where(e => e.PlantillaPlano == PlantillaPlano.Teatro)
+                .Include(e => e.TiposEntrada).ThenInclude(t => t.Asientos)
+                .AsSplitQuery()
+                .ToListAsync();
+
+            var cambiados = 0;
+            foreach (var evento in teatros)
+            {
+                var zonas = evento.TiposEntrada.OrderBy(t => t.Id).ToList();
+                cambiados += Services.Plano.PlanoService.Reubicar(zonas, zonas.SelectMany(z => z.Asientos));
+            }
+
+            if (cambiados > 0)
+            {
+                await db.SaveChangesAsync();
+                logger.LogInformation("🪑 {Cantidad} asientos reacomodados al nuevo plano del teatro", cambiados);
             }
         }
     }

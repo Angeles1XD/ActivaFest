@@ -11,11 +11,17 @@ namespace ActivaFest.Models
         [Display(Name = "Teatro / auditorio")]
         Teatro = 1,           // asientos numerados (zona, fila y número)
 
-        [Display(Name = "Estadio / coliseo")]
+        [Display(Name = "Estadio")]
         Estadio = 2,          // tribunas por zona
 
         [Display(Name = "Feria / exposición")]
-        Feria = 3             // entrada general, stands y servicios
+        Feria = 3,            // entrada general, stands y servicios
+
+        [Display(Name = "Coliseo / arena")]
+        Coliseo = 4,          // escenario o ring al centro: campo y anillos de tribuna, por zona
+
+        [Display(Name = "Discoteca / local nocturno")]
+        Discoteca = 5         // pista, VIP, boxes y mezzanine, por zona
     }
 
     // Ciclo de vida del Asiento (diagrama de estados)

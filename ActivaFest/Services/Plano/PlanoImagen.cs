@@ -16,8 +16,13 @@ public static class PlanoImagen
     private const int AnchoPlano = 800;
 
     private static readonly (byte R, byte G, byte B) Fondo = (18, 18, 26);
-    private static readonly (byte R, byte G, byte B) Escenario = (109, 91, 240);
-    private static readonly (byte R, byte G, byte B) Campo = (22, 101, 52);
+    private static readonly (byte R, byte G, byte B) Sala = (26, 26, 36);
+    private static readonly (byte R, byte G, byte B) Telon = (127, 29, 58);
+    private static readonly (byte R, byte G, byte B) Tablado = (82, 63, 49);
+    private static readonly (byte R, byte G, byte B) Cesped = (21, 128, 61);
+    private static readonly (byte R, byte G, byte B) CespedOscuro = (22, 101, 52);
+    private static readonly (byte R, byte G, byte B) Terreno = (15, 35, 24);
+    private static readonly (byte R, byte G, byte B) Tribuna = (40, 40, 52);
     private static readonly (byte R, byte G, byte B) Resaltado = (236, 72, 153);
     private static readonly (byte R, byte G, byte B) Blanco = (255, 255, 255);
 
@@ -33,31 +38,52 @@ public static class PlanoImagen
         switch (plantilla)
         {
             case PlantillaPlano.Teatro:
-                lienzo.Rect(220, 30, 360, 52, 10, Escenario);
+                lienzo.Rect(18, 8, 764, alto - 16, 28, Sala);
+                lienzo.Rect(186, 14, 428, 24, 4, Telon);
+                lienzo.Rect(186, 38, 428, 60, 18, Tablado);
+                // Butacas: las del comprador en rosa con borde blanco, el resto atenuadas
                 foreach (var a in asientos.Where(a => !asientosResaltados.Contains(a.Id)))
-                    lienzo.Circulo(a.X, a.Y, 9, Atenuar(colores.GetValueOrDefault(a.ZonaId, Escenario)));
+                    lienzo.Rect(a.X - 8.5, a.Y - 8, 17, 15, 4, Atenuar(colores.GetValueOrDefault(a.ZonaId, Tablado)));
                 foreach (var a in asientos.Where(a => asientosResaltados.Contains(a.Id)))
                 {
-                    lienzo.Circulo(a.X, a.Y, 12.5, Blanco);
-                    lienzo.Circulo(a.X, a.Y, 10.5, Resaltado);
+                    lienzo.Rect(a.X - 12.5, a.Y - 12, 25, 23, 6, Blanco);
+                    lienzo.Rect(a.X - 10.5, a.Y - 10, 21, 19, 5, Resaltado);
                 }
                 break;
 
             case PlantillaPlano.Estadio:
-                lienzo.Rect(250, 150, 300, 220, 14, Campo);
+                lienzo.Rect(18, 10, 764, 494, 140, Sala);
+                for (var i = zonas.Count; i < 4; i++)
+                    lienzo.Poligono(PlanoService.PoligonoZona(plantilla, i, zonas.Count), Tribuna);
+                for (var k = 0; k < 10; k++)
+                    lienzo.Rect(250 + k * 30, 170, 30, 180, 0, k % 2 == 0 ? Cesped : CespedOscuro);
                 ZonasDe(lienzo, plantilla, zonas, colores, zonasResaltadas);
                 break;
 
             case PlantillaPlano.Feria:
-                lienzo.Rect(60, 30, 680, 300, 14, (30, 30, 40));
+                lienzo.Rect(30, 18, 740, 318, 16, Sala);
                 for (var f = 0; f < 3; f++)
-                    for (var c = 0; c < 6; c++)
-                        lienzo.Rect(90 + c * 105, 55 + f * 90, 85, 60, 6, (45, 45, 58));
+                    for (var c = 0; c < 5; c++)
+                        lienzo.Rect(56 + c * 100, 36 + f * 96, 84, 66, 5, (45, 45, 58));
+                lienzo.Rect(566, 40, 184, 262, 10, (34, 34, 44));
                 ZonasDe(lienzo, plantilla, zonas, colores, zonasResaltadas);
                 break;
 
+            case PlantillaPlano.Coliseo:
+                ZonasDe(lienzo, plantilla, zonas, colores, zonasResaltadas);
+                var cy = PlanoService.CentroColiseoY(Math.Min(zonas.Count, PlanoService.MaxZonas[plantilla]));
+                lienzo.Rect(346, cy - 40, 108, 80, 4, (229, 231, 235));
+                break;
+
+            case PlantillaPlano.Discoteca:
+                lienzo.Rect(20, 10, 760, 440, 20, Sala);
+                ZonasDe(lienzo, plantilla, zonas, colores, zonasResaltadas);
+                lienzo.Rect(330, 24, 140, 46, 8, (39, 39, 42));
+                break;
+
             default:
-                lienzo.Rect(250, 30, 300, 52, 10, Escenario);
+                lienzo.Rect(12, 8, 776, alto - 16, 24, Terreno);
+                lienzo.Poligono(new[] { (246.0, 22.0), (554.0, 22.0), (588.0, 92.0), (212.0, 92.0) }, Tablado);
                 ZonasDe(lienzo, plantilla, zonas, colores, zonasResaltadas);
                 break;
         }
@@ -68,18 +94,11 @@ public static class PlanoImagen
     private static void ZonasDe(Lienzo lienzo, PlantillaPlano plantilla, IReadOnlyList<ZonaPlano> zonas,
         Dictionary<int, (byte, byte, byte)> colores, IReadOnlySet<int> resaltadas)
     {
-        for (var i = 0; i < zonas.Count && i < PlanoService.MaxZonas[plantilla]; i++)
+        var total = Math.Min(zonas.Count, PlanoService.MaxZonas[plantilla]);
+        for (var i = 0; i < total; i++)
         {
-            var (x, y, w, h) = PlanoService.RectZona(plantilla, i, zonas.Count);
-            if (resaltadas.Contains(zonas[i].Id))
-            {
-                lienzo.Rect(x - 5, y - 5, w + 10, h + 10, 14, Blanco);
-                lienzo.Rect(x, y, w, h, 10, Resaltado);
-            }
-            else
-            {
-                lienzo.Rect(x, y, w, h, 10, Atenuar(colores[zonas[i].Id]));
-            }
+            var contorno = PlanoService.PoligonoZona(plantilla, i, total);
+            lienzo.Poligono(contorno, resaltadas.Contains(zonas[i].Id) ? Resaltado : Atenuar(colores[zonas[i].Id]));
         }
     }
 
@@ -90,7 +109,7 @@ public static class PlanoImagen
     private static (byte R, byte G, byte B) Atenuar((byte R, byte G, byte B) c) =>
         ((byte)((c.R + Fondo.R * 2) / 3), (byte)((c.G + Fondo.G * 2) / 3), (byte)((c.B + Fondo.B * 2) / 3));
 
-    // Lienzo RGB mínimo: rectángulos con esquinas redondeadas y círculos, en coordenadas del plano (escaladas)
+    // Lienzo RGB mínimo: rectángulos redondeados, círculos y polígonos, en coordenadas del plano (escaladas)
     private sealed class Lienzo
     {
         private readonly int _ancho, _alto;
@@ -133,6 +152,27 @@ public static class PlanoImagen
                     if (dx * dx + dy * dy <= r * r)
                         Pintar(px, py, color);
                 }
+        }
+
+        // Relleno por barrido (regla par-impar): sirve para tribunas, abanicos y cualquier contorno cerrado
+        public void Poligono(IReadOnlyList<(double X, double Y)> puntos, (byte, byte, byte) color)
+        {
+            var p = puntos.Select(q => (X: q.X * Escala, Y: q.Y * Escala)).ToList();
+            var minY = Math.Max(0, (int)p.Min(q => q.Y));
+            var maxY = Math.Min(_alto - 1, (int)Math.Ceiling(p.Max(q => q.Y)));
+            var cortes = new List<double>();
+            for (var py = minY; py <= maxY; py++)
+            {
+                var y = py + 0.5;
+                cortes.Clear();
+                for (int i = 0, j = p.Count - 1; i < p.Count; j = i++)
+                    if ((p[i].Y <= y) != (p[j].Y <= y))
+                        cortes.Add(p[i].X + (y - p[i].Y) / (p[j].Y - p[i].Y) * (p[j].X - p[i].X));
+                cortes.Sort();
+                for (var k = 0; k + 1 < cortes.Count; k += 2)
+                    for (var px = (int)Math.Ceiling(cortes[k] - 0.5); px + 0.5 <= cortes[k + 1]; px++)
+                        Pintar(px, py, color);
+            }
         }
 
         // Codificación PNG estándar: firma + IHDR + IDAT (zlib) + IEND

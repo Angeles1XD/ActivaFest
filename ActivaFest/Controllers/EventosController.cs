@@ -133,6 +133,11 @@ namespace ActivaFest.Controllers
                     ModelState.AddModelError(nameof(model.Fotos), error);
             }
 
+            // Plano oficial del recinto (opcional): mismas reglas que las fotos (JPG, PNG o WebP y tamaño máximo)
+            var planoOficial = model.PlanoOficialArchivo is { Length: > 0 } archivoPlano ? archivoPlano : null;
+            if (planoOficial != null && ValidadorImagenes.Validar(planoOficial) is { } errorPlano)
+                ModelState.AddModelError(nameof(model.PlanoOficialArchivo), errorPlano);
+
             if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
                 ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
 
@@ -179,6 +184,12 @@ namespace ActivaFest.Controllers
                     var ruta = await _imagenes.GuardarAsync(fotos[i], "eventos", ct);
                     rutasGuardadas.Add(ruta);
                     evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = i });
+                }
+
+                if (planoOficial != null)
+                {
+                    evento.PlanoOficial = await _imagenes.GuardarAsync(planoOficial, "planos", ct);
+                    rutasGuardadas.Add(evento.PlanoOficial);
                 }
 
                 _context.Eventos.Add(evento);
@@ -249,7 +260,8 @@ namespace ActivaFest.Controllers
                     Comprometidas = t.Vendidas + t.Reservadas
                 }).ToList(),
                 ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList(),
-                ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList()
+                ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList(),
+                PlanoOficialActual = evento.PlanoOficial
             });
         }
 
@@ -291,6 +303,7 @@ namespace ActivaFest.Controllers
             model.Id = id;
             model.ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList();
             model.ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList();
+            model.PlanoOficialActual = evento.PlanoOficial;
             foreach (var tipo in model.TiposEntrada.Where(t => t.Id.HasValue))
             {
                 var actual = evento.TiposEntrada.FirstOrDefault(t => t.Id == tipo.Id);

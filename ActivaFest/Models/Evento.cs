@@ -53,6 +53,11 @@ namespace ActivaFest.Models
         // Plantilla con la que se genera el plano del recinto (HU25)
         public PlantillaPlano PlantillaPlano { get; set; } = PlantillaPlano.CampoAbierto;
 
+        // Imagen del plano real del recinto que sube el organizador (opcional). Es solo de referencia para el
+        // asistente: la zona o el asiento se eligen en el plano interactivo generado desde la plantilla.
+        [StringLength(500)]
+        public string? PlanoOficial { get; set; }
+
         public ICollection<TipoEntrada> TiposEntrada { get; set; } = new List<TipoEntrada>();
 
         public ICollection<EventoImagen> Imagenes { get; set; } = new List<EventoImagen>();

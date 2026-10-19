@@ -77,33 +77,33 @@
             : `🎟️ Comprar ${elegidos.size} ${elegidos.size === 1 ? 'asiento' : 'asientos'}`;
     }
 
-    function alternar(circulo) {
-        if (circulo.dataset.libre !== '1') return;
-        const id = circulo.dataset.asiento;
+    function alternar(butaca) {
+        if (butaca.dataset.libre !== '1') return;
+        const id = butaca.dataset.asiento;
 
         if (elegidos.has(id)) {
             elegidos.delete(id);
-            circulo.classList.remove('asiento-elegido');
+            butaca.classList.remove('asiento-elegido');
         } else {
             if (elegidos.size >= maximo) {
                 caja.querySelector('p').textContent = `Puedes elegir como máximo ${maximo} asientos por compra.`;
                 return;
             }
-            elegidos.set(id, { zona: circulo.dataset.zona, fila: circulo.dataset.fila, numero: parseInt(circulo.dataset.numero, 10) });
-            circulo.classList.add('asiento-elegido');
+            elegidos.set(id, { zona: butaca.dataset.zona, fila: butaca.dataset.fila, numero: parseInt(butaca.dataset.numero, 10) });
+            butaca.classList.add('asiento-elegido');
         }
-        circulo.setAttribute('aria-pressed', elegidos.has(id) ? 'true' : 'false');
+        butaca.setAttribute('aria-pressed', elegidos.has(id) ? 'true' : 'false');
         actualizar();
     }
 
-    plano.querySelectorAll('circle.asiento').forEach(function (circulo) {
-        if (circulo.dataset.libre !== '1') return;
-        circulo.setAttribute('tabindex', '0');
-        circulo.setAttribute('role', 'button');
-        circulo.setAttribute('aria-pressed', 'false');
-        circulo.setAttribute('aria-label', `Fila ${circulo.dataset.fila}, asiento ${circulo.dataset.numero}`);
-        circulo.addEventListener('click', function () { alternar(circulo); });
-        circulo.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(circulo); } });
+    plano.querySelectorAll('g.asiento').forEach(function (butaca) {
+        if (butaca.dataset.libre !== '1') return;
+        butaca.setAttribute('tabindex', '0');
+        butaca.setAttribute('role', 'button');
+        butaca.setAttribute('aria-pressed', 'false');
+        butaca.setAttribute('aria-label', `Fila ${butaca.dataset.fila}, asiento ${butaca.dataset.numero}`);
+        butaca.addEventListener('click', function () { alternar(butaca); });
+        butaca.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(butaca); } });
     });
 
     actualizar();

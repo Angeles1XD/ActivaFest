@@ -91,6 +91,8 @@ public class UbicacionEnQrYPlanoTests
     [InlineData(PlantillaPlano.CampoAbierto)]
     [InlineData(PlantillaPlano.Estadio)]
     [InlineData(PlantillaPlano.Feria)]
+    [InlineData(PlantillaPlano.Coliseo)]
+    [InlineData(PlantillaPlano.Discoteca)]
     public void En_plantillas_por_zona_se_resalta_la_zona(PlantillaPlano plantilla)
     {
         var zonas = new List<TipoEntrada>
@@ -103,8 +105,8 @@ public class UbicacionEnQrYPlanoTests
         var png = PlanoService.PngDeEvento(evento, Array.Empty<Asiento>(), new HashSet<int>(), new HashSet<int> { 2 });
         var (_, _, pixel) = LectorPng.Leer(png);
 
-        var (x, y, w, h) = PlanoService.RectZona(plantilla, 1, 2);
-        Assert.Equal(((byte)236, (byte)72, (byte)153), pixel((int)((x + w / 2) * 0.75), (int)((y + h / 2) * 0.75)));
+        var (x, y) = PlanoService.CentroZona(plantilla, 1, 2);
+        Assert.Equal(((byte)236, (byte)72, (byte)153), pixel((int)(x * 0.75), (int)(y * 0.75)));
     }
 }
 
