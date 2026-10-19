@@ -24,9 +24,11 @@ public abstract class BaseSprint6 : BaseSprint4, IClassFixture<ModeloCompartido>
     protected readonly RecomendacionService Recomendaciones;
     protected readonly AsistenteService Asistente;
     protected readonly Evento Rock, Hamlet, Feria;
+    protected readonly ModeloCompartido Modelo;
 
     protected BaseSprint6(ModeloCompartido modelo)
     {
+        Modelo = modelo;
         Catalogo = new CatalogoService(Db, new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<CatalogoService>.Instance);
         Recomendaciones = new RecomendacionService(Db);
         Asistente = new AsistenteService(Db, modelo.Ml, Catalogo, Recomendaciones, new RedactorDesactivado(), new ActivaFest.Services.Plano.UbicacionService(Db), NullLogger<AsistenteService>.Instance);

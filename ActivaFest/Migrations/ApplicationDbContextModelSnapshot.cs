@@ -304,6 +304,44 @@ namespace ActivaFest.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.ConsultaAsistente", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ConSesion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Intencion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Pregunta")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("RedactadaPorLlm")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Resuelta")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fecha");
+
+                    b.ToTable("ConsultasAsistente");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.ContratoDestacado", b =>
                 {
                     b.Property<int>("Id")

@@ -38,6 +38,9 @@ namespace ActivaFest.Data
         // HU23: umbrales del semáforo de variabilidad (una fila)
         public DbSet<UmbralesVariabilidad> UmbralesVariabilidad { get; set; }
 
+        // HU14: consultas al asistente (métrica del OE3)
+        public DbSet<ConsultaAsistente> ConsultasAsistente { get; set; }
+
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
         {
@@ -207,6 +210,7 @@ namespace ActivaFest.Data
             });
 
             builder.Entity<Evento>().Property(e => e.PlantillaPlano).HasConversion<string>().HasMaxLength(20);
+            builder.Entity<ConsultaAsistente>().HasIndex(c => c.Fecha);
 
             // HU30: un cupón por cliente y promoción, código único y aplicado como máximo en una compra
             builder.Entity<Promocion>(p =>

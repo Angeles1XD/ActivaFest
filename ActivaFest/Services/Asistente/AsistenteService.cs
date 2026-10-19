@@ -37,6 +37,27 @@ public class RespuestaChat
 
     // OE3: la consulta se resolvió sin necesidad de un humano
     public bool Resuelta { get; set; }
+
+    // HU14: Llama 3.2 redactó la respuesta (los datos siguen siendo los de la BD)
+    public bool RedactadaPorLlm { get; set; }
+}
+
+public record IntencionMetrica(string Intencion, int Total, int Resueltas);
+public record ConsultaPendiente(DateTime Fecha, string Pregunta, string Intencion);
+
+// HU14 / OE3: el asistente debe resolver sin ayuda humana al menos el 80 % de las consultas
+public class MetricasAsistente
+{
+    public const double Meta = 0.80;
+
+    public int Dias { get; set; }
+    public int Total { get; set; }
+    public int Resueltas { get; set; }
+    public int ConLlm { get; set; }
+    public double? Tasa => Total == 0 ? null : (double)Resueltas / Total;
+    public bool CumpleMeta => Tasa >= Meta;
+    public List<IntencionMetrica> PorIntencion { get; set; } = new();
+    public List<ConsultaPendiente> NoResueltas { get; set; } = new();
 }
 
 public interface IAsistenteService
@@ -44,6 +65,9 @@ public interface IAsistenteService
     Task<RespuestaChat> ResponderAsync(SolicitudChat solicitud, string? usuarioId, CancellationToken ct = default);
 
     string DetectarIntencion(string mensaje);
+
+    // HU14 / OE3: porcentaje de consultas resueltas sin ayuda humana y preguntas por mejorar
+    Task<MetricasAsistente> MetricasAsync(int dias = 30, CancellationToken ct = default);
 }
 
 // =============================
@@ -135,7 +159,65 @@ public class AsistenteService : IAsistenteService
     // =============================
     // 2️⃣ RESPONDER
     // =============================
+    // Responde y registra la consulta (diagrama de secuencia de HU14, paso 11: métrica del OE3)
     public async Task<RespuestaChat> ResponderAsync(SolicitudChat solicitud, string? usuarioId, CancellationToken ct = default)
+    {
+        var respuesta = await ResolverAsync(solicitud, usuarioId, ct);
+
+        var pregunta = (solicitud.Mensaje ?? "").Trim();
+        _db.ConsultasAsistente.Add(new ConsultaAsistente
+        {
+            Fecha = DateTime.UtcNow,
+            Pregunta = pregunta.Length > 200 ? pregunta[..200] : pregunta,
+            Intencion = respuesta.Intencion,
+            Resuelta = respuesta.Resuelta,
+            EventoId = respuesta.EventoId,
+            ConSesion = usuarioId != null,
+            RedactadaPorLlm = respuesta.RedactadaPorLlm
+        });
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // La métrica nunca debe impedir que el usuario reciba su respuesta
+            _logger.LogWarning(ex, "No se pudo registrar la consulta al asistente");
+        }
+        return respuesta;
+    }
+
+    private static void Redactar(RespuestaChat respuesta, string? redactado)
+    {
+        if (string.IsNullOrWhiteSpace(redactado))
+            return;
+        respuesta.Texto = redactado;
+        respuesta.RedactadaPorLlm = true;
+    }
+
+    public async Task<MetricasAsistente> MetricasAsync(int dias = 30, CancellationToken ct = default)
+    {
+        var desde = DateTime.UtcNow.AddDays(-Math.Clamp(dias, 1, 365));
+        var consultas = _db.ConsultasAsistente.AsNoTracking().Where(c => c.Fecha >= desde);
+
+        var porIntencion = await consultas
+            .GroupBy(c => c.Intencion)
+            .Select(g => new IntencionMetrica(g.Key, g.Count(), g.Count(c => c.Resuelta)))
+            .ToListAsync(ct);
+
+        return new MetricasAsistente
+        {
+            Dias = dias,
+            Total = porIntencion.Sum(i => i.Total),
+            Resueltas = porIntencion.Sum(i => i.Resueltas),
+            ConLlm = await consultas.CountAsync(c => c.RedactadaPorLlm, ct),
+            PorIntencion = porIntencion.OrderByDescending(i => i.Total).ToList(),
+            NoResueltas = await consultas.Where(c => !c.Resuelta).OrderByDescending(c => c.Fecha).Take(20)
+                .Select(c => new ConsultaPendiente(c.Fecha, c.Pregunta, c.Intencion)).ToListAsync(ct)
+        };
+    }
+
+    private async Task<RespuestaChat> ResolverAsync(SolicitudChat solicitud, string? usuarioId, CancellationToken ct = default)
     {
         var mensaje = (solicitud.Mensaje ?? "").Trim();
         var intencion = DetectarIntencion(mensaje);
@@ -147,7 +229,7 @@ public class AsistenteService : IAsistenteService
             var ubicacion = await MiUbicacionAsync(texto, solicitud.EventoId, usuarioId, ct);
             ubicacion.Intencion = intencion;
             if (ubicacion.Resuelta)
-                ubicacion.Texto = await _redactor.MejorarAsync(mensaje, ubicacion.Texto, ct) ?? ubicacion.Texto;
+                Redactar(ubicacion, await _redactor.MejorarAsync(mensaje, ubicacion.Texto, ct));
             return ubicacion;
         }
 
@@ -170,7 +252,7 @@ public class AsistenteService : IAsistenteService
 
         // Redacción más natural con el LLM si está disponible; los datos no cambian
         if (respuesta.Resuelta && intencion is not (Intenciones.Saludo or Intenciones.Agradecimiento))
-            respuesta.Texto = await _redactor.MejorarAsync(mensaje, respuesta.Texto, ct) ?? respuesta.Texto;
+            Redactar(respuesta, await _redactor.MejorarAsync(mensaje, respuesta.Texto, ct));
 
         return respuesta;
     }
@@ -192,7 +274,8 @@ public class AsistenteService : IAsistenteService
 
     private static RespuestaChat NoEntendida() => new()
     {
-        Texto = "No estoy seguro de haber entendido 🤔. Puedo ayudarte a buscar eventos, decirte dónde quedan, a qué hora empiezan o cuánto cuestan, y resolver dudas sobre compras y entradas. También puedes escribir a soporte@activafest.com.",
+        Texto = "No estoy seguro de haber entendido 🤔. Puedo ayudarte a buscar eventos, decirte dónde quedan, a qué hora empiezan o cuánto cuestan, y resolver dudas sobre compras y entradas (prueba con las preguntas frecuentes de abajo). " +
+                "Si tu duda es sobre un evento en particular, ábrelo y pregúntame desde su ficha, o escribe a soporte@activafest.com con el nombre del evento y te ponemos en contacto con su organizador.",
         Sugerencias = SugerenciasGenerales.ToList(),
         Resuelta = false
     };
@@ -228,6 +311,7 @@ public class AsistenteService : IAsistenteService
             .Include(e => e.TiposEntrada)
             .Include(e => e.Categoria)
             .Include(e => e.Imagenes)
+            .Include(e => e.Organizador)
             .AsSplitQuery()
             .FirstOrDefaultAsync(e => e.Id == id && e.Estado == EstadoEvento.Aprobado, ct);
     }
@@ -299,7 +383,7 @@ public class AsistenteService : IAsistenteService
                                   (evento.Aforo > 0 ? $" · 👥 aforo de {evento.Aforo:N0} personas" : "") + "." +
                                   (descripcion.Length > 0 ? $"\n{descripcion}" : "") +
                                   (evento.Imagenes.Count > 0 ? $"\nEn la ficha hay {evento.Imagenes.Count} fotos del recinto." : "") +
-                                  "\nPara detalles como estacionamiento o accesibilidad, revisa la descripción o consulta al organizador.";
+                                  $"\nPara detalles como estacionamiento o accesibilidad, revisa la descripción o consulta a su organizador{(evento.Organizador != null ? $", {evento.Organizador.NombreCompleto}," : "")} escribiendo a soporte@activafest.com.";
                 respuesta.Enlaces.Add(ficha);
                 respuesta.Sugerencias.AddRange(new[] { "¿Dónde queda?", "¿Cuánto cuesta?", "¿A qué hora empieza?" });
                 break;

@@ -905,3 +905,10 @@ a.boton-rol {
 .semaforo-rojo { color: #fca5a5; }
 .semaforo-ambar { color: #fcd34d; }
 .semaforo-verde { color: #86efac; }
+
+/* ===== HU14: estado de Llama 3.2 y métricas del asistente ===== */
+.estado-llm { margin-bottom: 16px; border-left: 4px solid #71717a; }
+.estado-llm.llm-ok { border-left-color: #22c55e; }
+.estado-llm.llm-alerta { border-left-color: #f59e0b; }
+.estado-llm code { padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, .08); }
+.estado-llm ol { margin: 8px 0; padding-left: 20px; }

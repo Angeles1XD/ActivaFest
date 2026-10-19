@@ -15,16 +15,32 @@ public class AsistenteOptions
     public int TiempoMaximoSegundos { get; set; } = 6;
 }
 
+// Estado de la conexión con el LLM (lo ve el administrador en las métricas del asistente)
+public record EstadoLlm(bool Activado, bool Disponible, string Modelo, string Url, bool ModeloInstalado, string Mensaje);
+
 public interface IRedactorLlm
 {
     // Devuelve la respuesta reescrita, o null si el LLM no está disponible (se usa la respuesta base)
     Task<string?> MejorarAsync(string pregunta, string respuestaBase, CancellationToken ct = default);
+
+    Task<EstadoLlm> EstadoAsync(CancellationToken ct = default);
 }
 
 public class RedactorDesactivado : IRedactorLlm
 {
+    private readonly AsistenteOptions _opciones;
+
+    public RedactorDesactivado(IOptions<AsistenteOptions>? opciones = null)
+    {
+        _opciones = opciones?.Value ?? new AsistenteOptions();
+    }
+
     public Task<string?> MejorarAsync(string pregunta, string respuestaBase, CancellationToken ct = default) =>
         Task.FromResult<string?>(null);
+
+    public Task<EstadoLlm> EstadoAsync(CancellationToken ct = default) =>
+        Task.FromResult(new EstadoLlm(false, false, _opciones.Modelo, _opciones.UrlLlm, false,
+            "Desactivado: el asistente responde con la base de conocimiento y los datos de la BD. Para usar Llama 3.2, activa Asistente:UsarLlm."));
 }
 
 // =============================
@@ -84,6 +100,31 @@ public class RedactorOllama : IRedactorLlm
             _pausadoHasta = DateTime.UtcNow.AddMinutes(5);
             _logger.LogWarning("El LLM no respondió ({Motivo}); el asistente usa respuestas base durante 5 minutos.", ex.GetBaseException().Message);
             return null;
+        }
+    }
+
+    // Consulta a Ollama la lista de modelos (API compatible con OpenAI: GET /v1/models)
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(3) };
+
+    public async Task<EstadoLlm> EstadoAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var json = await Http.GetStringAsync(_opciones.UrlLlm.TrimEnd('/') + "/models", ct);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var modelos = doc.RootElement.TryGetProperty("data", out var data)
+                ? data.EnumerateArray().Select(m => m.GetProperty("id").GetString() ?? "").ToList()
+                : new List<string>();
+            var instalado = modelos.Any(m => m == _opciones.Modelo || m.StartsWith(_opciones.Modelo + ":", StringComparison.OrdinalIgnoreCase));
+            return new EstadoLlm(true, true, _opciones.Modelo, _opciones.UrlLlm, instalado,
+                instalado
+                    ? $"Conectado: Ollama responde y el modelo {_opciones.Modelo} está instalado."
+                    : $"Ollama responde, pero falta el modelo: ejecuta \"ollama pull {_opciones.Modelo}\". Modelos instalados: {(modelos.Count == 0 ? "ninguno" : string.Join(", ", modelos))}.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            return new EstadoLlm(true, false, _opciones.Modelo, _opciones.UrlLlm, false,
+                $"Activado, pero Ollama no responde en {_opciones.UrlLlm}: abre la aplicación Ollama (o ejecuta \"ollama serve\"). Mientras tanto el asistente usa las respuestas base.");
         }
     }
 

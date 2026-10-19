@@ -19,12 +19,17 @@ namespace ActivaFest.Controllers
         private readonly IAnaliticaService _analitica;
         private readonly ICatalogoService _catalogo;
         private readonly IAsistenteAnaliticoService _ia;
+        private readonly ActivaFest.Services.Asistente.IAsistenteService _asistente;
+        private readonly ActivaFest.Services.Asistente.IRedactorLlm _llm;
 
-        public AnaliticaController(IAnaliticaService analitica, ICatalogoService catalogo, IAsistenteAnaliticoService ia)
+        public AnaliticaController(IAnaliticaService analitica, ICatalogoService catalogo, IAsistenteAnaliticoService ia,
+            ActivaFest.Services.Asistente.IAsistenteService asistente, ActivaFest.Services.Asistente.IRedactorLlm llm)
         {
             _analitica = analitica;
             _catalogo = catalogo;
             _ia = ia;
+            _asistente = asistente;
+            _llm = llm;
         }
 
         private static FiltroAnalitica Filtro(DateTime? desde, DateTime? hasta, int? categoriaId)
@@ -144,6 +149,15 @@ namespace ActivaFest.Controllers
             else
                 TempData["Mensaje"] = "Umbrales del semáforo actualizados.";
             return RedirectToAction(nameof(Variabilidad), new { desde = desde?.ToString("yyyy-MM-dd"), hasta = hasta?.ToString("yyyy-MM-dd"), categoriaId });
+        }
+
+        // =============================
+        // 💬 MÉTRICAS DEL ASISTENTE VIRTUAL (HU14 / OE3) Y ESTADO DE LLAMA 3.2
+        // =============================
+        public async Task<IActionResult> Asistente(int dias = 30, CancellationToken ct = default)
+        {
+            ViewBag.Llm = await _llm.EstadoAsync(ct);
+            return View(await _asistente.MetricasAsync(dias, ct));
         }
 
         // =============================

@@ -172,7 +172,7 @@ builder.Services.AddScoped<ActivaFest.Services.Recomendaciones.IRecomendacionSer
 builder.Services.AddSingleton<ActivaFest.Services.Asistente.IRedactorLlm>(sp =>
     sp.GetRequiredService<IOptions<ActivaFest.Services.Asistente.AsistenteOptions>>().Value.UsarLlm
         ? ActivatorUtilities.CreateInstance<ActivaFest.Services.Asistente.RedactorOllama>(sp)
-        : new ActivaFest.Services.Asistente.RedactorDesactivado());
+        : new ActivaFest.Services.Asistente.RedactorDesactivado(sp.GetRequiredService<IOptions<ActivaFest.Services.Asistente.AsistenteOptions>>()));
 
 // Límite de mensajes al chat por IP: evita abusos del asistente
 builder.Services.AddRateLimiter(opciones =>
