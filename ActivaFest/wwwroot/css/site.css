@@ -1000,3 +1000,17 @@ input[type="checkbox"] {
     padding: 30px 20px;
   }
 }
+
+/* HU28: plano con la ubicación del usuario dentro del chat */
+.chat-plano {
+  display: block;
+  margin-top: 10px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #12121a;
+  border: 1px solid rgba(255, 255, 255, .12);
+  color: var(--lila, #c4b5fd);
+  font-size: 13px;
+  text-decoration: none;
+}
+.chat-plano svg { display: block; width: 100%; min-width: 0; height: auto; }

@@ -78,6 +78,9 @@ public class HU06CompraTests : IClassFixture<AppDePrueba>
         // 4) Confirmación con las entradas
         var html = await TextoAsync(await cliente.GetAsync(confirmacion)); pasos++;
         Assert.Contains("¡Compra confirmada!", html);
+        // El botón "Ver mi ubicación en el plano" de cada entrada necesita su script también en la confirmación
+        Assert.Contains("entrada-plano", html);
+        Assert.Contains("/js/entradas.js", html);
         Assert.Contains("Tus 2 entradas", html);
 
         Assert.True(pasos <= 5, $"La compra tomó {pasos} pasos (RNF01: máximo 5)");

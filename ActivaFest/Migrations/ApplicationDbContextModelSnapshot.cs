@@ -928,6 +928,35 @@ namespace ActivaFest.Migrations
                     b.ToTable("TiposEntrada");
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.UmbralesVariabilidad", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ActualizadoEn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActualizadoPorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("CvEstable")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CvInestable")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("OcupacionAlta")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("OcupacionBaja")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UmbralesVariabilidad");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.VisualizacionEvento", b =>
                 {
                     b.Property<int>("Id")

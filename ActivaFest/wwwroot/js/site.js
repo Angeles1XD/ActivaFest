@@ -71,6 +71,33 @@
         mensajes.querySelectorAll('.chat-sugerencias').forEach(function (s) { s.remove(); });
     }
 
+    // HU28: plano del recinto con la ubicación del usuario resaltada (SVG de su propia entrada, mismo origen).
+    // Se interpreta como SVG (no como HTML) y se quitan scripts y atributos de eventos por si acaso.
+    function planoEnChat(url) {
+        const caja = document.createElement('a');
+        caja.className = 'chat-plano';
+        caja.href = url;
+        caja.target = '_blank';
+        caja.rel = 'noopener';
+        caja.title = 'Abrir el plano en grande';
+        caja.textContent = 'Cargando el plano…';
+        fetch(url, { headers: { Accept: 'image/svg+xml' } })
+            .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(function (texto) {
+                const doc = new DOMParser().parseFromString(texto, 'image/svg+xml');
+                const svg = doc.documentElement;
+                if (svg.nodeName !== 'svg' || doc.querySelector('parsererror')) throw new Error();
+                svg.querySelectorAll('script, foreignObject').forEach(function (n) { n.remove(); });
+                svg.querySelectorAll('*').forEach(function (n) {
+                    Array.from(n.attributes).forEach(function (a) { if (/^on/i.test(a.name)) n.removeAttribute(a.name); });
+                });
+                caja.replaceChildren(document.importNode(svg, true));
+                mensajes.scrollTop = mensajes.scrollHeight;
+            })
+            .catch(function () { caja.textContent = 'Ver el plano con tu ubicación'; });
+        return caja;
+    }
+
     // textContent (no innerHTML): ni el usuario ni el asistente pueden inyectar HTML
     function mostrar(m) {
         const div = document.createElement('div');
@@ -90,6 +117,7 @@
             });
             div.appendChild(lista);
         }
+        if (m.plano && urlSegura(m.plano)) div.appendChild(planoEnChat(m.plano));
         mensajes.appendChild(div);
 
         if (m.sugerencias && m.sugerencias.length) {
@@ -156,7 +184,7 @@
 
             const datos = await r.json();
             if (datos.eventoId) eventoId = datos.eventoId; // para preguntas de seguimiento
-            const respuesta = { autor: 'bot', texto: datos.reply, enlaces: datos.enlaces, sugerencias: datos.sugerencias };
+            const respuesta = { autor: 'bot', texto: datos.reply, enlaces: datos.enlaces, sugerencias: datos.sugerencias, plano: datos.plano };
             mostrar(respuesta);
             guardar(respuesta);
         } catch (err) {

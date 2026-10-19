@@ -35,6 +35,9 @@ namespace ActivaFest.Data
         public DbSet<Promocion> Promociones { get; set; }
         public DbSet<Cupon> Cupones { get; set; }
 
+        // HU23: umbrales del semáforo de variabilidad (una fila)
+        public DbSet<UmbralesVariabilidad> UmbralesVariabilidad { get; set; }
+
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
         {

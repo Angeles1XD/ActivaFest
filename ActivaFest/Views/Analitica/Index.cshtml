@@ -39,6 +39,7 @@
             <p class="cat-subtitulo">Actualizado @(minutos < 1 ? "hace menos de 1 min" : $"hace {minutos} min") · se recalcula cada 5 minutos.</p>
         </div>
         <div class="panel-acciones">
+            <a asp-action="Variabilidad" class="btn-gris enlace-boton">📈 Variabilidad</a>
             <a asp-action="Clientes" class="btn-gris enlace-boton">👥 Clientes</a>
             <a asp-controller="Admin" asp-action="Index" class="btn-gris enlace-boton">← Moderación</a>
         </div>
@@ -162,10 +163,29 @@
             }
         </section>
     </div>
+
+    <!-- 🤖 Consultas a la IA (HU24): la IA solo lee datos agregados y siempre muestra las cifras fuente -->
+    <section class="tarjeta-panel panel-ia" aria-labelledby="tituloIa">
+        <h2 id="tituloIa">🤖 Pregúntale a la IA</h2>
+        <p class="texto-tenue">Responde con datos reales de la plataforma: cada respuesta muestra la tabla de cifras fuente y el período consultado. Las consultas quedan en la auditoría.</p>
+        <div id="iaConversacion" class="ia-conversacion" aria-live="polite"></div>
+        <form id="iaFormulario" class="ia-formulario" data-url="@Url.Action("ConsultarIA", "Analitica")">
+            @Html.AntiForgeryToken()
+            <input type="text" id="iaPregunta" maxlength="300" autocomplete="off" placeholder="Ej.: ¿Cuáles fueron los 5 eventos más vendidos este mes?" aria-label="Pregunta para la IA" />
+            <button type="submit" class="btn-rosa">Preguntar</button>
+        </form>
+        <div class="ia-ejemplos">
+            @foreach (var ejemplo in AsistenteAnaliticoService.Ejemplos)
+            {
+                <button type="button" class="ia-ejemplo">@ejemplo</button>
+            }
+        </div>
+    </section>
 </div>
 
 @section Scripts {
     <script type="application/json" id="datosDashboard">@Html.Raw(datosGraficos)</script>
     <partial name="_ChartJs" />
     <script src="~/js/dashboard.js" asp-append-version="true"></script>
+    <script src="~/js/ia-analitica.js" asp-append-version="true"></script>
 }

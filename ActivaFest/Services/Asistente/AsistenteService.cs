@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ActivaFest.Data;
 using ActivaFest.Models;
 using ActivaFest.Services.Catalogo;
+using ActivaFest.Services.Plano;
 using ActivaFest.Services.Recomendaciones;
 
 namespace ActivaFest.Services.Asistente;
@@ -30,6 +31,9 @@ public class RespuestaChat
 
     // Evento al que se refiere la respuesta: el chat lo reenvía para preguntas de seguimiento ("¿y a qué hora?")
     public int? EventoId { get; set; }
+
+    // HU28: plano con la ubicación del usuario resaltada (URL del SVG de su entrada)
+    public string? Plano { get; set; }
 
     // OE3: la consulta se resolvió sin necesidad de un humano
     public bool Resuelta { get; set; }
@@ -80,16 +84,18 @@ public class AsistenteService : IAsistenteService
     private readonly ICatalogoService _catalogo;
     private readonly IRecomendacionService _recomendaciones;
     private readonly IRedactorLlm _redactor;
+    private readonly IUbicacionService _ubicacion;
     private readonly ILogger<AsistenteService> _logger;
 
     public AsistenteService(ApplicationDbContext db, MachineLearningService ml, ICatalogoService catalogo,
-        IRecomendacionService recomendaciones, IRedactorLlm redactor, ILogger<AsistenteService> logger)
+        IRecomendacionService recomendaciones, IRedactorLlm redactor, IUbicacionService ubicacion, ILogger<AsistenteService> logger)
     {
         _db = db;
         _ml = ml;
         _catalogo = catalogo;
         _recomendaciones = recomendaciones;
         _redactor = redactor;
+        _ubicacion = ubicacion;
         _logger = logger;
     }
 
@@ -134,6 +140,16 @@ public class AsistenteService : IAsistenteService
         var mensaje = (solicitud.Mensaje ?? "").Trim();
         var intencion = DetectarIntencion(mensaje);
         var texto = BaseConocimiento.Normalizar(mensaje);
+
+        // HU28: "¿dónde está mi asiento?" se responde con las entradas del propio usuario
+        if (intencion == Intenciones.MiUbicacion)
+        {
+            var ubicacion = await MiUbicacionAsync(texto, solicitud.EventoId, usuarioId, ct);
+            ubicacion.Intencion = intencion;
+            if (ubicacion.Resuelta)
+                ubicacion.Texto = await _redactor.MejorarAsync(mensaje, ubicacion.Texto, ct) ?? ubicacion.Texto;
+            return ubicacion;
+        }
 
         // Si nombra un evento ("¿cuánto cuesta Rock Fest?"), la pregunta es sobre ese evento
         var evento = await IdentificarEventoAsync(texto, solicitud.EventoId, ct);
@@ -393,6 +409,109 @@ public class AsistenteService : IAsistenteService
         var partes = f.RutaConPagina(1).Where(p => p.Key != "Pagina").Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value)}");
         var query = string.Join("&", partes);
         return query.Length == 0 ? "/Eventos" : $"/Eventos?{query}";
+    }
+
+    // =============================
+    // 🧭 ¿DÓNDE ESTÁ MI ASIENTO? (HU28)
+    // =============================
+    // La ubicación sale de la función de Semantic Kernel ObtenerUbicacionDeMiEntrada (solo entradas del usuario
+    // autenticado). Tres caminos, como en el diagrama: una entrada, varias para esa fecha o ninguna.
+    private async Task<RespuestaChat> MiUbicacionAsync(string texto, int? eventoContexto, string? usuarioId, CancellationToken ct)
+    {
+        if (usuarioId == null)
+        {
+            return new RespuestaChat
+            {
+                Texto = "Para decirte dónde está tu asiento necesito ver tus entradas: inicia sesión con la cuenta con la que compraste y vuelve a preguntarme.",
+                Enlaces = new() { new EnlaceChat("Iniciar sesión", "/Auth/Login") },
+                Resuelta = true
+            };
+        }
+
+        var fecha = FechaMencionada(texto, DateTime.Today);
+        var kernel = PluginUbicacion.KernelPara(_ubicacion, usuarioId);
+        var argumentos = new Microsoft.SemanticKernel.KernelArguments();
+        if (fecha != null)
+            argumentos["fecha"] = fecha.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var resultado = await kernel.InvokeAsync(PluginUbicacion.NombrePlugin, PluginUbicacion.NombreFuncion, argumentos, ct);
+        var entradas = resultado.GetValue<List<UbicacionMiEntrada>>() ?? new();
+
+        // Si nombra un evento, solo ese; si pregunta desde la ficha de un evento para el que tiene entradas, ese
+        var nombrado = await IdentificarEventoAsync(texto, null, ct);
+        if (nombrado != null)
+            entradas = entradas.Where(e => e.EventoId == nombrado.Id).ToList();
+        else if (eventoContexto != null && entradas.Any(e => e.EventoId == eventoContexto))
+            entradas = entradas.Where(e => e.EventoId == eventoContexto).ToList();
+
+        if (entradas.Count == 0)
+        {
+            var cuando = fecha == null ? "" : fecha == DateTime.Today ? " para hoy" : $" para el {Formato.Fecha(fecha.Value, "dddd dd 'de' MMMM")}";
+            return new RespuestaChat
+            {
+                Texto = $"No encontré entradas activas{cuando}{(nombrado != null ? $" para «{nombrado.Titulo}»" : "")} en tu cuenta. " +
+                        "Si ya compraste, revisa que hayas iniciado sesión con la misma cuenta; si no, puedes buscar un evento en el catálogo.",
+                Enlaces = new() { new EnlaceChat("Mis entradas", "/Entradas"), new EnlaceChat("Ver eventos", "/Eventos") },
+                Resuelta = true
+            };
+        }
+
+        var eventos = entradas.GroupBy(e => e.EventoId).ToList();
+        if (eventos.Count > 1)
+        {
+            // Varias entradas para esa fecha (o próximas): pregunta a cuál se refiere
+            return new RespuestaChat
+            {
+                Texto = $"Tienes entradas para {eventos.Count} eventos{(fecha != null ? " ese día" : "")}. ¿A cuál te refieres?\n" +
+                        string.Join("\n", eventos.Select(g => $"• {g.First().Evento} — {Formato.Fecha(g.First().Fecha, "ddd dd MMM, HH:mm")}")),
+                Sugerencias = eventos.Take(4).Select(g => $"¿Dónde está mi asiento para {g.First().Evento}?").ToList(),
+                Resuelta = false
+            };
+        }
+
+        var mias = eventos[0].ToList();
+        var primera = mias[0];
+        var lineas = new List<string>
+        {
+            $"🎟️ {(mias.Count == 1 ? "Tu entrada" : $"Tus {mias.Count} entradas")} para «{primera.Evento}» ({Formato.Fecha(primera.Fecha, "ddd dd/MM, HH:mm")}, {primera.Recinto}):"
+        };
+        lineas.AddRange(mias.Take(10).Select(e => $"• {e.Resumen}"));
+        lineas.Add(mias.Count == 1 ? "Cómo llegar:" : $"Cómo llegar a {(primera.Asiento != null ? $"la fila {primera.Fila}, asiento {primera.Asiento}" : $"la zona {primera.Zona}")}:");
+        lineas.AddRange(primera.Indicaciones.Select((p, i) => $"{i + 1}. {p}"));
+
+        return new RespuestaChat
+        {
+            Texto = string.Join("\n", lineas),
+            EventoId = primera.EventoId,
+            Plano = $"/Entradas/Plano/{primera.EntradaId}",
+            Enlaces = new() { new EnlaceChat("Ver mi entrada", "/Entradas"), new EnlaceChat("Ver mapa y ruta al recinto", $"/Eventos/Detalle/{primera.EventoId}") },
+            Sugerencias = new() { "¿A qué hora empieza?", "¿Cómo ingreso con el QR?" },
+            Resuelta = true
+        };
+    }
+
+    // "hoy", "mañana", "pasado mañana", "el sábado" o "28/11" → fecha; null si no menciona ninguna
+    public static DateTime? FechaMencionada(string textoNormalizado, DateTime hoy)
+    {
+        if (BaseConocimiento.Contiene(textoNormalizado, "pasado manana"))
+            return hoy.AddDays(2);
+        if (BaseConocimiento.Contiene(textoNormalizado, "manana"))
+            return hoy.AddDays(1);
+        if (BaseConocimiento.Contiene(textoNormalizado, "hoy") || BaseConocimiento.Contiene(textoNormalizado, "esta noche"))
+            return hoy;
+
+        var dias = new[] { "domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado" };
+        for (var d = 0; d < dias.Length; d++)
+            if (BaseConocimiento.Contiene(textoNormalizado, dias[d]))
+                return hoy.AddDays(((d - (int)hoy.DayOfWeek) + 7) % 7);
+
+        // "28 11" (la normalización convierte "28/11" en "28 11")
+        var m = System.Text.RegularExpressions.Regex.Match(textoNormalizado, @"\b(\d{1,2}) (\d{1,2})\b");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var dia) && int.TryParse(m.Groups[2].Value, out var mes) && mes is >= 1 and <= 12 && dia >= 1 && dia <= DateTime.DaysInMonth(hoy.Year, mes))
+        {
+            var f = new DateTime(hoy.Year, mes, dia);
+            return f < hoy ? f.AddYears(1) : f;
+        }
+        return null;
     }
 
     // ---------- Recomendación ----------

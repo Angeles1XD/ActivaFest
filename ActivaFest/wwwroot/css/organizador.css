@@ -868,3 +868,40 @@ a.boton-rol {
 .nivel-alta { color: #86efac; }
 .nivel-media { color: #fcd34d; }
 .nivel-baja { color: #fca5a5; }
+
+/* ===== HU24: consultas a la IA en el dashboard ===== */
+.panel-ia { margin-top: 20px; }
+.ia-conversacion { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; margin: 12px 0; }
+.ia-conversacion:empty { display: none; }
+.ia-msg { padding: 12px 14px; border-radius: 12px; max-width: 100%; }
+.ia-msg-admin { align-self: flex-end; background: rgba(139, 92, 246, .22); color: var(--viz-texto, #fff); max-width: 80%; }
+.ia-msg-ia { align-self: stretch; background: rgba(255, 255, 255, .04); border: 1px solid var(--viz-grilla, #2a2a36); }
+.ia-fuera { border-color: rgba(245, 158, 11, .45); }
+.ia-texto { margin: 0 0 6px; line-height: 1.5; }
+.ia-fuente { margin: 0 0 10px; font-size: 12px; color: var(--viz-texto-3, #a1a1b5); }
+.ia-tabla caption { caption-side: top; text-align: left; padding: 0 0 6px; font-size: 13px; }
+.ia-grafico { height: 240px; margin-top: 12px; }
+.ia-formulario { display: flex; gap: 8px; flex-wrap: wrap; }
+.ia-formulario input {
+  flex: 1 1 260px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--viz-grilla, #334155);
+  background: rgba(15, 23, 42, .6); color: inherit; font: inherit;
+}
+.ia-ejemplos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ia-ejemplo {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--viz-grilla, #334155);
+  background: transparent; color: var(--viz-texto-2, #c4c4d4); font: inherit; font-size: 13px; cursor: pointer;
+}
+.ia-ejemplo:hover { border-color: #c4b5fd; color: #fff; }
+
+/* ===== HU23: variabilidad y semáforo ===== */
+.umbrales { margin-bottom: 16px; }
+.umbrales summary { cursor: pointer; font-size: 14px; }
+.form-umbrales { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
+.form-umbrales label { display: grid; gap: 4px; font-size: 13px; color: var(--viz-texto-3, #a1a1b5); }
+.form-umbrales input { width: 140px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--viz-grilla, #334155); background: rgba(15, 23, 42, .6); color: inherit; font: inherit; }
+.tabla-variabilidad td.serie { font-size: 12px; white-space: nowrap; }
+.tabla-variabilidad td.decision { font-size: 13px; min-width: 220px; }
+.semaforo { white-space: nowrap; font-weight: 600; }
+.semaforo-rojo { color: #fca5a5; }
+.semaforo-ambar { color: #fcd34d; }
+.semaforo-verde { color: #86efac; }

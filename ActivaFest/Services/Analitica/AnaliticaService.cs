@@ -92,6 +92,20 @@ public interface IAnaliticaService
     Task RegistrarAuditoriaAsync(string administradorId, string consulta, string fuenteDatos, CancellationToken ct = default);
 
     Task<List<AuditoriaAnalitica>> AuditoriaAsync(int maximo = 50, CancellationToken ct = default);
+
+    // =============================
+    // 🔎 CONSULTAS DE SOLO LECTURA PARA LA IA (HU24) Y LA VARIABILIDAD (HU23)
+    // =============================
+    Task<List<VentaEvento>> TopEventosAsync(DateTime desde, DateTime hasta, int n, CancellationToken ct = default);
+    Task<List<VentaCategoriaPeriodo>> IngresosPorCategoriaAsync(DateTime desde, DateTime hasta, CancellationToken ct = default);
+    Task<List<VariabilidadEvento>> VariabilidadPorEventoAsync(DateTime desde, DateTime hasta, CancellationToken ct = default);
+    Task<List<ResumenSegmento>> ResumenSegmentosAsync(CancellationToken ct = default);
+    Task<List<EventoOcupacion>> EventosBajaOcupacionAsync(int dias, double umbral, CancellationToken ct = default);
+
+    // HU23: variabilidad de ventas, precios y gasto con semáforo de decisión (umbrales configurables)
+    Task<ReporteVariabilidad> VariabilidadAsync(FiltroAnalitica filtro, CancellationToken ct = default);
+    Task<UmbralesVariabilidad> UmbralesAsync(CancellationToken ct = default);
+    Task<string?> GuardarUmbralesAsync(UmbralesVariabilidad umbrales, string administradorId, CancellationToken ct = default);
 }
 
 // =============================
@@ -411,4 +425,239 @@ public class AnaliticaService : IAnaliticaService
             .OrderByDescending(a => a.Fecha)
             .Take(maximo)
             .ToListAsync(ct);
+
+    // =============================
+    // 🔎 CONSULTAS DE SOLO LECTURA (HU24 / HU23)
+    // =============================
+    // Fechas locales; "hasta" incluye todo el día. Solo agregados: nunca nombres ni correos.
+    public async Task<List<VentaEvento>> TopEventosAsync(DateTime desde, DateTime hasta, int n, CancellationToken ct = default)
+    {
+        var ventas = await Pagadas(desde, hasta, null)
+            .GroupBy(o => new { o.EventoId, o.Evento!.Titulo, Categoria = o.Evento.Categoria!.Nombre, o.Evento.Aforo })
+            .Select(g => new { g.Key.EventoId, g.Key.Titulo, g.Key.Categoria, g.Key.Aforo, Entradas = g.SelectMany(o => o.Items).Sum(i => i.Cantidad), Ingresos = g.Sum(o => o.Total) })
+            .ToListAsync(ct);
+
+        return ventas
+            .Select(v => new VentaEvento(v.EventoId, v.Titulo, v.Categoria, v.Entradas, v.Ingresos, v.Aforo))
+            .OrderByDescending(v => v.Entradas).ThenByDescending(v => v.Ingresos)
+            .Take(Math.Clamp(n, 1, 50))
+            .ToList();
+    }
+
+    public async Task<List<VentaCategoriaPeriodo>> IngresosPorCategoriaAsync(DateTime desde, DateTime hasta, CancellationToken ct = default)
+    {
+        var ventas = await Pagadas(desde, hasta, null)
+            .GroupBy(o => o.Evento!.Categoria!.Nombre)
+            .Select(g => new { Categoria = g.Key, Eventos = g.Select(o => o.EventoId).Distinct().Count(), Entradas = g.SelectMany(o => o.Items).Sum(i => i.Cantidad), Ingresos = g.Sum(o => o.Total) })
+            .ToListAsync(ct);
+
+        return ventas
+            .Select(v => new VentaCategoriaPeriodo(v.Categoria, v.Eventos, v.Entradas, v.Ingresos))
+            .OrderByDescending(v => v.Ingresos)
+            .ToList();
+    }
+
+    // Entradas vendidas por semana de cada evento (desde su primera venta del período hasta su fecha o el fin del período).
+    // Con menos de 2 semanas no hay variabilidad que medir. σ es la desviación estándar muestral (n − 1).
+    public async Task<List<VariabilidadEvento>> VariabilidadPorEventoAsync(DateTime desde, DateTime hasta, CancellationToken ct = default)
+    {
+        var umbrales = await UmbralesAsync(ct);
+        var inicio = desde.Date;
+        var ventas = await Pagadas(inicio, hasta, null)
+            .SelectMany(o => o.Items, (o, i) => new { o.EventoId, o.Evento!.Titulo, Categoria = o.Evento.Categoria!.Nombre, EventoFecha = o.Evento.Fecha, o.FechaPago, i.Cantidad })
+            .ToListAsync(ct);
+
+        var semanaFin = (int)((hasta.Date - inicio).TotalDays / 7);
+        var resultado = new List<VariabilidadEvento>();
+        foreach (var g in ventas.GroupBy(v => new { v.EventoId, v.Titulo, v.Categoria, v.EventoFecha }))
+        {
+            int Semana(DateTime d) => (int)((d.Date - inicio).TotalDays / 7);
+            var porSemana = g.GroupBy(v => Semana(v.FechaPago!.Value.ToLocalTime())).ToDictionary(s => s.Key, s => s.Sum(v => v.Cantidad));
+            var primera = porSemana.Keys.Min();
+            var ultima = Math.Max(porSemana.Keys.Max(), Math.Min(semanaFin, Semana(g.Key.EventoFecha)));
+            if (ultima - primera < 1)
+                continue;
+
+            var serie = Enumerable.Range(primera, ultima - primera + 1).Select(s => porSemana.GetValueOrDefault(s)).ToList();
+            var valores = serie.Select(v => (double)v).ToArray();
+            resultado.Add(new VariabilidadEvento(g.Key.EventoId, g.Key.Titulo, g.Key.Categoria, serie,
+                Math.Round(MathNet.Numerics.Statistics.Statistics.Mean(valores), 2),
+                Math.Round(MathNet.Numerics.Statistics.Statistics.StandardDeviation(valores), 2))
+            { LimiteEstable = umbrales.CvEstable, LimiteInestable = umbrales.CvInestable });
+        }
+
+        return resultado.OrderByDescending(v => v.Cv ?? -1).ToList();
+    }
+
+    public async Task<List<ResumenSegmento>> ResumenSegmentosAsync(CancellationToken ct = default)
+    {
+        var clientes = await ClientesAsync(ct);
+        return SegmentoRfm.Todos
+            .Select(s => clientes.Where(c => c.Segmento == s).ToList())
+            .Select((g, i) => new ResumenSegmento(SegmentoRfm.Todos[i], g.Count, g.Sum(c => c.Gasto), g.Count(c => c.AceptaPromociones)))
+            .ToList();
+    }
+
+    // Eventos aprobados de los próximos "dias" con ocupación (entradas emitidas ÷ aforo) por debajo del umbral (0–1)
+    public async Task<List<EventoOcupacion>> EventosBajaOcupacionAsync(int dias, double umbral, CancellationToken ct = default)
+    {
+        var ahora = DateTime.Now;
+        var limite = ahora.Date.AddDays(Math.Clamp(dias, 1, 366) + 1);
+        var eventos = await _db.Eventos.AsNoTracking()
+            .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= ahora && e.Fecha < limite)
+            .Select(e => new
+            {
+                e.Id, e.Titulo, Categoria = e.Categoria!.Nombre, e.Fecha,
+                Aforo = e.TiposEntrada.Sum(t => t.Capacidad),
+                Vendidas = _db.Entradas.Count(x => x.EventoId == e.Id && x.Estado != EstadoEntrada.Anulada)
+            })
+            .ToListAsync(ct);
+
+        return eventos
+            .Select(e => new EventoOcupacion(e.Id, e.Titulo, e.Categoria, e.Fecha, e.Vendidas, e.Aforo))
+            .Where(e => e.Aforo > 0 && e.Ocupacion < umbral)
+            .OrderBy(e => e.Ocupacion).ThenBy(e => e.Fecha)
+            .ToList();
+    }
+
+    // =============================
+    // 🚦 VARIABILIDAD Y SEMÁFORO DE DECISIÓN (HU23)
+    // =============================
+    public async Task<UmbralesVariabilidad> UmbralesAsync(CancellationToken ct = default) =>
+        await _db.UmbralesVariabilidad.AsNoTracking().OrderBy(u => u.Id).FirstOrDefaultAsync(ct) ?? new UmbralesVariabilidad();
+
+    public async Task<string?> GuardarUmbralesAsync(UmbralesVariabilidad umbrales, string administradorId, CancellationToken ct = default)
+    {
+        var error = umbrales.Validar();
+        if (error != null)
+            return error;
+
+        var actual = await _db.UmbralesVariabilidad.OrderBy(u => u.Id).FirstOrDefaultAsync(ct);
+        if (actual == null)
+            _db.UmbralesVariabilidad.Add(actual = new UmbralesVariabilidad());
+        actual.CvEstable = Math.Round(umbrales.CvEstable, 1);
+        actual.CvInestable = Math.Round(umbrales.CvInestable, 1);
+        actual.OcupacionBaja = Math.Round(umbrales.OcupacionBaja, 1);
+        actual.OcupacionAlta = Math.Round(umbrales.OcupacionAlta, 1);
+        actual.ActualizadoEn = DateTime.UtcNow;
+        actual.ActualizadoPorId = administradorId;
+        await _db.SaveChangesAsync(ct);
+        return null;
+    }
+
+    // Regla del semáforo: rojo = actuar (demanda inestable u ocupación baja), ámbar = monitorear, verde = mantener precio
+    public static (Semaforo Color, string Decision) Decidir(double? cv, double? ocupacion, UmbralesVariabilidad u)
+    {
+        var ocupacionPct = ocupacion * 100;
+        var inestable = cv > u.CvInestable;
+        var baja = ocupacionPct < u.OcupacionBaja;
+        var alta = ocupacionPct >= u.OcupacionAlta;
+
+        if (inestable && baja)
+            return (Semaforo.Rojo, "Demanda inestable y baja ocupación: lanzar una promoción y destacar el evento en las semanas de baja venta.");
+        if (inestable)
+            return (Semaforo.Rojo, "Demanda inestable: destacar el evento en las semanas de baja venta.");
+        if (baja)
+            return (Semaforo.Rojo, "Ocupación baja: revisar el precio o la fecha y lanzar una promoción.");
+        if (cv == null)
+            return (Semaforo.Ambar, "Pocas semanas de ventas para medir la variabilidad: monitorear.");
+        if (cv >= u.CvEstable)
+            return (Semaforo.Ambar, "Demanda variable: monitorear las ventas de las próximas semanas.");
+        return alta
+            ? (Semaforo.Verde, "Demanda estable y alta ocupación: mantener el precio (o evaluar subirlo).")
+            : (Semaforo.Verde, "Demanda estable: mantener el precio.");
+    }
+
+    public async Task<ReporteVariabilidad> VariabilidadAsync(FiltroAnalitica filtro, CancellationToken ct = default)
+    {
+        var f = filtro.Normalizado();
+        var umbrales = await UmbralesAsync(ct);
+        var reporte = new ReporteVariabilidad { Desde = f.Desde, Hasta = f.Hasta, CategoriaId = f.CategoriaId, Umbrales = umbrales };
+
+        var items = await Pagadas(f.Desde, f.Hasta, f.CategoriaId)
+            .SelectMany(o => o.Items, (o, i) => new
+            {
+                OrdenId = o.Id, o.UsuarioId, o.Total, o.EventoId, o.Evento!.Titulo, Categoria = o.Evento.Categoria!.Nombre,
+                EventoFecha = o.Evento.Fecha, o.FechaPago, i.Cantidad, i.PrecioUnitario
+            })
+            .ToListAsync(ct);
+        if (items.Count == 0)
+            return reporte;
+
+        var inicio = f.Desde.Date;
+        int Semana(DateTime d) => (int)((d.Date - inicio).TotalDays / 7);
+        var semanaFin = Semana(f.Hasta);
+
+        // Precios de las zonas y ocupación actual de los eventos con ventas en el período
+        var ids = items.Select(i => i.EventoId).Distinct().ToList();
+        var zonas = await _db.TiposEntrada.AsNoTracking().Where(t => ids.Contains(t.EventoId))
+            .Select(t => new { t.EventoId, t.Precio, t.Capacidad }).ToListAsync(ct);
+        var emitidas = await _db.Entradas.AsNoTracking().Where(e => ids.Contains(e.EventoId) && e.Estado != EstadoEntrada.Anulada)
+            .GroupBy(e => e.EventoId).Select(g => new { g.Key, Total = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+
+        // ---------- Por evento: ventas semanales, precios, ocupación y semáforo ----------
+        foreach (var g in items.GroupBy(i => new { i.EventoId, i.Titulo, i.Categoria, i.EventoFecha }))
+        {
+            var porSemana = g.GroupBy(v => Semana(v.FechaPago!.Value.ToLocalTime())).ToDictionary(s => s.Key, s => s.Sum(v => v.Cantidad));
+            var primera = porSemana.Keys.Min();
+            var ultima = Math.Max(porSemana.Keys.Max(), Math.Min(semanaFin, Semana(g.Key.EventoFecha)));
+            var serie = Enumerable.Range(primera, ultima - primera + 1).Select(s => porSemana.GetValueOrDefault(s)).ToList();
+
+            var precios = zonas.Where(z => z.EventoId == g.Key.EventoId).Select(z => z.Precio).ToList();
+            var aforo = zonas.Where(z => z.EventoId == g.Key.EventoId).Sum(z => z.Capacidad);
+            double? ocupacion = aforo == 0 ? null : (double)emitidas.GetValueOrDefault(g.Key.EventoId) / aforo;
+
+            var fila = new FilaVariabilidadEvento
+            {
+                EventoId = g.Key.EventoId, Evento = g.Key.Titulo, Categoria = g.Key.Categoria, Fecha = g.Key.EventoFecha,
+                Semanas = serie, Entradas = serie.Sum(),
+                Ventas = Estadisticos.De(serie.Select(v => (double)v).ToList()),
+                Precios = Estadisticos.De(precios.Select(p => (double)p).ToList()),
+                PrecioMin = precios.DefaultIfEmpty().Min(), PrecioMax = precios.DefaultIfEmpty().Max(),
+                Ocupacion = ocupacion
+            };
+            (fila.Semaforo, fila.Decision) = Decidir(fila.Ventas.Cv, ocupacion, umbrales);
+            reporte.Eventos.Add(fila);
+        }
+
+        // Eventos con ventas atípicas en el período (más entradas que Q3 + 1,5 × IQR)
+        var limiteEventos = Estadisticos.De(reporte.Eventos.Select(e => (double)e.Entradas).ToList()).LimiteAtipico;
+        foreach (var e in reporte.Eventos)
+            e.Atipico = limiteEventos != null && e.Entradas > limiteEventos;
+
+        reporte.Eventos = reporte.Eventos
+            .OrderByDescending(e => e.Semaforo).ThenByDescending(e => e.Ventas.Cv ?? -1).ThenBy(e => e.Evento)
+            .ToList();
+
+        // ---------- Por categoría: ventas semanales (con semanas sin venta), precio pagado y gasto por compra ----------
+        foreach (var g in items.GroupBy(i => i.Categoria))
+        {
+            var porSemana = g.GroupBy(v => Semana(v.FechaPago!.Value.ToLocalTime())).ToDictionary(s => s.Key, s => s.Sum(v => v.Cantidad));
+            var serie = Enumerable.Range(0, semanaFin + 1).Select(s => (double)porSemana.GetValueOrDefault(s)).ToList();
+            reporte.Categorias.Add(new FilaVariabilidadCategoria
+            {
+                Categoria = g.Key,
+                Eventos = g.Select(v => v.EventoId).Distinct().Count(),
+                Entradas = g.Sum(v => v.Cantidad),
+                VentasSemanales = Estadisticos.De(serie),
+                PrecioPagado = Estadisticos.De(g.SelectMany(v => Enumerable.Repeat((double)v.PrecioUnitario, v.Cantidad)).ToList()),
+                GastoPorCompra = Estadisticos.De(g.DistinctBy(v => v.OrdenId).Select(v => (double)v.Total).ToList())
+            });
+        }
+        reporte.Categorias = reporte.Categorias.OrderByDescending(c => c.Entradas).ToList();
+
+        // ---------- Gasto: por compra y por cliente, con clientes atípicos (código anónimo) ----------
+        var ordenes = items.DistinctBy(i => i.OrdenId).ToList();
+        reporte.GastoPorCompra = Estadisticos.De(ordenes.Select(o => (double)o.Total).ToList());
+        var porCliente = ordenes.GroupBy(o => o.UsuarioId).Select(c => (UsuarioId: c.Key, Gasto: c.Sum(o => o.Total), Compras: c.Count())).ToList();
+        reporte.GastoPorCliente = Estadisticos.De(porCliente.Select(c => (double)c.Gasto).ToList());
+        var limiteClientes = reporte.GastoPorCliente.LimiteAtipico;
+        reporte.ClientesAtipicos = limiteClientes == null ? new() : porCliente
+            .Where(c => (double)c.Gasto > limiteClientes)
+            .OrderByDescending(c => c.Gasto)
+            .Select(c => new ClienteAtipico(c.UsuarioId, ClienteAnalitica.CodigoDe(c.UsuarioId), c.Gasto, c.Compras))
+            .ToList();
+
+        return reporte;
+    }
 }

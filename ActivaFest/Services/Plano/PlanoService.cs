@@ -79,6 +79,81 @@ public static class PlanoService
     public static string LetraFila(int indice) =>
         indice < 26 ? ((char)('A' + indice)).ToString() : LetraFila(indice / 26 - 1) + (char)('A' + indice % 26);
 
+    // "A" → 0, "Z" → 25, "AA" → 26 (inverso de LetraFila); -1 si no es una fila válida
+    public static int IndiceFila(string? fila)
+    {
+        if (string.IsNullOrEmpty(fila) || !fila.All(c => c is >= 'A' and <= 'Z'))
+            return -1;
+        var valor = 0;
+        foreach (var c in fila)
+            valor = valor * 26 + (c - 'A' + 1);
+        return valor - 1;
+    }
+
+    // =============================
+    // 🧭 CÓMO LLEGAR A MI UBICACIÓN (HU28)
+    // =============================
+    // Indicaciones paso a paso a partir del plano: puerta, pasillos, filas y referencias del recinto.
+    // Son datos calculados (no los inventa la IA): la IA solo puede redactarlos con otras palabras.
+
+    // Dónde queda la zona i (de "total") dentro del recinto, según la plantilla
+    public static string Referencia(PlantillaPlano plantilla, int i, int total, string? zonaAnterior = null) => plantilla switch
+    {
+        PlantillaPlano.Estadio => i switch
+        {
+            0 => "la tribuna del lado izquierdo de la cancha",
+            1 => "la tribuna del lado derecho de la cancha",
+            2 => "la tribuna detrás del arco del fondo (arriba en el plano)",
+            _ => "la tribuna detrás del arco más cercano a las puertas (abajo en el plano)"
+        },
+        PlantillaPlano.Coliseo => i == 0 ? "el campo, alrededor del escenario central" : $"el {Ordinal(i)} anillo de tribuna desde el escenario",
+        PlantillaPlano.Discoteca => i switch
+        {
+            0 => "la pista central, frente a la cabina del DJ",
+            1 => "el área VIP, a la izquierda de la pista",
+            2 => "los boxes, a la derecha de la pista",
+            _ => "el mezzanine, al fondo detrás de la pista"
+        },
+        PlantillaPlano.Feria => "el acceso de tu entrada, al frente del pabellón",
+        PlantillaPlano.Teatro => "la platea, frente al escenario",
+        _ => i == 0 ? "la zona más cercana al escenario" : $"la {OrdinalF(i + 1)} franja desde el escenario" + (zonaAnterior != null ? $", detrás de {zonaAnterior}" : "")
+    };
+
+    public static List<string> Indicaciones(PlantillaPlano plantilla, IReadOnlyList<TipoEntrada> zonasOrdenadas, TipoEntrada zona, string? fila, int? numero)
+    {
+        var pasos = new List<string>
+        {
+            string.IsNullOrWhiteSpace(zona.PuertaIngreso)
+                ? "Ingresa por la entrada principal del recinto y muestra tu QR."
+                : $"Ingresa por la {zona.PuertaIngreso!.Trim()} y muestra tu QR."
+        };
+
+        var indice = Math.Max(0, zonasOrdenadas.ToList().FindIndex(z => z.Id == zona.Id));
+
+        if (plantilla == PlantillaPlano.Teatro && fila != null && numero is > 0 && zona.AsientosPorFila is > 0)
+        {
+            var orden = IndiceFila(fila) + 1;
+            pasos.Add($"Avanza hacia el escenario por el pasillo central hasta la fila {fila} ({OrdinalF(orden)} fila desde el escenario), en la zona {zona.Nombre}.");
+
+            // Bloque izquierdo: 1..mitad; derecho: el resto (izquierda y derecha mirando al escenario)
+            var izquierda = (zona.AsientosPorFila.Value + 1) / 2;
+            var (lado, desdePasillo) = numero <= izquierda ? ("izquierda", izquierda - numero.Value + 1) : ("derecha", numero.Value - izquierda);
+            pasos.Add($"Tu asiento es el {numero}: el {Ordinal(desdePasillo)} a la {lado} del pasillo central, mirando al escenario.");
+            return pasos;
+        }
+
+        var anterior = indice > 0 && indice - 1 < zonasOrdenadas.Count ? zonasOrdenadas[indice - 1].Nombre : null;
+        var destino = Referencia(plantilla, indice, zonasOrdenadas.Count, anterior);
+        pasos.Add($"{(destino.StartsWith("el ") ? "Dirígete al " + destino[3..] : "Dirígete a " + destino)}: es la zona {zona.Nombre}.");
+        pasos.Add(plantilla == PlantillaPlano.Feria
+            ? "Tu entrada no tiene asiento numerado: con ella recorres todo el pabellón, sus stands y el patio de comidas."
+            : "Tu entrada no tiene asiento numerado: ubícate en cualquier lugar libre de tu zona.");
+        return pasos;
+    }
+
+    private static string Ordinal(int n) => $"{n}.º";
+    private static string OrdinalF(int n) => $"{n}.ª";
+
     // =============================
     // 🪑 ASIENTOS NUMERADOS (plantilla de teatro)
     // =============================

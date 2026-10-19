@@ -47,6 +47,7 @@ namespace ActivaFest.Controllers
                 enlaces = respuesta.Enlaces.Select(e => new { texto = e.Texto, url = e.Url }),
                 sugerencias = respuesta.Sugerencias,
                 eventoId = respuesta.EventoId,
+                plano = respuesta.Plano,
                 intencion = respuesta.Intencion
             });
         }

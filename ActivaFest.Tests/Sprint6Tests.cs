@@ -29,7 +29,7 @@ public abstract class BaseSprint6 : BaseSprint4, IClassFixture<ModeloCompartido>
     {
         Catalogo = new CatalogoService(Db, new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<CatalogoService>.Instance);
         Recomendaciones = new RecomendacionService(Db);
-        Asistente = new AsistenteService(Db, modelo.Ml, Catalogo, Recomendaciones, new RedactorDesactivado(), NullLogger<AsistenteService>.Instance);
+        Asistente = new AsistenteService(Db, modelo.Ml, Catalogo, Recomendaciones, new RedactorDesactivado(), new ActivaFest.Services.Plano.UbicacionService(Db), NullLogger<AsistenteService>.Instance);
 
         Rock = Crear("Rock en el Parque", 1, dias: 10, -16.40, -71.54, ("General", 50m, 100), ("VIP", 120m, 5));
         Hamlet = Crear("Hamlet", 2, dias: 6, -16.41, -71.53, ("Platea", 35m, 200));

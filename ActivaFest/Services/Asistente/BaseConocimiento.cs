@@ -15,6 +15,9 @@ public static class Intenciones
     public const string Precio = "Precio";
     public const string Instalaciones = "Instalaciones";
 
+    // HU28: ubicación de la entrada del propio usuario (zona, fila, asiento, puerta y cómo llegar)
+    public const string MiUbicacion = "MiUbicacion";
+
     // Se responden con la base de conocimiento
     public const string Saludo = "Saludo";
     public const string Agradecimiento = "Agradecimiento";
@@ -138,6 +141,10 @@ public static class BaseConocimiento
             "Puedes escribirnos a soporte@activafest.com y te responderemos lo antes posible. Si tu consulta es sobre un evento en particular (horario, ingreso, devoluciones), también puedes contactar a su organizador."),
 
         // ----- Intenciones con datos de la BD (la respuesta se arma en AsistenteService) -----
+        new(Intenciones.MiUbicacion,
+            new[] { "mi asiento", "mis asientos", "donde esta mi asiento", "donde queda mi asiento", "donde me siento", "donde me toca", "mi butaca", "mi fila", "mi zona", "mi ubicacion", "donde estoy ubicado", "por que puerta", "que puerta", "mi puerta", "por donde entro", "como llego a mi asiento", "como llego a mi zona", "donde esta mi zona" },
+            new[] { "donde esta mi asiento", "donde me toca sentarme en el concierto de manana", "por que puerta entro", "como llego a mi zona", "cual es mi asiento para el evento de hoy", "en que fila estoy" }),
+
         new(Intenciones.BuscarEventos,
             new[] { "que eventos", "eventos hay", "hay algun", "hay algo", "busco", "quiero ir", "planes", "que hacer", "concierto", "conciertos", "obra", "teatro", "feria", "festival", "exposicion", "partido", "fin de semana", "esta semana", "hoy", "manana", "gratis", "gratuito", "barato", "eventos para", "actividades", "familias" },
             new[] { "que eventos hay este fin de semana", "busco un concierto", "hay obras de teatro", "quiero ir a una feria", "que hay para hacer hoy", "hay eventos gratis", "eventos en arequipa", "algun festival este mes" }),

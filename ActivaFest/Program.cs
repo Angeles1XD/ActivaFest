@@ -104,6 +104,7 @@ builder.Services.AddScoped<ActivaFest.Services.Comisiones.IComisionService, Acti
 
 // 📊 Analítica del administrador (HU21, HU22, HU29)
 builder.Services.AddScoped<ActivaFest.Services.Analitica.IAnaliticaService, ActivaFest.Services.Analitica.AnaliticaService>();
+builder.Services.AddScoped<ActivaFest.Services.Analitica.IAsistenteAnaliticoService, ActivaFest.Services.Analitica.AsistenteAnaliticoService>();
 
 // =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
@@ -163,6 +164,7 @@ builder.Services.AddHttpContextAccessor();
 // =============================
 builder.Services.AddSingleton<MachineLearningService>();
 builder.Services.Configure<ActivaFest.Services.Asistente.AsistenteOptions>(builder.Configuration.GetSection("Asistente"));
+builder.Services.AddScoped<ActivaFest.Services.Plano.IUbicacionService, ActivaFest.Services.Plano.UbicacionService>();
 builder.Services.AddScoped<ActivaFest.Services.Asistente.IAsistenteService, ActivaFest.Services.Asistente.AsistenteService>();
 builder.Services.AddScoped<ActivaFest.Services.Recomendaciones.IRecomendacionService, ActivaFest.Services.Recomendaciones.RecomendacionService>();
 

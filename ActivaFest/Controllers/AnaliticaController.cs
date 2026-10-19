@@ -18,11 +18,13 @@ namespace ActivaFest.Controllers
     {
         private readonly IAnaliticaService _analitica;
         private readonly ICatalogoService _catalogo;
+        private readonly IAsistenteAnaliticoService _ia;
 
-        public AnaliticaController(IAnaliticaService analitica, ICatalogoService catalogo)
+        public AnaliticaController(IAnaliticaService analitica, ICatalogoService catalogo, IAsistenteAnaliticoService ia)
         {
             _analitica = analitica;
             _catalogo = catalogo;
+            _ia = ia;
         }
 
         private static FiltroAnalitica Filtro(DateTime? desde, DateTime? hasta, int? categoriaId)
@@ -113,5 +115,61 @@ namespace ActivaFest.Controllers
 
         public async Task<IActionResult> Auditoria(CancellationToken ct) =>
             View(await _analitica.AuditoriaAsync(100, ct));
+
+        // =============================
+        // 📈 VARIABILIDAD Y SEMÁFORO DE DECISIÓN (HU23)
+        // =============================
+        public async Task<IActionResult> Variabilidad(DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
+        {
+            // Por defecto, las últimas 12 semanas: con un solo mes hay muy pocas semanas para medir la variabilidad
+            var filtro = new FiltroAnalitica { Desde = desde ?? DateTime.Today.AddDays(-83), Hasta = hasta ?? DateTime.Today, CategoriaId = categoriaId };
+            var reporte = await _analitica.VariabilidadAsync(filtro, ct);
+
+            // Muestra clientes con gasto atípico (con código): la consulta se audita como el resto de la analítica individual
+            await _analitica.RegistrarAuditoriaAsync(AdministradorId,
+                $"Variabilidad y atípicos ({reporte.Desde:dd/MM/yyyy} - {reporte.Hasta:dd/MM/yyyy}{(categoriaId != null ? $", categoría {categoriaId}" : "")})",
+                "Ordenes, Entradas, Eventos", ct);
+
+            ViewBag.Categorias = await _catalogo.ObtenerCategoriasAsync(ct);
+            return View(reporte);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Umbrales(UmbralesVariabilidad umbrales, DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
+        {
+            var error = await _analitica.GuardarUmbralesAsync(umbrales, AdministradorId, ct);
+            if (error != null)
+                TempData["Error"] = error;
+            else
+                TempData["Mensaje"] = "Umbrales del semáforo actualizados.";
+            return RedirectToAction(nameof(Variabilidad), new { desde = desde?.ToString("yyyy-MM-dd"), hasta = hasta?.ToString("yyyy-MM-dd"), categoriaId });
+        }
+
+        // =============================
+        // 🤖 CONSULTAS A LA IA (HU24): solo lectura, cifras fuente y auditoría
+        // =============================
+        public record PreguntaIa(string Pregunta);
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConsultarIA([FromBody] PreguntaIa datos, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(datos?.Pregunta))
+                return BadRequest("Escribe una pregunta.");
+
+            var r = await _ia.ConsultarAsync(datos.Pregunta, AdministradorId, ct);
+            return Ok(new
+            {
+                texto = r.Texto,
+                funcion = r.Funcion,
+                periodo = r.Periodo,
+                fueraDeAlcance = r.FueraDeAlcance,
+                redactadaPorIa = r.RedactadaPorIa,
+                tabla = r.Tabla == null ? null : new { titulo = r.Tabla.Titulo, columnas = r.Tabla.Columnas, filas = r.Tabla.Filas },
+                grafico = r.Grafico == null || r.Grafico.Valores.Count == 0 ? null : new { tipo = r.Grafico.Tipo, serie = r.Grafico.Serie, etiquetas = r.Grafico.Etiquetas, valores = r.Grafico.Valores },
+                sugerencias = r.Sugerencias
+            });
+        }
     }
 }
