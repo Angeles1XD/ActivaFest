@@ -146,4 +146,16 @@ public class HU01RegistroLoginTests : IClassFixture<AppDePrueba>
         Assert.Equal(HttpStatusCode.Redirect, (await IniciarSesionAsync(admin, "admin@test.com", "Admin123!")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/Admin")).StatusCode);
     }
+
+    // Regresión: con [Range(true, true)] la validación del navegador (jQuery) rechazaba la casilla aunque estuviera marcada
+    [Fact]
+    public async Task La_casilla_de_consentimiento_se_puede_marcar_en_el_navegador()
+    {
+        var html = await _app.Cliente().GetStringAsync("/Auth/Registro");
+        var casilla = System.Text.RegularExpressions.Regex.Match(html, "<input[^>]*id=\"AceptaTratamientoDatos\"[^>]*>").Value;
+
+        Assert.NotEmpty(casilla);
+        Assert.DoesNotContain("data-val-range", casilla);
+        Assert.Contains("required", casilla);
+    }
 }
