@@ -45,7 +45,7 @@
 
         <!-- Consentimientos separados (Ley N.° 29733, RNF07) -->
         <label class="campo-check">
-            <input asp-for="AceptaTratamientoDatos" />
+            <input asp-for="AceptaTratamientoDatos" required />
             <span>Acepto el tratamiento de mis datos personales según la <a asp-controller="Home" asp-action="Privacy" target="_blank">política de privacidad</a>.</span>
         </label>
         <span asp-validation-for="AceptaTratamientoDatos" class="text-danger"></span>
