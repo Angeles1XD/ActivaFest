@@ -27,10 +27,38 @@ public class FiltroAnalitica
     }
 
     public string Clave => $"{Desde:yyyyMMdd}-{Hasta:yyyyMMdd}-{CategoriaId}";
+
+    // Períodos rápidos del dashboard. Si vienen fechas, es un período personalizado.
+    public static readonly (string Clave, string Nombre)[] Rangos =
+    {
+        ("hoy", "Hoy"), ("7d", "Últimos 7 días"), ("mes", "Este mes"), ("mespasado", "Mes pasado"),
+        ("30d", "Últimos 30 días"), ("anio", "Este año"), ("personalizado", "Personalizado")
+    };
+
+    public static (FiltroAnalitica Filtro, string Rango) DeRango(string? rango, DateTime? desde, DateTime? hasta, int? categoriaId, DateTime hoy)
+    {
+        hoy = hoy.Date;
+        var inicioMes = new DateTime(hoy.Year, hoy.Month, 1);
+        rango = Rangos.Any(r => r.Clave == rango) ? rango : desde != null || hasta != null ? "personalizado" : "mes";
+        var (d, h) = rango switch
+        {
+            "hoy" => (hoy, hoy),
+            "7d" => (hoy.AddDays(-6), hoy),
+            "30d" => (hoy.AddDays(-29), hoy),
+            "mespasado" => (inicioMes.AddMonths(-1), inicioMes.AddDays(-1)),
+            "anio" => (new DateTime(hoy.Year, 1, 1), hoy),
+            "personalizado" => (desde ?? inicioMes, hasta ?? hoy),
+            _ => (inicioMes, hoy)   // este mes, hasta hoy (sin días futuros, para comparar con el período anterior)
+        };
+        return (new FiltroAnalitica { Desde = d, Hasta = h, CategoriaId = categoriaId }.Normalizado(), rango!);
+    }
 }
 
 public record PuntoSemana(string Etiqueta, decimal Ingresos);
 public record VentaCategoria(string Categoria, string? Color, int Entradas, decimal Ingresos);
+
+// Compra reciente para el dashboard (el cliente va con su código anónimo, nunca con su nombre)
+public record CompraReciente(DateTime Fecha, string Evento, string Cliente, int Entradas, decimal Total);
 
 // =============================
 // 📊 INDICADORES DEL DASHBOARD (HU21)
@@ -54,7 +82,9 @@ public class DashboardAnalitica
     public int EntradasAnterior { get; set; }
     public decimal TicketAnterior { get; set; }
 
-    // De los eventos que se realizan en el período (por fecha del evento)
+    // De los eventos que vendieron en el período o que se realizan en él (por fecha del evento)
+    public int EventosConsiderados { get; set; }
+    public int EventosRealizados { get; set; }
     public int AforoEventos { get; set; }
     public int VendidasEventos { get; set; }
     public int VendidasEventosRealizados { get; set; }
@@ -71,6 +101,9 @@ public class DashboardAnalitica
 
     public List<PuntoSemana> IngresosPorSemana { get; set; } = new();
     public List<VentaCategoria> VentasPorCategoria { get; set; } = new();
+
+    // Las 10 compras pagadas más recientes del período (se actualizan en cuanto se paga una compra)
+    public List<CompraReciente> UltimasCompras { get; set; } = new();
 
     public static double? Variacion(decimal actual, decimal anterior) =>
         anterior == 0 ? null : Math.Round((double)((actual - anterior) / anterior * 100), 1);
@@ -130,7 +163,8 @@ public class AnaliticaService : IAnaliticaService
     public async Task<DashboardAnalitica> DashboardAsync(FiltroAnalitica filtro, CancellationToken ct = default)
     {
         filtro = filtro.Normalizado();
-        var clave = "analitica:dashboard:" + filtro.Clave;
+        // La clave incluye una "huella" de los datos: una compra pagada o una entrada validada invalida la caché al instante
+        var clave = "analitica:dashboard:" + filtro.Clave + ":" + await HuellaAsync(ct);
 
         var enCache = await _cache.GetStringAsync(clave, ct);
         if (enCache != null)
@@ -170,10 +204,13 @@ public class AnaliticaService : IAnaliticaService
         d.EntradasAnterior = await anterior.SelectMany(o => o.Items).SumAsync(i => (int?)i.Cantidad, ct) ?? 0;
         d.TicketAnterior = comprasAnterior == 0 ? 0 : Math.Round(d.IngresosAnterior / comprasAnterior, 2);
 
-        // ---------- Eventos que se realizan en el período: ocupación, asistencia y conversión ----------
+        // ---------- Ocupación, asistencia y conversión ----------
+        // De los eventos que vendieron en el período o que se realizan en él: así una compra de hoy para un evento
+        // del próximo mes también cuenta en la ocupación (antes solo se miraban los eventos con fecha en el período)
         var hastaEvento = f.Hasta.AddDays(1);
+        var conVentas = periodo.Select(o => o.EventoId);
         var eventos = _db.Eventos.AsNoTracking()
-            .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= f.Desde && e.Fecha < hastaEvento);
+            .Where(e => e.Estado == EstadoEvento.Aprobado && ((e.Fecha >= f.Desde && e.Fecha < hastaEvento) || conVentas.Contains(e.Id)));
         if (f.CategoriaId != null)
             eventos = eventos.Where(e => e.CategoriaId == f.CategoriaId);
 
@@ -190,6 +227,8 @@ public class AnaliticaService : IAnaliticaService
             })
             .ToListAsync(ct);
 
+        d.EventosConsiderados = porEvento.Count;
+        d.EventosRealizados = porEvento.Count(e => e.Fecha <= ahora);
         d.AforoEventos = porEvento.Sum(e => e.Aforo);
         d.VendidasEventos = porEvento.Sum(e => e.Vendidas);
         d.VendidasEventosRealizados = porEvento.Where(e => e.Fecha <= ahora).Sum(e => e.Vendidas);
@@ -227,7 +266,27 @@ public class AnaliticaService : IAnaliticaService
             .OrderByDescending(c => c.Entradas)
             .ToList();
 
+        // ---------- Últimas compras del período ----------
+        d.UltimasCompras = (await periodo
+                .OrderByDescending(o => o.FechaPago)
+                .Take(10)
+                .Select(o => new { o.FechaPago, Evento = o.Evento!.Titulo, o.UsuarioId, Entradas = o.Items.Sum(i => i.Cantidad), o.Total })
+                .ToListAsync(ct))
+            .Select(o => new CompraReciente(o.FechaPago!.Value.ToLocalTime(), o.Evento, ClienteAnalitica.CodigoDe(o.UsuarioId), o.Entradas, o.Total))
+            .ToList();
+
         return d;
+    }
+
+    // Cambia cuando hay una compra pagada nueva, una entrada validada en puerta o un evento aprobado o cancelado
+    private async Task<string> HuellaAsync(CancellationToken ct)
+    {
+        var pagadas = _db.Ordenes.AsNoTracking().Where(o => o.Estado == EstadoOrden.Pagada);
+        var cantidad = await pagadas.CountAsync(ct);
+        var ultima = await pagadas.MaxAsync(o => o.FechaPago, ct);
+        var usadas = await _db.Entradas.AsNoTracking().CountAsync(e => e.Estado == EstadoEntrada.Usada, ct);
+        var aprobados = await _db.Eventos.AsNoTracking().CountAsync(e => e.Estado == EstadoEvento.Aprobado, ct);
+        return $"{cantidad}-{ultima?.Ticks}-{usadas}-{aprobados}";
     }
 
     // =============================

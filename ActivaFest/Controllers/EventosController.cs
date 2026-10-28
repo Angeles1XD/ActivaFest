@@ -141,8 +141,14 @@ namespace ActivaFest.Controllers
             if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
                 ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
 
+            // Las fotos de un envío anterior con errores cuentan solo si las subió este mismo usuario
+            FiltrarArchivosSubidos(model);
+            if (fotos.Count + model.FotosSubidas.Count < EventoFormViewModel.MinFotos && ModelState.IsValid)
+                ModelState.AddModelError(nameof(model.Fotos), $"Sube al menos {EventoFormViewModel.MinFotos} fotos del recinto.");
+
             if (!ModelState.IsValid)
             {
+                await ConservarArchivosAsync(model, fotos, planoOficial, ct);
                 await CargarCategoriasAsync(ct);
                 return View(model);
             }
@@ -179,17 +185,25 @@ namespace ActivaFest.Controllers
             var rutasGuardadas = new List<string>();
             try
             {
-                for (var i = 0; i < fotos.Count; i++)
+                var orden = 0;
+                foreach (var ruta in model.FotosSubidas)
+                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
+
+                foreach (var foto in fotos)
                 {
-                    var ruta = await _imagenes.GuardarAsync(fotos[i], "eventos", ct);
+                    var ruta = await _imagenes.GuardarAsync(foto, "eventos", ct);
                     rutasGuardadas.Add(ruta);
-                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = i });
+                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
                 }
 
                 if (planoOficial != null)
                 {
                     evento.PlanoOficial = await _imagenes.GuardarAsync(planoOficial, "planos", ct);
                     rutasGuardadas.Add(evento.PlanoOficial);
+                }
+                else if (model.PlanoSubido != null)
+                {
+                    evento.PlanoOficial = model.PlanoSubido;
                 }
 
                 _context.Eventos.Add(evento);
@@ -207,6 +221,7 @@ namespace ActivaFest.Controllers
                 return View(model);
             }
 
+            OlvidarArchivosSubidos(model);
             HttpContext.Session.SetString("UltimoEvento", evento.Titulo);
 
             if (usuario?.Email != null)
@@ -280,6 +295,8 @@ namespace ActivaFest.Controllers
             if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
                 ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
 
+            FiltrarArchivosSubidos(model);
+
             if (ModelState.IsValid)
             {
                 var url = Url.Action(nameof(Detalle), "Eventos", new { id }, Request.Scheme)!;
@@ -287,6 +304,7 @@ namespace ActivaFest.Controllers
 
                 if (resultado.Exito)
                 {
+                    OlvidarArchivosSubidos(model);
                     TempData["Mensaje"] = evento.Estado == EstadoEvento.Aprobado
                         ? "Cambios guardados." + (resultado.CompradoresNotificados > 0
                             ? $" Avisamos por correo a {resultado.CompradoresNotificados} {(resultado.CompradoresNotificados == 1 ? "comprador" : "compradores")}."
@@ -299,7 +317,9 @@ namespace ActivaFest.Controllers
                     ModelState.AddModelError(string.Empty, error);
             }
 
-            // Se vuelve a mostrar el formulario con las fotos actuales y lo comprometido por zona
+            // Se vuelve a mostrar el formulario con las fotos actuales y lo comprometido por zona;
+            // las fotos nuevas que eligió se guardan para que no tenga que volver a subirlas
+            await ConservarArchivosAsync(model, model.Fotos, model.PlanoOficialArchivo, ct);
             model.Id = id;
             model.ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList();
             model.ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList();
@@ -376,6 +396,64 @@ namespace ActivaFest.Controllers
                 return BadRequest();
 
             return Content(Services.Plano.PlanoService.SvgVistaPrevia(plantilla, tiposEntrada), "image/svg+xml; charset=utf-8");
+        }
+
+        // =============================
+        // 🖼️ FOTOS YA SUBIDAS EN UN ENVÍO CON ERRORES
+        // =============================
+        // El navegador vacía el campo de archivos al volver a mostrar el formulario, así que las fotos válidas
+        // se guardan y sus rutas viajan en el formulario. La sesión recuerda cuáles subió este usuario,
+        // para que nadie pueda colar rutas de otras imágenes.
+        private const string ClaveArchivosSubidos = "ArchivosSubidos";
+
+        private HashSet<string> ArchivosSubidos() =>
+            (HttpContext.Session.GetString(ClaveArchivosSubidos) ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+
+        private void GuardarArchivosSubidos(HashSet<string> rutas) =>
+            HttpContext.Session.SetString(ClaveArchivosSubidos, string.Join('|', rutas));
+
+        private void FiltrarArchivosSubidos(EventoFormViewModel model)
+        {
+            var permitidos = ArchivosSubidos();
+            model.FotosSubidas = model.FotosSubidas.Where(permitidos.Contains).Distinct().Take(EventoFormViewModel.MaxFotos).ToList();
+            if (model.PlanoSubido != null && !permitidos.Contains(model.PlanoSubido))
+                model.PlanoSubido = null;
+        }
+
+        private void OlvidarArchivosSubidos(EventoFormViewModel model)
+        {
+            var permitidos = ArchivosSubidos();
+            permitidos.ExceptWith(model.FotosSubidas);
+            if (model.PlanoSubido != null)
+                permitidos.Remove(model.PlanoSubido);
+            GuardarArchivosSubidos(permitidos);
+        }
+
+        private async Task ConservarArchivosAsync(EventoFormViewModel model, IEnumerable<IFormFile> fotos, IFormFile? plano, CancellationToken ct)
+        {
+            var permitidos = ArchivosSubidos();
+            var conservadas = model.ImagenesActualesIds.Except(model.ImagenesEliminar).Count();
+
+            foreach (var foto in fotos.Where(f => f.Length > 0 && ValidadorImagenes.Validar(f) == null))
+            {
+                if (conservadas + model.FotosSubidas.Count >= EventoFormViewModel.MaxFotos)
+                    break;
+                var ruta = await _imagenes.GuardarAsync(foto, "eventos", ct);
+                model.FotosSubidas.Add(ruta);
+                permitidos.Add(ruta);
+            }
+
+            if (plano is { Length: > 0 } && ValidadorImagenes.Validar(plano) == null)
+            {
+                model.PlanoSubido = await _imagenes.GuardarAsync(plano, "planos", ct);
+                permitidos.Add(model.PlanoSubido);
+            }
+
+            GuardarArchivosSubidos(permitidos);
+
+            // El formulario se dibuja con las rutas guardadas, no con lo que llegó en el envío
+            ModelState.Remove(nameof(model.FotosSubidas));
+            ModelState.Remove(nameof(model.PlanoSubido));
         }
 
         private Task<Evento?> CargarEventoEditableAsync(int id, CancellationToken ct)

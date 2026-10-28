@@ -126,6 +126,97 @@ public class HU09PublicarEventoTests : IClassFixture<AppDePrueba>
         Assert.Null(await BuscarAsync(titulo));
     }
 
+    // Si el formulario vuelve con un error (p. ej. el precio), las fotos ya elegidas se conservan y no se piden de nuevo
+    [Fact]
+    public async Task Al_corregir_un_error_no_hay_que_volver_a_subir_las_fotos()
+    {
+        var (organizador, _) = await OrganizadorAsync();
+        var titulo = $"Sin precio {Guid.NewGuid():N}";
+        var datos = Datos(titulo);
+        datos["TiposEntrada[0].Precio"] = "-5";
+
+        var html = await TextoAsync(await PublicarAsync(organizador, datos));
+        Assert.Contains("data-dato=\"fotos-subidas\"", html);
+        var rutas = System.Text.RegularExpressions.Regex.Matches(html, "name=\"FotosSubidas\" value=\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(3, rutas.Count);
+
+        // Otro organizador no puede usar esas rutas como si fueran suyas
+        var (otro, _) = await OrganizadorAsync();
+        var ajeno = Datos($"Ajeno {Guid.NewGuid():N}");
+        var r = await PublicarConSubidasAsync(otro, ajeno, rutas);
+        Assert.Contains("Sube al menos 3 fotos del recinto", await TextoAsync(r));
+
+        // Corrige solo el precio y envía sin elegir fotos otra vez
+        datos["TiposEntrada[0].Precio"] = "50";
+        r = await PublicarConSubidasAsync(organizador, datos, rutas);
+
+        Assert.Equal("/Eventos/MisEventos", r.Headers.Location!.OriginalString);
+        var evento = await BuscarAsync(titulo);
+        Assert.Equal(rutas, evento!.Imagenes.OrderBy(i => i.Orden).Select(i => i.Ruta));
+    }
+
+    // Editar solo el precio de un evento que ya tiene fotos no pide elegir archivos (ni muestra mensajes en inglés)
+    [Fact]
+    public async Task Editar_solo_el_precio_no_pide_fotos_de_nuevo()
+    {
+        var (organizador, _) = await OrganizadorAsync();
+        var titulo = $"Gratis {Guid.NewGuid():N}";
+        var datos = Datos(titulo);
+        datos["TiposEntrada[0].Precio"] = "0";
+        await PublicarAsync(organizador, datos);
+        var evento = await BuscarAsync(titulo);
+
+        var pagina = await TextoAsync(await organizador.GetAsync($"/Eventos/Editar/{evento!.Id}"));
+        Assert.DoesNotMatch("<input[^>]*data-val-required[^>]*name=\"Fotos\"", pagina);
+
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(await TokenAsync(organizador, $"/Eventos/Editar/{evento.Id}")), "__RequestVerificationToken");
+        datos["TiposEntrada[0].Precio"] = "35";
+        datos["TiposEntrada[0].Id"] = evento.TiposEntrada.Single(t => t.Nombre == "General").Id.ToString();
+        datos["TiposEntrada[1].Id"] = evento.TiposEntrada.Single(t => t.Nombre == "VIP").Id.ToString();
+        foreach (var (clave, valor) in datos)
+            form.Add(new StringContent(valor), clave);
+        foreach (var imagen in evento.Imagenes)
+            form.Add(new StringContent(imagen.Id.ToString()), "ImagenesActualesIds");
+        // El navegador envía el campo de archivos vacío
+        var vacio = new ByteArrayContent(Array.Empty<byte>());
+        vacio.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        vacio.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data") { Name = "\"Fotos\"", FileName = "\"\"" };
+        form.Add(vacio);
+
+        var r = await organizador.PostAsync($"/Eventos/Editar/{evento.Id}", form);
+
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, await TextoAsync(r));
+        evento = await BuscarAsync(titulo);
+        Assert.Equal(35m, evento!.TiposEntrada.Single(t => t.Nombre == "General").Precio);
+        Assert.Equal(3, evento.Imagenes.Count);
+    }
+
+    [Fact]
+    public async Task Los_mensajes_de_validacion_automaticos_salen_en_espanol()
+    {
+        var (organizador, _) = await OrganizadorAsync();
+        var datos = Datos($"Idioma {Guid.NewGuid():N}");
+        datos["TiposEntrada[0].Capacidad"] = "abc";
+
+        var html = await TextoAsync(await PublicarAsync(organizador, datos));
+
+        Assert.Contains("no es válido", html);
+        Assert.DoesNotContain("is invalid", html);
+        Assert.DoesNotContain("field is required", html);
+    }
+
+    private static async Task<HttpResponseMessage> PublicarConSubidasAsync(HttpClient cliente, Dictionary<string, string> datos, List<string> rutas)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(await TokenAsync(cliente, "/Eventos/Crear")), "__RequestVerificationToken");
+        foreach (var (clave, valor) in datos)
+            form.Add(new StringContent(valor), clave);
+        foreach (var ruta in rutas)
+            form.Add(new StringContent(ruta), "FotosSubidas");
+        return await cliente.PostAsync("/Eventos/Crear", form);
+    }
+
     [Fact]
     public async Task Rechaza_archivos_que_no_son_imagenes()
     {

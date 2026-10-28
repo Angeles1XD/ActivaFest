@@ -1,8 +1,11 @@
+@inject ActivaFest.Services.Organizadores.ISolicitudOrganizadorService SolicitudesOrg
+@inject ActivaFest.Services.Organizadores.ISolicitudPersonalService SolicitudesPer
 @model List<Evento>
 @{
     ViewData["Title"] = "Moderación de eventos";
     var actual = (EstadoEvento)ViewBag.EstadoActual;
     var conteos = (Dictionary<EstadoEvento, int>)ViewBag.Conteos;
+    var pendientesSolicitudes = await SolicitudesOrg.PendientesAsync() + await SolicitudesPer.PendientesAsync();
 }
 
 <header class="cat-encabezado catalogo-encabezado">
@@ -15,6 +18,7 @@
         <a asp-controller="Analitica" asp-action="Index" class="btn-gris enlace-boton">📊 Dashboard</a>
         <a asp-controller="Comisiones" asp-action="Index" class="btn-gris enlace-boton">💰 Comisiones</a>
         <a asp-controller="Promociones" asp-action="Index" class="btn-gris enlace-boton">🎁 Promociones</a>
+        <a asp-controller="Solicitudes" asp-action="Index" class="btn-gris enlace-boton">📥 Solicitudes@(pendientesSolicitudes > 0 ? $" ({pendientesSolicitudes})" : "")</a>
         <a asp-controller="Paquetes" asp-action="Index" class="btn-gris enlace-boton">⭐ Paquetes</a>
         <a asp-controller="Usuarios" asp-action="Index" class="btn-gris enlace-boton">👥 Usuarios</a>
     </div>

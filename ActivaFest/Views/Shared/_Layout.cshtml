@@ -53,6 +53,10 @@
                         <a asp-controller="Eventos" asp-action="MisEventos" class="@Activo("Eventos", "MisEventos")@Activo("Eventos", "Crear")@Activo("Eventos", "Editar")">Mis eventos</a>
                         <a asp-controller="Panel" asp-action="Index" class="@Activo("Panel")">Panel</a>
                     }
+                    else
+                    {
+                        <a asp-controller="Organizador" asp-action="Solicitar" class="@Activo("Organizador")">Organiza tu evento</a>
+                    }
                     @if (User.IsInRole(ActivaFest.Models.Roles.ControlAcceso))
                     {
                         <a asp-controller="Acceso" asp-action="Index" class="@Activo("Acceso")">Puerta</a>
@@ -114,6 +118,8 @@
         <nav class="pie-links" aria-label="Pie de página">
             <a asp-controller="Eventos" asp-action="Index">Eventos</a>
             <a asp-controller="Categorias" asp-action="Index">Categorías</a>
+            <a asp-controller="Organizador" asp-action="Solicitar">Organiza tu evento</a>
+            <a asp-controller="Contacto" asp-action="Index">Contacto</a>
             <a asp-controller="Home" asp-action="Privacy">Privacidad</a>
         </nav>
         <p class="pie-copy">© 2026 ActivaFest · Plataforma de eventos</p>

@@ -82,13 +82,28 @@ public class HU01RegistroLoginTests : IClassFixture<AppDePrueba>
     }
 
     [Fact]
-    public async Task Nadie_puede_registrarse_como_administrador_manipulando_el_formulario()
+    public async Task Nadie_puede_registrarse_como_administrador_ni_organizador_manipulando_el_formulario()
     {
-        var email = Correo();
-        var r = await RegistrarAsync(_app.Cliente(), email, rol: Roles.Administrador);
+        // HU31: el formulario ya no tiene tipo de cuenta; aunque alguien envíe "Rol", la cuenta nace como Usuario
+        foreach (var rol in new[] { Roles.Administrador, Roles.Organizador, Roles.ControlAcceso })
+        {
+            var cliente = _app.Cliente();
+            var email = Correo();
+            var datos = new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = await TokenAsync(cliente, "/Auth/Registro"),
+                ["NombreCompleto"] = "Intruso", ["Email"] = email, ["Password"] = "Clave1234", ["ConfirmarPassword"] = "Clave1234",
+                ["Rol"] = rol, ["AceptaTratamientoDatos"] = "true"
+            };
+            await cliente.PostAsync("/Auth/Registro", new FormUrlEncodedContent(datos));
 
-        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
-        Assert.Null(await BuscarAsync(email));
+            using var scope = _app.Services.CreateScope();
+            var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var usuario = (await usuarios.FindByEmailAsync(email))!;
+            Assert.Equal(new[] { Roles.Asistente }, await usuarios.GetRolesAsync(usuario));
+        }
+
+        Assert.DoesNotContain("name=\"Rol\"", await _app.Cliente().GetStringAsync("/Auth/Registro"));
     }
 
     [Fact]

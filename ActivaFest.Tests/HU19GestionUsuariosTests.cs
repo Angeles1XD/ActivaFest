@@ -135,6 +135,49 @@ public class HU19GestionUsuariosTests : IClassFixture<AppDePrueba>
         Assert.Equal(HttpStatusCode.NotFound, (await puerta.GetAsync($"/Acceso/Escanear/{eventoId}")).StatusCode);
     }
 
+    // Con muchos eventos se busca por nombre y se asigna o quita de a uno, sin perder las demás asignaciones
+    [Fact]
+    public async Task Con_muchos_eventos_se_busca_por_nombre_y_se_asigna_sin_perder_los_demas()
+    {
+        var marca = Guid.NewGuid().ToString("N")[..6];
+        var ids = await ConAsync(async (u, db) =>
+        {
+            var admin = (await u.FindByEmailAsync("admin@test.com"))!;
+            var eventos = Enumerable.Range(1, 25).Select(i => new Evento
+            {
+                Titulo = i == 25 ? $"Gala Única {marca}" : $"Feria {marca} {i:D2}", Descripcion = "Evento para probar el buscador.", CategoriaId = 1,
+                Ubicacion = "Arequipa", Fecha = DateTime.Now.AddDays(3 + i), Estado = EstadoEvento.Aprobado, OrganizadorId = admin.Id,
+                Aforo = 10, TiposEntrada = { new TipoEntrada { Nombre = "General", Precio = 10, Capacidad = 10 } }
+            }).ToList();
+            db.Eventos.AddRange(eventos);
+            await db.SaveChangesAsync();
+            return eventos.Select(e => e.Id).ToList();
+        });
+        var email = Correo();
+        await RegistrarAsync(_app.Cliente(), email);
+        var personal = await UsuarioAsync(email);
+        var admin = await AdminAsync();
+        await PostAsync(admin, "/Usuarios/CambiarRol", ("usuarioId", personal.Id), ("rol", Roles.ControlAcceso), ("asignar", "true"));
+        await PostAsync(admin, "/Usuarios/Asignar", ("id", personal.Id), ("eventoId", ids[0].ToString()));
+
+        // La búsqueda por nombre encuentra el evento entre todos
+        var html = await TextoAsync(await admin.GetAsync($"/Usuarios/Asignaciones/{personal.Id}?buscar={Uri.EscapeDataString("Gala Única " + marca)}"));
+        Assert.Contains("Resultados para «Gala Única " + marca + "»: 1 evento", html);
+        Assert.Contains($"name=\"eventoId\" value=\"{ids[24]}\"", html);
+
+        // Por nombre parcial hay 25 resultados: 20 por página
+        var lista = await TextoAsync(await admin.GetAsync($"/Usuarios/Asignaciones/{personal.Id}?buscar={marca}"));
+        Assert.Contains($"«{marca}»: 25 eventos", lista);
+        Assert.Contains("Página 1 de 2", lista);
+
+        // Asignar desde la búsqueda no quita el evento que ya tenía
+        await PostAsync(admin, "/Usuarios/Asignar", ("id", personal.Id), ("eventoId", ids[24].ToString()));
+        Assert.Equal(new[] { ids[0], ids[24] }, (await ConAsync((u, db) => Task.FromResult(db.AsignacionesAcceso.Where(a => a.UsuarioId == personal.Id).Select(a => a.EventoId).OrderBy(x => x).ToList()))));
+
+        await PostAsync(admin, "/Usuarios/Quitar", ("id", personal.Id), ("eventoId", ids[0].ToString()));
+        Assert.Equal(new[] { ids[24] }, await ConAsync((u, db) => Task.FromResult(db.AsignacionesAcceso.Where(a => a.UsuarioId == personal.Id).Select(a => a.EventoId).ToList())));
+    }
+
     [Fact]
     public async Task Solo_el_administrador_gestiona_usuarios()
     {

@@ -12,5 +12,10 @@ namespace ActivaFest.Models
         public Evento? Evento { get; set; }
 
         public DateTime FechaAsignacion { get; set; } = DateTime.UtcNow;
+
+        // HU33: cuando termina el plazo de ingreso del evento la asignación se desactiva sola (se conserva como historial)
+        public DateTime? FinalizadaEn { get; set; }
+
+        public bool Activa => FinalizadaEn == null;
     }
 }

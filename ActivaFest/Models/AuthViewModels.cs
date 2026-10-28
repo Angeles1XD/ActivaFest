@@ -50,9 +50,7 @@ namespace ActivaFest.Models
         [Display(Name = "Confirmar contraseña")]
         public string ConfirmarPassword { get; set; } = "";
 
-        [Required]
-        [Display(Name = "Tipo de cuenta")]
-        public string Rol { get; set; } = Roles.Asistente;
+        // HU31: ya no se elige el tipo de cuenta. Todas nacen como Usuario; para crear eventos se solicita al administrador.
 
         // Obligatorio (RNF07): sin consentimiento no se crea la cuenta
         // No usar [Range(true, true)]: su validación en el navegador (jQuery) rechaza la casilla aunque esté marcada

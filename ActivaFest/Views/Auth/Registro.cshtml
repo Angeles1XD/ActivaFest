@@ -21,14 +21,6 @@
             <span asp-validation-for="Email" class="text-danger"></span>
         </div>
 
-        <div class="campo">
-            <label asp-for="Rol"></label>
-            <select asp-for="Rol">
-                <option value="@Roles.Asistente">Usuario — quiero descubrir eventos y comprar entradas</option>
-                <option value="@Roles.Organizador">Organizador — quiero publicar y vender mis eventos</option>
-            </select>
-            <span asp-validation-for="Rol" class="text-danger"></span>
-        </div>
 
         <div class="campo">
             <label asp-for="Password"></label>
@@ -60,6 +52,7 @@
 
     <div class="auth-links">
         <p>¿Ya tienes cuenta? <a asp-action="Login">Inicia sesión</a></p>
+        <p class="texto-suave">¿Quieres publicar eventos? Crea tu cuenta y luego <a asp-controller="Organizador" asp-action="Solicitar">solicita que la habiliten como organizador</a>.</p>
     </div>
 </div>
 

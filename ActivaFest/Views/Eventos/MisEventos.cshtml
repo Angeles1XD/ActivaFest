@@ -9,7 +9,10 @@
         <h1>Mis <span class="degradado">eventos</span></h1>
         <p class="cat-subtitulo">Publica, edita y sigue el estado de revisión de tus eventos.</p>
     </div>
-    <a asp-action="Crear" class="cat-boton">+ Crear evento</a>
+    <div class="panel-acciones">
+        <a asp-action="Crear" class="cat-boton">+ Crear evento</a>
+        <a asp-controller="Personal" asp-action="Index" class="btn-gris enlace-boton">🚪 Personal de control</a>
+    </div>
 </header>
 
 @if (!Model.Any())

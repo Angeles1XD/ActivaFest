@@ -80,7 +80,7 @@ public class AccesoService : IAccesoService
         return esAdministrador
             ? query
             : query.Where(e => e.OrganizadorId == usuarioId ||
-                               _db.AsignacionesAcceso.Any(a => a.EventoId == e.Id && a.UsuarioId == usuarioId));
+                               _db.AsignacionesAcceso.Any(a => a.EventoId == e.Id && a.UsuarioId == usuarioId && a.FinalizadaEn == null));
     }
 
     public Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esAdministrador, CancellationToken ct = default)

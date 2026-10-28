@@ -165,6 +165,13 @@
                     <label class="opcion-quitar"><input type="checkbox" asp-for="QuitarPlanoOficial" /> Quitar el plano oficial</label>
                 </div>
             }
+            @if (!string.IsNullOrEmpty(Model.PlanoSubido))
+            {
+                <div class="plano-oficial-actual">
+                    <a href="@Model.PlanoSubido" target="_blank" rel="noopener"><img src="@Model.PlanoSubido" alt="Plano que ya subiste" /></a>
+                    <label class="opcion-quitar"><input type="checkbox" name="PlanoSubido" value="@Model.PlanoSubido" checked /> Usar el plano que ya subiste</label>
+                </div>
+            }
             <input asp-for="PlanoOficialArchivo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
             <span asp-validation-for="PlanoOficialArchivo" class="text-danger"></span>
         </div>
@@ -192,6 +199,24 @@
                 }
             </div>
             <p class="texto-suave">Agregar más fotos (opcional):</p>
+        }
+
+        @if (Model.FotosSubidas.Count > 0)
+        {
+            <p class="texto-suave" data-dato="fotos-subidas">✅ Estas fotos ya las subiste, no hace falta volver a elegirlas (desmarca la que no quieras):</p>
+            <div class="preview-fotos fotos-actuales">
+                @foreach (var ruta in Model.FotosSubidas)
+                {
+                    <label class="foto-actual">
+                        <img src="@ruta" alt="" loading="lazy" />
+                        <span><input type="checkbox" name="FotosSubidas" value="@ruta" checked /> Usar</span>
+                    </label>
+                }
+            </div>
+            @if (Model.ImagenesActuales.Count == 0)
+            {
+                <p class="texto-suave">Agregar más fotos (opcional):</p>
+            }
         }
 
         <div class="campo">
