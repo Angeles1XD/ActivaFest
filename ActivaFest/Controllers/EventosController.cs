@@ -99,12 +99,34 @@ namespace ActivaFest.Controllers
 
             ViewBag.PuedeEditar = esDuenio || User.IsInRole(Roles.Administrador);
 
+            // HU34: en los eventos gratuitos se muestra cuántos marcaron «Me interesa»
+            if (evento.EsGratuito)
+            {
+                var gratuitos = HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>();
+                var (interesados, meInteresa) = await gratuitos.InteresAsync(id, _userManager.GetUserId(User), ct);
+                ViewBag.Interesados = interesados;
+                ViewBag.MeInteresa = meInteresa;
+            }
+
             // HU25: plano del recinto generado desde la plantilla (con los asientos numerados si es teatro)
             var asientos = evento.PlantillaPlano == PlantillaPlano.Teatro
                 ? await _context.Asientos.AsNoTracking().Where(a => a.TipoEntrada!.EventoId == id).ToListAsync(ct)
                 : new List<Asiento>();
             ViewBag.PlanoSvg = Services.Plano.PlanoService.SvgDeEvento(evento, asientos);
             return View(evento);
+        }
+
+        // HU34: «Me interesa» en un evento gratuito (marca o desmarca)
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MeInteresa(int id, [FromServices] Services.Eventos.IEventoGratuitoService gratuitos, CancellationToken ct)
+        {
+            var r = await gratuitos.AlternarInteresAsync(_userManager.GetUserId(User)!, id, ct);
+            if (r == null)
+                return NotFound();
+            TempData["Mensaje"] = r.Value ? "¡Listo! Marcaste que te interesa este evento." : "Quitaste tu «Me interesa».";
+            return Redirect(Url.Action(nameof(Detalle), new { id }) + "#interes");
         }
 
         // =============================
@@ -122,7 +144,7 @@ namespace ActivaFest.Controllers
         [Authorize(Roles = RolesPublicadores)]
         [RequestSizeLimit(LimiteSubida)]
         [RequestFormLimits(MultipartBodyLengthLimit = LimiteSubida)]
-        public async Task<IActionResult> Crear(EventoFormViewModel model, CancellationToken ct)
+        public async Task<IActionResult> Crear(EventoFormViewModel model, [FromServices] Services.Eventos.IEventoGratuitoService gratuitos, CancellationToken ct)
         {
             var fotos = model.Fotos.Where(f => f.Length > 0).ToList();
 
@@ -177,6 +199,9 @@ namespace ActivaFest.Controllers
             };
             // HU25: el aforo del evento es siempre la suma de sus zonas; en teatro se generan los asientos numerados
             evento.Aforo = evento.TiposEntrada.Sum(t => t.Capacidad);
+            // HU34: entrada libre si todas las zonas cuestan 0; si el aforo pasa el tramo sin costo, se paga la publicación
+            evento.EsGratuito = evento.TiposEntrada.All(t => t.Precio == 0);
+            evento.PendientePagoPublicacion = evento.EsGratuito && gratuitos.TarifaPara(evento.Aforo) > 0;
             if (evento.PlantillaPlano == PlantillaPlano.Teatro)
                 foreach (var asiento in Services.Plano.PlanoService.GenerarAsientos(evento.TiposEntrada.ToList()))
                     asiento.TipoEntrada!.Asientos.Add(asiento);
@@ -223,6 +248,17 @@ namespace ActivaFest.Controllers
 
             OlvidarArchivosSubidos(model);
             HttpContext.Session.SetString("UltimoEvento", evento.Titulo);
+
+            // HU34: un evento gratuito con aforo mayor al tramo sin costo pasa a revisión cuando se paga la publicación
+            if (evento.PendientePagoPublicacion)
+            {
+                var tarifa = gratuitos.TarifaPara(evento.Aforo);
+                if (usuario?.Email != null)
+                    await _email.EnviarAsync(usuario.Email, $"Falta pagar la publicación: {evento.Titulo}",
+                        EmailTemplates.PublicacionPorPagar(evento, tarifa, Url.Action("Pagar", "Publicacion", new { id = evento.Id }, Request.Scheme)!));
+                TempData["Mensaje"] = $"Tu evento gratuito quedó registrado. Paga la tarifa de publicación (S/ {tarifa:0.00}) para enviarlo a revisión.";
+                return RedirectToAction("Pagar", "Publicacion", new { id = evento.Id });
+            }
 
             if (usuario?.Email != null)
             {

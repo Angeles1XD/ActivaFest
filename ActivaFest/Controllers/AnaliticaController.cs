@@ -40,7 +40,11 @@ namespace ActivaFest.Controllers
         {
             ViewBag.Categorias = await _catalogo.ObtenerCategoriasAsync(ct);
             ViewBag.Rango = FiltroAnalitica.DeRango(rango, desde, hasta, categoriaId, DateTime.Today).Rango;
-            return View(await _analitica.DashboardAsync(Filtro(rango, desde, hasta, categoriaId), ct));
+            // HU34: alcance de los eventos gratuitos en el mismo período (visitas, «Me interesa» y tarifas cobradas)
+            var filtro = Filtro(rango, desde, hasta, categoriaId);
+            ViewBag.Gratuitos = await HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>()
+                .ResumenAsync(filtro.Desde, filtro.Hasta, ct);
+            return View(await _analitica.DashboardAsync(filtro, ct));
         }
 
         // Datos del dashboard en JSON: la página los vuelve a pedir cada pocos segundos (actualización en tiempo real)

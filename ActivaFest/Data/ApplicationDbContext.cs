@@ -45,6 +45,8 @@ namespace ActivaFest.Data
         public DbSet<SolicitudOrganizador> SolicitudesOrganizador { get; set; }
         public DbSet<SolicitudPersonal> SolicitudesPersonal { get; set; }
         public DbSet<CalificacionPersonal> CalificacionesPersonal { get; set; }
+        public DbSet<PagoPublicacion> PagosPublicacion { get; set; }
+        public DbSet<InteresEvento> InteresesEvento { get; set; }
 
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
@@ -240,6 +242,21 @@ namespace ActivaFest.Data
                 c.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
                 c.HasOne(x => x.Personal).WithMany().HasForeignKey(x => x.PersonalId).OnDelete(DeleteBehavior.Cascade);
                 c.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // HU34: cobro de publicación de eventos gratuitos y «Me interesa» (uno por usuario y evento)
+            builder.Entity<PagoPublicacion>(p =>
+            {
+                p.HasIndex(x => x.Codigo).IsUnique();
+                p.HasIndex(x => new { x.EventoId, x.Estado });
+                p.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+                p.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OrganizadorId).OnDelete(DeleteBehavior.Restrict);
+            });
+            builder.Entity<InteresEvento>(i =>
+            {
+                i.HasIndex(x => new { x.EventoId, x.UsuarioId }).IsUnique();
+                i.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+                i.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
             });
 
             // HU30: un cupón por cliente y promoción, código único y aplicado como máximo en una compra

@@ -59,6 +59,12 @@ public class EventoEdicionService : IEventoEdicionService
 
         // ---------- Zonas de entrada ----------
         var enviadas = datos.TiposEntrada;
+
+        // HU34: un evento no pasa de pago a gratuito ni al revés (cambia el cobro y la venta de entradas)
+        if (enviadas.Count > 0 && enviadas.All(t => t.Precio == 0) != evento.EsGratuito)
+            errores.Add(evento.EsGratuito
+                ? "Este evento es de entrada libre: no se le pueden poner precios. Crea un evento nuevo con entradas pagadas."
+                : "Este evento vende entradas: no se puede convertir en gratuito. Crea un evento nuevo de entrada libre.");
         var idsEnviados = enviadas.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
 
         if (idsEnviados.Any(id => evento.TiposEntrada.All(t => t.Id != id)))

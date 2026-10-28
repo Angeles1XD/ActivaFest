@@ -104,7 +104,11 @@
                 var disponibles = tipos.Sum(t => t.Disponibles);
                 <li>
                     👥 Aforo: @Model.Aforo.ToString("N0") personas
-                    @if (mostrarDisponibles)
+                    @if (Model.EsGratuito)
+                    {
+                        <span class="aforo-disponible">· 🎉 Entrada libre</span>
+                    }
+                    else if (mostrarDisponibles)
                     {
                         <span class="aforo-disponible @(disponibles == 0 ? "agotado" : "")">
                             · @(disponibles == 0 ? "agotado" : $"{disponibles:N0} disponibles")
@@ -114,6 +118,34 @@
             }
         </ul>
 
+        @if (Model.EsGratuito)
+        {
+            // HU34: entrada libre: no se compra nada; el público marca «Me interesa»
+            var interesados = (int)(ViewBag.Interesados ?? 0);
+            var meInteresa = ViewBag.MeInteresa == true;
+            <div class="ficha-precios ficha-gratuita" id="interes" data-dato="entrada-libre">
+                <h3>🎉 Entrada libre</h3>
+                <p>Este evento es gratuito: <b>no necesitas comprar entrada</b>. El ingreso es por orden de llegada hasta completar el aforo, así que llega con anticipación.</p>
+                <p class="contador-interes" data-dato="interesados">⭐ <b>@interesados.ToString("N0")</b> @(interesados == 1 ? "persona está interesada" : "personas están interesadas")</p>
+                @if (Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now)
+                {
+                    if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <form asp-action="MeInteresa" asp-route-id="@Model.Id" method="post">
+                            <button type="submit" class="@(meInteresa ? "btn-gris" : "btn-rosa") btn-bloque">@(meInteresa ? "✓ Te interesa (quitar)" : "⭐ Me interesa")</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a asp-controller="Auth" asp-action="Login" asp-route-returnUrl="@($"/Eventos/Detalle/{Model.Id}#interes")"
+                           class="btn-rosa btn-bloque enlace-boton">⭐ Inicia sesión para marcar «Me interesa»</a>
+                    }
+                    <p class="texto-suave">Así el organizador sabe cuánta gente espera y te recomendamos eventos parecidos.</p>
+                }
+            </div>
+        }
+        else
+        {
         <!-- 💲 PRECIOS -->
         <div class="ficha-precios">
             <h3>Entradas</h3>
@@ -238,6 +270,7 @@
                 </form>
             }
         </div>
+        }
     </section>
 </div>
 
@@ -246,7 +279,7 @@
 {
     var zonasPlano = Model.TiposEntrada.OrderBy(t => t.Id).ToList();
     // HU26: el plano es interactivo cuando se puede comprar (clic en asientos o en zonas)
-    var planoInteractivo = Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now && User.Identity?.IsAuthenticated == true;
+    var planoInteractivo = !Model.EsGratuito && Model.Estado == EstadoEvento.Aprobado && Model.Fecha > DateTime.Now && User.Identity?.IsAuthenticated == true;
     <section class="ficha-seccion plano-recinto" id="plano">
         <h3>Plano del recinto</h3>
         <p class="texto-suave">

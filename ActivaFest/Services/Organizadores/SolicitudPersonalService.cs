@@ -77,7 +77,8 @@ public class SolicitudPersonalService : ISolicitudPersonalService
     private IQueryable<Evento> Vigentes(string organizadorId, bool esAdmin)
     {
         var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
-        var q = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde);
+        // HU34: los eventos gratuitos no tienen entradas que controlar
+        var q = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde);
         return esAdmin ? q : q.Where(e => e.OrganizadorId == organizadorId);
     }
 

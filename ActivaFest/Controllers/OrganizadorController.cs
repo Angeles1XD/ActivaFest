@@ -24,7 +24,16 @@ namespace ActivaFest.Controllers
         public async Task<IActionResult> Solicitar(CancellationToken ct)
         {
             ViewBag.Ultima = UsuarioId == null ? null : await _solicitudes.UltimaAsync(UsuarioId, ct);
+            await CargarAlcanceGratuitosAsync(ct);
             return View(new SolicitudOrganizadorInput());
+        }
+
+        // HU34: cifras de alcance de los eventos gratuitos para animar a más organizadores a publicar
+        private async Task CargarAlcanceGratuitosAsync(CancellationToken ct)
+        {
+            var gratuitos = HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>();
+            ViewBag.Gratuitos = await gratuitos.ResumenAsync(ct: ct);
+            ViewBag.Tramos = gratuitos.Tramos;
         }
 
         [HttpPost]
@@ -32,6 +41,7 @@ namespace ActivaFest.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Solicitar(SolicitudOrganizadorInput datos, CancellationToken ct)
         {
+            await CargarAlcanceGratuitosAsync(ct);
             if (!ModelState.IsValid)
             {
                 ViewBag.Ultima = await _solicitudes.UltimaAsync(UsuarioId!, ct);

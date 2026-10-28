@@ -76,7 +76,7 @@ public class AccesoService : IAccesoService
     // (organizador) o aquellos a los que el administrador los asignó (personal de Control de Acceso)
     private IQueryable<Evento> EventosDe(string usuarioId, bool esAdministrador)
     {
-        var query = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado);
+        var query = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito);   // HU34: sin entradas que validar
         return esAdministrador
             ? query
             : query.Where(e => e.OrganizadorId == usuarioId ||

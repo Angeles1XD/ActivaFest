@@ -50,6 +50,19 @@ public static class EmailTemplates
             $"<p>Tu evento <b>{E(ev.Titulo)}</b> fue registrado y está <b>pendiente de revisión</b> por nuestro equipo.</p>" +
             "<p>Te avisaremos por correo cuando sea aprobado o si necesita cambios.</p>");
 
+    // HU34: evento gratuito que debe pagar la tarifa de publicación antes de pasar a revisión
+    public static string PublicacionPorPagar(Evento ev, decimal tarifa, string urlPago) =>
+        Layout("Falta un paso para publicar tu evento",
+            $"<p>Registramos <b>{E(ev.Titulo)}</b> como evento de <b>entrada libre</b>. Para publicarlo se cobra una tarifa única de " +
+            $"<b>S/ {tarifa:0.00}</b> según su aforo ({ev.Aforo:N0} personas).</p>" +
+            "<p>Cuando la pagues, el evento pasará a revisión del administrador.</p>",
+            "Pagar publicación", urlPago);
+
+    public static string PublicacionPagada(PagoPublicacion pago, string titulo) =>
+        Layout("Pagaste la publicación de tu evento ✅",
+            $"<p>Recibimos el pago de <b>S/ {pago.Monto:0.00}</b> por publicar <b>{E(titulo)}</b> (referencia {E(pago.Referencia)}).</p>" +
+            "<p>Tu evento ya está en revisión; te avisaremos cuando sea aprobado.</p>");
+
     // Confirmación de la compra de un paquete publicitario (HU12)
     public static string DestacadoActivado(ContratoDestacado c) =>
         Layout("¡Tu evento ya está destacado! ⭐",

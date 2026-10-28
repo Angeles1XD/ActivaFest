@@ -150,4 +150,28 @@
             }
         </section>
     </div>
+
+    @* HU34: alcance de los eventos gratuitos publicados, para animar a más organizadores *@
+    @if (ViewBag.Gratuitos is ActivaFest.Services.Eventos.ResumenGratuitos alcance)
+    {
+        var tramos = (IReadOnlyList<TramoTarifa>)ViewBag.Tramos;
+        int? desde = 1;
+        <section class="tarjeta-panel alcance-gratuitos" aria-labelledby="tituloAlcance" data-dato="alcance-gratuitos">
+            <h2 id="tituloAlcance">🎉 ¿Tu evento es gratuito? Publícalo aquí</h2>
+            <p>Los eventos de entrada libre no venden entradas: el público marca «Me interesa» y tú ves cuánta gente atraes.</p>
+            <div class="fila-kpi">
+                <div class="kpi"><span class="kpi-etiqueta">Eventos gratuitos publicados</span><span class="kpi-valor">@alcance.Eventos.ToString("N0")</span></div>
+                <div class="kpi"><span class="kpi-etiqueta">Visitas que recibieron</span><span class="kpi-valor">@alcance.Visitas.ToString("N0")</span></div>
+                <div class="kpi"><span class="kpi-etiqueta">Personas interesadas</span><span class="kpi-valor">@alcance.Interesados.ToString("N0")</span></div>
+            </div>
+            <p class="texto-suave">
+                Se paga una sola vez por publicar, según el aforo:
+                @foreach (var t in tramos)
+                {
+                    <span class="chip-tarifa">@(t.HastaAforo is int hasta ? $"hasta {hasta:N0} personas" : $"más de {(desde - 1):N0}"): @(t.Tarifa == 0 ? "gratis" : Formato.Monto(t.Tarifa))</span>
+                    desde = t.HastaAforo + 1;
+                }
+            </p>
+        </section>
+    }
 </div>

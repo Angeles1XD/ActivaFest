@@ -226,3 +226,16 @@
 .plano-barra-mostrador { fill: #f59e0b; opacity: .55; }
 .plano-baranda { stroke: #e4e4e7; stroke-width: 2; stroke-dasharray: 3 3; opacity: .7; pointer-events: none; }
 .plano-area-vacia { fill: rgba(255, 255, 255, .04); stroke: rgba(255, 255, 255, .12); stroke-dasharray: 6 4; }
+
+/* =============================
+   🎉 HU34: eventos gratuitos (entrada libre)
+   ============================= */
+.opcion-gratuito { margin: 6px 0 14px; padding: 12px 14px; border-radius: 12px; background: rgba(34, 197, 94, .08); border: 1px solid rgba(34, 197, 94, .25); }
+.opcion-gratuito .opcion { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.opcion-gratuito p { margin: 6px 0 0; }
+.chip-tarifa { display: inline-block; margin: 2px 4px 0 0; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: rgba(255, 255, 255, .08); }
+.form-evento.es-gratuito .campo-precio { display: none; }
+.ficha-gratuita { border: 1px solid rgba(34, 197, 94, .3); }
+.ficha-gratuita h3 { color: #86efac; }
+.contador-interes { font-size: 16px; }
+.badge-gratuito { background: rgba(34, 197, 94, .18); color: #86efac; }

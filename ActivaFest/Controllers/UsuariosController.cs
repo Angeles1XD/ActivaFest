@@ -166,7 +166,7 @@ namespace ActivaFest.Controllers
                 return NotFound();
 
             var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
-            var vigentes = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde);
+            var vigentes = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde);
             var asignados = (await _db.AsignacionesAcceso.Where(a => a.UsuarioId == usuario.Id).Select(a => a.EventoId).ToListAsync(ct)).ToHashSet();
 
             var texto = buscar?.Trim();
@@ -203,7 +203,7 @@ namespace ActivaFest.Controllers
                 return NotFound();
 
             var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
-            var evento = await _db.Eventos.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventoId && e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde, ct);
+            var evento = await _db.Eventos.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventoId && e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde, ct);
             if (evento != null && !await _db.AsignacionesAcceso.AnyAsync(a => a.UsuarioId == id && a.EventoId == eventoId, ct))
             {
                 _db.AsignacionesAcceso.Add(new AsignacionAcceso { UsuarioId = id, EventoId = eventoId });
@@ -238,7 +238,7 @@ namespace ActivaFest.Controllers
             // Solo eventos aprobados y vigentes; las asignaciones de eventos ya pasados se conservan como historial
             var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
             var vigentes = await _db.Eventos
-                .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde)
+                .Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde)
                 .Select(e => e.Id)
                 .ToListAsync(ct);
             var elegidos = eventos.Intersect(vigentes).ToHashSet();

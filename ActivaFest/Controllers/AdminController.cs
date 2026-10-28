@@ -63,6 +63,13 @@ namespace ActivaFest.Controllers
             if (evento.Estado != EstadoEvento.Pendiente)
                 return NoModerable(evento);
 
+            // HU34: un evento gratuito se modera después de pagar su publicación
+            if (evento.PendientePagoPublicacion)
+            {
+                TempData["Error"] = $"\"{evento.Titulo}\" es un evento gratuito que aún no pagó su publicación.";
+                return RedirectToAction(nameof(Index));
+            }
+
             // Publicar un evento cuya fecha ya pasó no tiene sentido: se debe rechazar o pedir otra fecha
             if (evento.YaOcurrio(DateTime.Now))
             {

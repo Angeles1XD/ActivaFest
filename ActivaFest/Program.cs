@@ -111,6 +111,8 @@ builder.Services.Configure<ActivaFest.Controllers.ContactoOptions>(builder.Confi
 builder.Services.AddHostedService<ActivaFest.Services.Organizadores.VencimientoOrganizadoresService>();
 builder.Services.AddScoped<ActivaFest.Services.Acceso.IReputacionPersonalService, ActivaFest.Services.Acceso.ReputacionPersonalService>();
 builder.Services.AddHostedService<ActivaFest.Services.Organizadores.AutomatizacionPersonalService>();
+builder.Services.Configure<ActivaFest.Models.EventosGratuitosOptions>(builder.Configuration.GetSection("EventosGratuitos"));
+builder.Services.AddScoped<ActivaFest.Services.Eventos.IEventoGratuitoService, ActivaFest.Services.Eventos.EventoGratuitoService>();
 
 // =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)

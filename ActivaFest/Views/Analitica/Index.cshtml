@@ -192,6 +192,41 @@
         </div>
     </section>
 
+    <!-- 🎉 Eventos gratuitos (HU34): cuánta gente atraen, para animar a más organizadores a publicarlos -->
+    @{ var gratuitos = (ActivaFest.Services.Eventos.ResumenGratuitos)ViewBag.Gratuitos; }
+    <section class="tarjeta-panel" aria-labelledby="tituloGratuitos" data-dato="dashboard-gratuitos">
+        <h2 id="tituloGratuitos">🎉 Eventos gratuitos</h2>
+        <p class="texto-tenue">Eventos de entrada libre que se realizan en el período: no venden entradas, así que su alcance se mide con las visitas a la ficha y los «Me interesa». Las tarifas son las de publicación cobradas en el período.</p>
+        <div class="fila-kpi">
+            <div class="kpi"><span class="kpi-etiqueta">Eventos gratuitos</span><span class="kpi-valor">@gratuitos.Eventos</span><span class="kpi-nota">@gratuitos.PendientesDePago esperando pago de publicación</span></div>
+            <div class="kpi"><span class="kpi-etiqueta">Visitas</span><span class="kpi-valor">@gratuitos.Visitas.ToString("N0")</span><span class="kpi-nota">a sus fichas</span></div>
+            <div class="kpi"><span class="kpi-etiqueta">Me interesa</span><span class="kpi-valor">@gratuitos.Interesados.ToString("N0")</span><span class="kpi-nota">@gratuitos.TasaInteres.ToString("0.#")% de las visitas</span></div>
+            <div class="kpi"><span class="kpi-etiqueta">Tarifas de publicación</span><span class="kpi-valor">@Formato.Monto(gratuitos.IngresosPublicacion)</span><span class="kpi-nota">ingreso de la plataforma</span></div>
+        </div>
+        <div class="tabla-contenedor">
+            <table class="tabla-datos">
+                <thead><tr><th>Evento</th><th>Categoría</th><th>Fecha</th><th class="derecha">Visitas</th><th class="derecha">Me interesa</th><th class="derecha">Interés</th></tr></thead>
+                <tbody>
+                    @if (gratuitos.Top.Count == 0)
+                    {
+                        <tr><td colspan="6" class="texto-tenue">No hay eventos gratuitos en este período.</td></tr>
+                    }
+                    @foreach (var g in gratuitos.Top)
+                    {
+                        <tr>
+                            <td><a asp-controller="Eventos" asp-action="Detalle" asp-route-id="@g.Id">@g.Titulo</a></td>
+                            <td>@g.Categoria</td>
+                            <td class="num">@g.Fecha.ToString("dd/MM")</td>
+                            <td class="derecha num">@g.Visitas.ToString("N0")</td>
+                            <td class="derecha num">@g.Interesados.ToString("N0")</td>
+                            <td class="derecha num">@g.TasaInteres.ToString("0.#")%</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- 🤖 Consultas a la IA (HU24): la IA solo lee datos agregados y siempre muestra las cifras fuente -->
     <section class="tarjeta-panel panel-ia" aria-labelledby="tituloIa">
         <h2 id="tituloIa">🤖 Pregúntale a la IA</h2>
