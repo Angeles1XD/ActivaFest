@@ -46,4 +46,31 @@
     {
         <span class="entrada-estado">@(claseEstado switch { "Usada" => "Usada", "Anulada" => "Anulada", _ => "Evento finalizado" })</span>
     }
+
+    @* HU33: después de ingresar, el asistente califica el trato de quien escaneó su entrada *@
+    @if (ViewData["Calificaciones"] is Dictionary<int, CalificacionPersonal> calificaciones && e.Estado == EstadoEntrada.Usada && e.ValidadoPorId != null)
+    {
+        if (calificaciones.TryGetValue(e.Id, out var calificacion))
+        {
+            <p class="calificacion-dada" data-dato="calificacion-dada">
+                Calificaste la atención en la puerta: <b>@(new string('★', calificacion.Puntaje))@(new string('☆', 5 - calificacion.Puntaje))</b>
+            </p>
+        }
+        else if (ActivaFest.Services.Acceso.ReputacionPersonalService.PuedeCalificar(e, e.UsuarioId, DateTime.Now))
+        {
+            <form asp-controller="Entradas" asp-action="Calificar" asp-route-id="@e.Id" method="post" class="form-calificar" data-dato="calificar">
+                <p>¿Cómo te atendieron en la puerta?</p>
+                <div class="estrellas" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas">
+                    @for (var p = 5; p >= 1; p--)
+                    {
+                        <input type="radio" id="estrella-@e.Id-@p" name="puntaje" value="@p" required />
+                        <label for="estrella-@e.Id-@p" title="@p @(p == 1 ? "estrella" : "estrellas")">★</label>
+                    }
+                </div>
+                <textarea name="comentario" rows="2" maxlength="300" placeholder="Opcional: ¿te trataron con amabilidad y respeto?"></textarea>
+                <button type="submit" class="btn-gris">Enviar calificación</button>
+                <small class="texto-tenue">Es anónima: el personal no ve quién lo calificó.</small>
+            </form>
+        }
+    }
 </article>

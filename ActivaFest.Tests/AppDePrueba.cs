@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using ActivaFest.Models;
 using ActivaFest.Services.Email;
@@ -70,7 +71,15 @@ public class AppDePrueba : WebApplicationFactory<Program>
         });
     }
 
-    public HttpClient Cliente() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+    public HttpClient Cliente()
+    {
+        var cliente = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        DeCliente.AddOrUpdate(cliente, this);
+        return cliente;
+    }
+
+    // Para que los helpers de formularios sepan a qué aplicación pertenece cada cliente HTTP
+    internal static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, AppDePrueba> DeCliente = new();
 
     protected override void Dispose(bool disposing)
     {
@@ -98,11 +107,27 @@ public static class Formularios
             ["Email"] = email,
             ["Password"] = password,
             ["ConfirmarPassword"] = password,
-            ["Rol"] = rol,
             ["AceptaTratamientoDatos"] = consiente ? "true" : "false",
             ["AceptaPromociones"] = promociones ? "true" : "false"
         };
-        return await cliente.PostAsync("/Auth/Registro", new FormUrlEncodedContent(datos));
+        var respuesta = await cliente.PostAsync("/Auth/Registro", new FormUrlEncodedContent(datos));
+
+        // HU31: toda cuenta nace como Usuario. Si la prueba necesita otro rol, se otorga como lo haría el
+        // administrador (al aprobar una solicitud o asignar personal) y se vuelve a iniciar sesión para tomarlo.
+        if (rol != Roles.Asistente && respuesta.StatusCode == HttpStatusCode.Redirect && AppDePrueba.DeCliente.TryGetValue(cliente, out var app))
+        {
+            using (var scope = app.Services.CreateScope())
+            {
+                var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+                var usuario = (await usuarios.FindByEmailAsync(email))!;
+                await usuarios.AddToRoleAsync(usuario, rol);
+            }
+            // El token se toma de "Mis entradas" (no de la portada, para no dejar el catálogo en caché antes de tiempo)
+            var salir = new Dictionary<string, string> { ["__RequestVerificationToken"] = await TokenAsync(cliente, "/Entradas") };
+            await cliente.PostAsync("/Auth/Logout", new FormUrlEncodedContent(salir));
+            await IniciarSesionAsync(cliente, email, password);
+        }
+        return respuesta;
     }
 
     public static async Task<HttpResponseMessage> IniciarSesionAsync(HttpClient cliente, string email, string password)

@@ -78,7 +78,11 @@ namespace ActivaFest.Models
         public List<TipoEntradaInput> TiposEntrada { get; set; } = new() { new TipoEntradaInput() };
 
         [Display(Name = "Fotos del recinto")]
+        // Sin "required" implícito: al editar o al reusar fotos ya subidas no hace falta elegir archivos;
+        // la cantidad mínima la comprueba Validate()
+#nullable disable
         public List<IFormFile> Fotos { get; set; } = new();
+#nullable restore
 
         // Plano oficial del recinto (imagen opcional que sube el organizador)
         [Display(Name = "Plano oficial del recinto")]
@@ -101,6 +105,12 @@ namespace ActivaFest.Models
         public List<int> ImagenesEliminar { get; set; } = new();
 
         public List<int> ImagenesActualesIds { get; set; } = new();
+
+        // Fotos y plano que ya se subieron en un envío anterior que tuvo errores: no hay que volver a elegirlos
+        // (el navegador vacía el campo de archivos). Solo se aceptan las rutas guardadas en la sesión del usuario.
+        public List<string> FotosSubidas { get; set; } = new();
+
+        public string? PlanoSubido { get; set; }
 
         // HU25: cada plantilla tiene un máximo de zonas legible y en teatro la capacidad sale de filas x asientos
         private IEnumerable<ValidationResult> ValidarPlano()
@@ -157,7 +167,7 @@ namespace ActivaFest.Models
 
             // En la edición cuentan también las fotos que se conservan (el servicio lo vuelve a comprobar contra la BD)
             var conservadas = ImagenesActualesIds.Except(ImagenesEliminar).Count();
-            var fotos = Fotos.Where(f => f.Length > 0).Count() + conservadas;
+            var fotos = Fotos.Where(f => f.Length > 0).Count() + conservadas + FotosSubidas.Count;
             if (fotos < MinFotos)
                 yield return new ValidationResult($"Sube al menos {MinFotos} fotos del recinto.", new[] { nameof(Fotos) });
 

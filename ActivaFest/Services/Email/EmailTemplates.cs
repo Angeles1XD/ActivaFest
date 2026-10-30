@@ -50,6 +50,19 @@ public static class EmailTemplates
             $"<p>Tu evento <b>{E(ev.Titulo)}</b> fue registrado y está <b>pendiente de revisión</b> por nuestro equipo.</p>" +
             "<p>Te avisaremos por correo cuando sea aprobado o si necesita cambios.</p>");
 
+    // HU34: evento gratuito que debe pagar la tarifa de publicación antes de pasar a revisión
+    public static string PublicacionPorPagar(Evento ev, decimal tarifa, string urlPago) =>
+        Layout("Falta un paso para publicar tu evento",
+            $"<p>Registramos <b>{E(ev.Titulo)}</b> como evento de <b>entrada libre</b>. Para publicarlo se cobra una tarifa única de " +
+            $"<b>S/ {tarifa:0.00}</b> según su aforo ({ev.Aforo:N0} personas).</p>" +
+            "<p>Cuando la pagues, el evento pasará a revisión del administrador.</p>",
+            "Pagar publicación", urlPago);
+
+    public static string PublicacionPagada(PagoPublicacion pago, string titulo) =>
+        Layout("Pagaste la publicación de tu evento ✅",
+            $"<p>Recibimos el pago de <b>S/ {pago.Monto:0.00}</b> por publicar <b>{E(titulo)}</b> (referencia {E(pago.Referencia)}).</p>" +
+            "<p>Tu evento ya está en revisión; te avisaremos cuando sea aprobado.</p>");
+
     // Confirmación de la compra de un paquete publicitario (HU12)
     public static string DestacadoActivado(ContratoDestacado c) =>
         Layout("¡Tu evento ya está destacado! ⭐",
@@ -106,6 +119,42 @@ public static class EmailTemplates
             $"<p><b>Motivo:</b> {E(ev.MotivoRechazo)}</p>" +
             "<p>Puedes corregir la información y volver a enviarlo.</p>",
             "Ir a mis eventos", urlMisEventos);
+
+    // HU31 / HU32: solicitudes al administrador
+    public static string SolicitudParaAdmin(string tipo, string quien, string urlAdmin) =>
+        Layout("Nueva solicitud por revisar",
+            $"<p><b>{E(quien)}</b> envió una solicitud para <b>{E(tipo)}</b>.</p><p>Revísala y apruébala o recházala desde el panel de administración.</p>",
+            "Ver solicitudes", urlAdmin);
+
+    public static string OrganizadorAprobado(string nombre, DateTime? hasta, string urlCrearEvento) =>
+        Layout("¡Tu cuenta ya puede crear eventos! 🎉",
+            $"<p>Hola {E(nombre)}, aprobamos tu solicitud: ya puedes publicar tus eventos en ActivaFest" +
+            (hasta == null ? " sin fecha de vencimiento." : $" hasta el <b>{hasta:dd/MM/yyyy}</b>.") + "</p>" +
+            "<p>Cada evento que crees pasa por la revisión del equipo antes de aparecer en el catálogo. " +
+            "Si necesitas personal para validar las entradas en la puerta, solicítalo desde «Mis eventos».</p>",
+            "Crear mi primer evento", urlCrearEvento);
+
+    public static string SolicitudRechazada(string tipo, string nombre, string? motivo, string urlSolicitud) =>
+        Layout("Tu solicitud no fue aprobada",
+            $"<p>Hola {E(nombre)}, revisamos tu solicitud para <b>{E(tipo)}</b> y por ahora no pudimos aprobarla.</p>" +
+            $"<p><b>Motivo:</b> {E(motivo)}</p><p>Puedes corregir los datos y volver a enviarla.</p>",
+            "Ver mi solicitud", urlSolicitud);
+
+    public static string OrganizadorVencido(string nombre) =>
+        Layout("Tu periodo como organizador terminó",
+            $"<p>Hola {E(nombre)}, terminó el plazo en el que tu cuenta podía crear eventos. Tus eventos ya publicados siguen vigentes.</p>" +
+            "<p>Si quieres seguir organizando, envía una nueva solicitud desde «Organiza tu evento».</p>");
+
+    public static string PersonalAsignado(string nombre, Evento ev, string urlPuerta) =>
+        Layout("Validarás las entradas en la puerta 🚪",
+            $"<p>Hola {E(nombre)}, te asignaron como personal de control de <b>{E(ev.Titulo)}</b> ({ev.Fecha:dd/MM/yyyy HH:mm}, {E(ev.Ubicacion)}).</p>" +
+            "<p>El día del evento inicia sesión con esta cuenta y entra a «Puerta» para escanear los códigos QR de las entradas.</p>",
+            "Ir a la puerta", urlPuerta);
+
+    public static string PersonalAprobado(string nombre, string evento, IEnumerable<string> correos) =>
+        Layout("Tu personal de control fue aprobado",
+            $"<p>Hola {E(nombre)}, ya están asignadas para validar las entradas de <b>{E(evento)}</b> estas cuentas:</p>" +
+            $"<ul>{string.Join("", correos.Select(c => $"<li>{E(c)}</li>"))}</ul>");
 
     // HU30: cupón personal de una promoción
     public static string CuponPromocion(string nombre, Promocion p, string codigo, string urlCatalogo) =>

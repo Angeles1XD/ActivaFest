@@ -41,6 +41,8 @@ public record SolicitudCobro(string Codigo, IReadOnlyList<ItemCobro> Items, Date
 
     public bool EsDestacado => Codigo.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal);
 
+    public bool EsPublicacion => Codigo.StartsWith(PagoPublicacion.PrefijoCodigo, StringComparison.Ordinal);
+
     // HU30: con cupón se cobra una sola línea por el total con descuento (la pasarela no admite precios negativos)
     public static SolicitudCobro DesdeOrden(Orden orden, string tituloEvento) => new(
         orden.Codigo,
@@ -56,6 +58,12 @@ public record SolicitudCobro(string Codigo, IReadOnlyList<ItemCobro> Items, Date
     public static SolicitudCobro DesdeContrato(ContratoDestacado contrato, string tituloEvento, string nombrePaquete) => new(
         contrato.Codigo,
         new[] { new ItemCobro($"paquete-{contrato.PaqueteId}", $"Destacado {nombrePaquete} ({contrato.Dias} días) - {tituloEvento}", 1, contrato.Precio) },
+        DateTime.UtcNow.AddHours(1));
+
+    // HU34: tarifa única por publicar un evento gratuito
+    public static SolicitudCobro DesdePublicacion(PagoPublicacion pago, string tituloEvento) => new(
+        pago.Codigo,
+        new[] { new ItemCobro($"publicacion-{pago.EventoId}", $"Publicación de evento gratuito - {tituloEvento}", 1, pago.Monto) },
         DateTime.UtcNow.AddHours(1));
 }
 
@@ -99,7 +107,7 @@ public class PasarelaSimulada : IPasarelaPago
     public Task<InicioPago> IniciarAsync(SolicitudCobro cobro, string? emailPagador, UrlsRetorno urls, CancellationToken ct = default)
     {
         // Cada tipo de cobro tiene su propia pantalla de prueba
-        var controlador = cobro.EsDestacado ? "Destacados" : "Compras";
+        var controlador = cobro.EsDestacado ? "Destacados" : cobro.EsPublicacion ? "Publicacion" : "Compras";
         var url = _links.GetPathByAction(_http.HttpContext!, "PasarelaSimulada", controlador, new { codigo = cobro.Codigo })!;
         return Task.FromResult(new InicioPago(url));
     }

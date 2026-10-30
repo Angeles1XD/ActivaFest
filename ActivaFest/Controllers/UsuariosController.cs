@@ -24,6 +24,14 @@ namespace ActivaFest.Controllers
         public string Email { get; set; } = "";
         public List<Evento> Eventos { get; set; } = new();
         public HashSet<int> Asignados { get; set; } = new();
+
+        // Buscador (con miles de eventos no se listan todos): resultados paginados y eventos ya asignados
+        public const int TamanoPagina = 20;
+        public string? Buscar { get; set; }
+        public int Total { get; set; }
+        public int Pagina { get; set; } = 1;
+        public int Paginas => Math.Max(1, (int)Math.Ceiling(Total / (double)TamanoPagina));
+        public List<Evento> EventosAsignados { get; set; } = new();
     }
 
     // =============================
@@ -66,7 +74,7 @@ namespace ActivaFest.Controllers
                                select new { ur.UserId, r.Name }).ToListAsync(ct);
 
             var asignaciones = await _db.AsignacionesAcceso
-                .Where(a => ids.Contains(a.UsuarioId))
+                .Where(a => ids.Contains(a.UsuarioId) && a.FinalizadaEn == null)
                 .GroupBy(a => a.UsuarioId)
                 .Select(g => new { UsuarioId = g.Key, Cantidad = g.Count() })
                 .ToDictionaryAsync(x => x.UsuarioId, x => x.Cantidad, ct);
@@ -150,24 +158,73 @@ namespace ActivaFest.Controllers
         // =============================
         // 🚪 ASIGNACIÓN DEL PERSONAL DE CONTROL A EVENTOS (ASIGNACION_ACCESO)
         // =============================
-        public async Task<IActionResult> Asignaciones(string id, CancellationToken ct)
+        // Con miles de eventos no se listan todos: se busca por nombre o lugar y se asigna o quita de a uno
+        public async Task<IActionResult> Asignaciones(string id, string? buscar, int pagina = 1, CancellationToken ct = default)
         {
             var usuario = await _userManager.FindByIdAsync(id);
             if (usuario == null || !await _userManager.IsInRoleAsync(usuario, Roles.ControlAcceso))
                 return NotFound();
 
             var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
-            return View(new AsignacionesViewModel
+            var vigentes = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde);
+            var asignados = (await _db.AsignacionesAcceso.Where(a => a.UsuarioId == usuario.Id).Select(a => a.EventoId).ToListAsync(ct)).ToHashSet();
+
+            var texto = buscar?.Trim();
+            var q = vigentes;
+            if (!string.IsNullOrEmpty(texto))
+            {
+                var patron = "%" + texto.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
+                q = q.Where(e => EF.Functions.Like(e.Titulo, patron, @"\") || EF.Functions.Like(e.Ubicacion, patron, @"\"));
+            }
+
+            var modelo = new AsignacionesViewModel
             {
                 UsuarioId = usuario.Id,
                 Nombre = usuario.NombreCompleto,
                 Email = usuario.Email ?? "",
-                Eventos = await _db.Eventos.AsNoTracking()
-                    .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde)
-                    .OrderBy(e => e.Fecha)
-                    .ToListAsync(ct),
-                Asignados = (await _db.AsignacionesAcceso.Where(a => a.UsuarioId == usuario.Id).Select(a => a.EventoId).ToListAsync(ct)).ToHashSet()
-            });
+                Buscar = texto,
+                Total = await q.CountAsync(ct),
+                Asignados = asignados,
+                EventosAsignados = await vigentes.Where(e => asignados.Contains(e.Id)).OrderBy(e => e.Fecha).ToListAsync(ct)
+            };
+            modelo.Pagina = Math.Clamp(pagina, 1, modelo.Paginas);
+            modelo.Eventos = await q.OrderBy(e => e.Fecha).ThenBy(e => e.Id)
+                .Skip((modelo.Pagina - 1) * AsignacionesViewModel.TamanoPagina).Take(AsignacionesViewModel.TamanoPagina)
+                .ToListAsync(ct);
+            return View(modelo);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Asignar(string id, int eventoId, string? buscar, int pagina = 1, CancellationToken ct = default)
+        {
+            var usuario = await _userManager.FindByIdAsync(id);
+            if (usuario == null || !await _userManager.IsInRoleAsync(usuario, Roles.ControlAcceso))
+                return NotFound();
+
+            var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
+            var evento = await _db.Eventos.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventoId && e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde, ct);
+            if (evento != null && !await _db.AsignacionesAcceso.AnyAsync(a => a.UsuarioId == id && a.EventoId == eventoId, ct))
+            {
+                _db.AsignacionesAcceso.Add(new AsignacionAcceso { UsuarioId = id, EventoId = eventoId });
+                await _db.SaveChangesAsync(ct);
+                TempData["Mensaje"] = $"{usuario.Email} ya puede validar entradas de «{evento.Titulo}».";
+            }
+            return RedirectToAction(nameof(Asignaciones), new { id, buscar, pagina });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Quitar(string id, int eventoId, string? buscar, int pagina = 1, CancellationToken ct = default)
+        {
+            var asignacion = await _db.AsignacionesAcceso.Include(a => a.Evento).FirstOrDefaultAsync(a => a.UsuarioId == id && a.EventoId == eventoId, ct);
+            if (asignacion != null)
+            {
+                _db.AsignacionesAcceso.Remove(asignacion);
+                await _db.SaveChangesAsync(ct);
+                TempData["Mensaje"] = $"Se quitó «{asignacion.Evento?.Titulo}» de sus eventos.";
+            }
+            return RedirectToAction(nameof(Asignaciones), new { id, buscar, pagina });
         }
 
         [HttpPost]
@@ -181,7 +238,7 @@ namespace ActivaFest.Controllers
             // Solo eventos aprobados y vigentes; las asignaciones de eventos ya pasados se conservan como historial
             var desde = DateTime.Now.AddHours(-Evento.HorasValidezEntradas);
             var vigentes = await _db.Eventos
-                .Where(e => e.Estado == EstadoEvento.Aprobado && e.Fecha >= desde)
+                .Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito && e.Fecha >= desde)
                 .Select(e => e.Id)
                 .ToListAsync(ct);
             var elegidos = eventos.Intersect(vigentes).ToHashSet();

@@ -66,6 +66,9 @@ namespace ActivaFest.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("OrganizadorHasta")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("TEXT");
 
@@ -143,6 +146,9 @@ namespace ActivaFest.Migrations
                     b.Property<DateTime>("FechaAsignacion")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("FinalizadaEn")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("UsuarioId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -187,6 +193,50 @@ namespace ActivaFest.Migrations
                     b.HasIndex("Fecha");
 
                     b.ToTable("AuditoriasAnalitica");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.CalificacionPersonal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Comentario")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EntradaId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PersonalId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Puntaje")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntradaId")
+                        .IsUnique();
+
+                    b.HasIndex("EventoId");
+
+                    b.HasIndex("PersonalId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("CalificacionesPersonal");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.Categoria", b =>
@@ -532,6 +582,9 @@ namespace ActivaFest.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("EsGratuito")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Estado")
                         .HasColumnType("INTEGER");
 
@@ -560,6 +613,9 @@ namespace ActivaFest.Migrations
 
                     b.Property<string>("OrganizadorId")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("PendientePagoPublicacion")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PlanoOficial")
                         .HasMaxLength(500)
@@ -643,6 +699,32 @@ namespace ActivaFest.Migrations
                     b.HasIndex("UsuarioId", "Fecha");
 
                     b.ToTable("HistorialBusquedas");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.InteresEvento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("EventoId", "UsuarioId")
+                        .IsUnique();
+
+                    b.ToTable("InteresesEvento");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.Liquidacion", b =>
@@ -792,6 +874,59 @@ namespace ActivaFest.Migrations
                     b.ToTable("OrdenItems");
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.PagoPublicacion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Aforo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("FechaPago")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Monto")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("OrganizadorId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Proveedor")
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Referencia")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizadorId");
+
+                    b.HasIndex("EventoId", "Estado");
+
+                    b.ToTable("PagosPublicacion");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.PaqueteDestacado", b =>
                 {
                     b.Property<int>("Id")
@@ -909,6 +1044,138 @@ namespace ActivaFest.Migrations
                     b.HasIndex("CreadaPorId");
 
                     b.ToTable("Promociones");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.SolicitudOrganizador", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DescripcionEventos")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Documento")
+                        .IsRequired()
+                        .HasMaxLength(11)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("FechaRespuesta")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FechaSolicitud")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("HabilitadoHasta")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NombreOrganizador")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PlazoAprobado")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PlazoSolicitado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RespondidaPorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Telefono")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebORedes")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("Estado", "FechaSolicitud");
+
+                    b.ToTable("SolicitudesOrganizador");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.SolicitudPersonal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Correos")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EventoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("FechaRespuesta")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FechaSolicitud")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Mensaje")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Observacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrganizadorId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RespondidaPorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("RespuestaAutomatica")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventoId");
+
+                    b.HasIndex("OrganizadorId");
+
+                    b.HasIndex("Estado", "FechaSolicitud");
+
+                    b.ToTable("SolicitudesPersonal");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.TipoEntrada", b =>
@@ -1189,6 +1456,39 @@ namespace ActivaFest.Migrations
                     b.Navigation("Administrador");
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.CalificacionPersonal", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Entrada", "Entrada")
+                        .WithMany()
+                        .HasForeignKey("EntradaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", "Personal")
+                        .WithMany()
+                        .HasForeignKey("PersonalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Entrada");
+
+                    b.Navigation("Evento");
+
+                    b.Navigation("Personal");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.ContratoDestacado", b =>
                 {
                     b.HasOne("ActivaFest.Models.Evento", "Evento")
@@ -1314,6 +1614,23 @@ namespace ActivaFest.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.InteresEvento", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.Liquidacion", b =>
                 {
                     b.HasOne("ActivaFest.Models.Evento", "Evento")
@@ -1385,6 +1702,23 @@ namespace ActivaFest.Migrations
                     b.Navigation("TipoEntrada");
                 });
 
+            modelBuilder.Entity("ActivaFest.Models.PagoPublicacion", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizadorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+                });
+
             modelBuilder.Entity("ActivaFest.Models.Promocion", b =>
                 {
                     b.HasOne("ActivaFest.Models.ApplicationUser", "CreadaPor")
@@ -1394,6 +1728,36 @@ namespace ActivaFest.Migrations
                         .IsRequired();
 
                     b.Navigation("CreadaPor");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.SolicitudOrganizador", b =>
+                {
+                    b.HasOne("ActivaFest.Models.ApplicationUser", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("ActivaFest.Models.SolicitudPersonal", b =>
+                {
+                    b.HasOne("ActivaFest.Models.Evento", "Evento")
+                        .WithMany()
+                        .HasForeignKey("EventoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ActivaFest.Models.ApplicationUser", "Organizador")
+                        .WithMany()
+                        .HasForeignKey("OrganizadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Evento");
+
+                    b.Navigation("Organizador");
                 });
 
             modelBuilder.Entity("ActivaFest.Models.TipoEntrada", b =>

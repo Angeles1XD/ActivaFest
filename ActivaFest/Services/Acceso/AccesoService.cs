@@ -76,11 +76,11 @@ public class AccesoService : IAccesoService
     // (organizador) o aquellos a los que el administrador los asignó (personal de Control de Acceso)
     private IQueryable<Evento> EventosDe(string usuarioId, bool esAdministrador)
     {
-        var query = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado);
+        var query = _db.Eventos.AsNoTracking().Where(e => e.Estado == EstadoEvento.Aprobado && !e.EsGratuito);   // HU34: sin entradas que validar
         return esAdministrador
             ? query
             : query.Where(e => e.OrganizadorId == usuarioId ||
-                               _db.AsignacionesAcceso.Any(a => a.EventoId == e.Id && a.UsuarioId == usuarioId));
+                               _db.AsignacionesAcceso.Any(a => a.EventoId == e.Id && a.UsuarioId == usuarioId && a.FinalizadaEn == null));
     }
 
     public Task<List<Evento>> EventosControlablesAsync(string usuarioId, bool esAdministrador, CancellationToken ct = default)

@@ -158,6 +158,9 @@ public class CompraService : ICompraService
 
         if (evento == null || evento.Estado != EstadoEvento.Aprobado)
             return (null, "Este evento no está disponible para la venta.");
+        // HU34: en los eventos de entrada libre no se venden entradas
+        if (evento.EsGratuito)
+            return (null, "Este evento es de entrada libre: no necesitas comprar entrada.");
         if (evento.Fecha <= DateTime.Now)
             return (null, "La venta de este evento ya terminó.");
         return (evento, null);

@@ -59,6 +59,12 @@ public class EventoEdicionService : IEventoEdicionService
 
         // ---------- Zonas de entrada ----------
         var enviadas = datos.TiposEntrada;
+
+        // HU34: un evento no pasa de pago a gratuito ni al revés (cambia el cobro y la venta de entradas)
+        if (enviadas.Count > 0 && enviadas.All(t => t.Precio == 0) != evento.EsGratuito)
+            errores.Add(evento.EsGratuito
+                ? "Este evento es de entrada libre: no se le pueden poner precios. Crea un evento nuevo con entradas pagadas."
+                : "Este evento vende entradas: no se puede convertir en gratuito. Crea un evento nuevo de entrada libre.");
         var idsEnviados = enviadas.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToHashSet();
 
         if (idsEnviados.Any(id => evento.TiposEntrada.All(t => t.Id != id)))
@@ -120,7 +126,8 @@ public class EventoEdicionService : IEventoEdicionService
         // ---------- Fotos ----------
         var aEliminar = evento.Imagenes.Where(i => datos.ImagenesEliminar.Contains(i.Id)).ToList();
         var nuevas = datos.Fotos.Where(f => f.Length > 0).ToList();
-        var total = evento.Imagenes.Count - aEliminar.Count + nuevas.Count;
+        // FotosSubidas: las de un envío anterior con errores (el controlador ya comprobó que son de este usuario)
+        var total = evento.Imagenes.Count - aEliminar.Count + nuevas.Count + datos.FotosSubidas.Count;
 
         if (total < EventoFormViewModel.MinFotos)
             errores.Add($"El evento debe tener al menos {EventoFormViewModel.MinFotos} fotos.");
@@ -138,7 +145,7 @@ public class EventoEdicionService : IEventoEdicionService
         var planoNuevo = datos.PlanoOficialArchivo is { Length: > 0 } archivoPlano ? archivoPlano : null;
         if (planoNuevo != null && ValidadorImagenes.Validar(planoNuevo) is { } errorPlano)
             errores.Add($"Plano oficial: {errorPlano}");
-        var planoAnterior = planoNuevo != null || datos.QuitarPlanoOficial ? evento.PlanoOficial : null;
+        var planoAnterior = planoNuevo != null || datos.PlanoSubido != null || datos.QuitarPlanoOficial ? evento.PlanoOficial : null;
 
         if (errores.Count > 0)
             return new ResultadoEdicion(false, errores);
@@ -197,6 +204,8 @@ public class EventoEdicionService : IEventoEdicionService
             }
 
             var orden = evento.Imagenes.Except(aEliminar).Select(i => i.Orden).DefaultIfEmpty(-1).Max() + 1;
+            foreach (var ruta in datos.FotosSubidas)
+                evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
             foreach (var foto in nuevas)
             {
                 var ruta = await _imagenes.GuardarAsync(foto, "eventos", ct);
@@ -208,6 +217,10 @@ public class EventoEdicionService : IEventoEdicionService
             {
                 evento.PlanoOficial = await _imagenes.GuardarAsync(planoNuevo, "planos", ct);
                 rutasNuevas.Add(evento.PlanoOficial);
+            }
+            else if (datos.PlanoSubido != null)
+            {
+                evento.PlanoOficial = datos.PlanoSubido;
             }
             else if (datos.QuitarPlanoOficial)
             {

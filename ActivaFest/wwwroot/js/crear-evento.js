@@ -197,6 +197,20 @@
     });
 
     lista.addEventListener('input', recalcular);
+
+    // HU34: evento gratuito: todas las zonas cuestan 0 y se oculta el precio
+    const casillaGratuito = document.getElementById('eventoGratuito');
+    function aplicarGratuito() {
+        if (!casillaGratuito) return;
+        formulario.classList.toggle('es-gratuito', casillaGratuito.checked);
+        if (casillaGratuito.checked)
+            lista.querySelectorAll('input[name$=".Precio"], input[data-campo="Precio"]').forEach(function (i) { i.value = '0'; });
+    }
+    if (casillaGratuito) {
+        casillaGratuito.addEventListener('change', aplicarGratuito);
+        botonAgregar.addEventListener('click', aplicarGratuito);
+        aplicarGratuito();
+    }
     formulario.querySelectorAll('input[name="Plantilla"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
             // Si la nueva plantilla admite menos zonas, se quitan las sobrantes que no tienen compras

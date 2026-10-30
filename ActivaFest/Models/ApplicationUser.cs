@@ -17,5 +17,8 @@ namespace ActivaFest.Models
         public bool AceptaTratamientoDatos { get; set; }
 
         public bool AceptaPromociones { get; set; }
+
+        // HU31: hasta cuándo puede crear eventos como organizador (null = indefinido). Al vencer, pierde el rol.
+        public DateTime? OrganizadorHasta { get; set; }
     }
 }

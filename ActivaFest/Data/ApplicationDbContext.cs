@@ -41,6 +41,13 @@ namespace ActivaFest.Data
         // HU14: consultas al asistente (métrica del OE3)
         public DbSet<ConsultaAsistente> ConsultasAsistente { get; set; }
 
+        // HU31 y HU32: solicitudes al administrador (habilitar organizador y personal de control)
+        public DbSet<SolicitudOrganizador> SolicitudesOrganizador { get; set; }
+        public DbSet<SolicitudPersonal> SolicitudesPersonal { get; set; }
+        public DbSet<CalificacionPersonal> CalificacionesPersonal { get; set; }
+        public DbSet<PagoPublicacion> PagosPublicacion { get; set; }
+        public DbSet<InteresEvento> InteresesEvento { get; set; }
+
         // Paquetes publicitarios iniciales (el administrador puede editarlos)
         public static readonly PaqueteDestacado[] PaquetesIniciales =
         {
@@ -211,6 +218,46 @@ namespace ActivaFest.Data
 
             builder.Entity<Evento>().Property(e => e.PlantillaPlano).HasConversion<string>().HasMaxLength(20);
             builder.Entity<ConsultaAsistente>().HasIndex(c => c.Fecha);
+            builder.Entity<SolicitudOrganizador>(s =>
+            {
+                s.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+                s.Property(x => x.PlazoSolicitado).HasConversion<string>().HasMaxLength(20);
+                s.Property(x => x.PlazoAprobado).HasConversion<string>().HasMaxLength(20);
+                s.HasIndex(x => new { x.Estado, x.FechaSolicitud });
+                s.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+            });
+            builder.Entity<SolicitudPersonal>(s =>
+            {
+                s.HasIndex(x => new { x.Estado, x.FechaSolicitud });
+                s.HasOne(x => x.Organizador).WithMany().HasForeignKey(x => x.OrganizadorId).OnDelete(DeleteBehavior.Cascade);
+                s.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // HU33: una calificación por entrada; la reputación se calcula por persona del personal
+            builder.Entity<CalificacionPersonal>(c =>
+            {
+                c.HasIndex(x => x.EntradaId).IsUnique();
+                c.HasIndex(x => x.PersonalId);
+                c.HasOne(x => x.Entrada).WithMany().HasForeignKey(x => x.EntradaId).OnDelete(DeleteBehavior.Cascade);
+                c.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Restrict);
+                c.HasOne(x => x.Personal).WithMany().HasForeignKey(x => x.PersonalId).OnDelete(DeleteBehavior.Cascade);
+                c.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // HU34: cobro de publicación de eventos gratuitos y «Me interesa» (uno por usuario y evento)
+            builder.Entity<PagoPublicacion>(p =>
+            {
+                p.HasIndex(x => x.Codigo).IsUnique();
+                p.HasIndex(x => new { x.EventoId, x.Estado });
+                p.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+                p.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OrganizadorId).OnDelete(DeleteBehavior.Restrict);
+            });
+            builder.Entity<InteresEvento>(i =>
+            {
+                i.HasIndex(x => new { x.EventoId, x.UsuarioId }).IsUnique();
+                i.HasOne(x => x.Evento).WithMany().HasForeignKey(x => x.EventoId).OnDelete(DeleteBehavior.Cascade);
+                i.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             // HU30: un cupón por cliente y promoción, código único y aplicado como máximo en una compra
             builder.Entity<Promocion>(p =>

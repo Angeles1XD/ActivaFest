@@ -45,7 +45,7 @@
                 }
                 else if (!autenticado)
                 {
-                    <a asp-controller="Auth" asp-action="Registro" class="inicio-boton-secundario">＋ Organiza tu evento</a>
+                    <a asp-controller="Organizador" asp-action="Solicitar" class="inicio-boton-secundario">＋ Organiza tu evento</a>
                 }
                 else
                 {
@@ -212,11 +212,11 @@
             </div>
             @if (autenticado)
             {
-                <p class="inicio-organiza-nota">Para publicar necesitas una cuenta de organizador.</p>
+                <a asp-controller="Organizador" asp-action="Solicitar" class="cat-boton">Solicitar ser organizador</a>
             }
             else
             {
-                <a asp-controller="Auth" asp-action="Registro" class="cat-boton">Crear cuenta de organizador</a>
+                <a asp-controller="Organizador" asp-action="Solicitar" class="cat-boton">Ver requisitos para organizar</a>
             }
         </section>
     }

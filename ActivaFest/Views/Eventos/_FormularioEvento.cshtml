@@ -1,4 +1,5 @@
 @model EventoFormViewModel
+@inject ActivaFest.Services.Eventos.IEventoGratuitoService Gratuitos
 @{
     var categorias = (List<Categoria>)ViewBag.Categorias;
     var inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -91,6 +92,31 @@
             @ActivaFest.Services.Plano.PlanoService.MaxFilasTeatro filas en total). La primera zona queda más cerca del escenario. Usa precio 0 para entradas gratuitas.
         </p>
 
+        @* HU34: entrada libre: no se venden entradas; solo se paga una vez la publicación según el aforo *@
+        @{
+            var esGratuito = Model.TiposEntrada.Count > 0 && Model.TiposEntrada.All(t => t.Precio == 0);
+            int? desdeTramo = 1;
+        }
+        <div class="opcion-gratuito">
+            <label class="opcion">
+                <input type="checkbox" id="eventoGratuito" checked="@esGratuito" disabled="@Model.EsEdicion" />
+                <b>🎉 Evento gratuito (entrada libre)</b>
+            </label>
+            <p class="texto-suave">
+                No se venden entradas ni se pide personal de control: el público marca «Me interesa» y tú ves cuánta gente atrae.
+                Se paga una sola vez por publicarlo, según el aforo:
+                @foreach (var t in Gratuitos.Tramos)
+                {
+                    <span class="chip-tarifa">@(t.HastaAforo is int hasta ? $"hasta {hasta:N0}" : $"más de {(desdeTramo - 1):N0}"): @(t.Tarifa == 0 ? "gratis" : Formato.Monto(t.Tarifa))</span>
+                    desdeTramo = t.HastaAforo + 1;
+                }
+                @if (Model.EsEdicion)
+                {
+                    <br /><span>Un evento no puede pasar de pago a gratuito ni al revés.</span>
+                }
+            </p>
+        </div>
+
         <div id="tiposEntrada">
             @for (var i = 0; i < Model.TiposEntrada.Count; i++)
             {
@@ -105,7 +131,7 @@
                         <label>Zona</label>
                         <input name="TiposEntrada[@i].Nombre" value="@t.Nombre" maxlength="60" required />
                     </div>
-                    <div class="campo">
+                    <div class="campo campo-precio">
                         <label>Precio (S/)</label>
                         <input name="TiposEntrada[@i].Precio" value="@t.Precio.ToString(inv)"
                                type="number" min="0" max="100000" step="0.01" required />
@@ -165,6 +191,13 @@
                     <label class="opcion-quitar"><input type="checkbox" asp-for="QuitarPlanoOficial" /> Quitar el plano oficial</label>
                 </div>
             }
+            @if (!string.IsNullOrEmpty(Model.PlanoSubido))
+            {
+                <div class="plano-oficial-actual">
+                    <a href="@Model.PlanoSubido" target="_blank" rel="noopener"><img src="@Model.PlanoSubido" alt="Plano que ya subiste" /></a>
+                    <label class="opcion-quitar"><input type="checkbox" name="PlanoSubido" value="@Model.PlanoSubido" checked /> Usar el plano que ya subiste</label>
+                </div>
+            }
             <input asp-for="PlanoOficialArchivo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
             <span asp-validation-for="PlanoOficialArchivo" class="text-danger"></span>
         </div>
@@ -194,6 +227,24 @@
             <p class="texto-suave">Agregar más fotos (opcional):</p>
         }
 
+        @if (Model.FotosSubidas.Count > 0)
+        {
+            <p class="texto-suave" data-dato="fotos-subidas">✅ Estas fotos ya las subiste, no hace falta volver a elegirlas (desmarca la que no quieras):</p>
+            <div class="preview-fotos fotos-actuales">
+                @foreach (var ruta in Model.FotosSubidas)
+                {
+                    <label class="foto-actual">
+                        <img src="@ruta" alt="" loading="lazy" />
+                        <span><input type="checkbox" name="FotosSubidas" value="@ruta" checked /> Usar</span>
+                    </label>
+                }
+            </div>
+            @if (Model.ImagenesActuales.Count == 0)
+            {
+                <p class="texto-suave">Agregar más fotos (opcional):</p>
+            }
+        }
+
         <div class="campo">
             <input asp-for="Fotos" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
             <span asp-validation-for="Fotos" class="text-danger"></span>
@@ -211,7 +262,7 @@
             <label>Zona</label>
             <input data-campo="Nombre" maxlength="60" required />
         </div>
-        <div class="campo">
+        <div class="campo campo-precio">
             <label>Precio (S/)</label>
             <input data-campo="Precio" type="number" min="0" max="100000" step="0.01" value="0" required />
         </div>

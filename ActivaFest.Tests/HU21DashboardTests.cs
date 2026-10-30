@@ -155,19 +155,67 @@ public class HU21DashboardTests : IDisposable
         Assert.Equal(3, d.UsuariosActivos);
     }
 
-    // Caché de 5 minutos: la segunda consulta no vuelve a calcular
+    // Caché de 5 minutos mientras los datos no cambian; una compra nueva se ve al instante (tiempo real)
     [Fact]
-    public async Task El_dashboard_se_guarda_en_cache()
+    public async Task El_dashboard_usa_cache_pero_una_compra_nueva_se_ve_al_instante()
     {
         Escenario();
         var filtro = new FiltroAnalitica { Desde = _e.Desde, Hasta = _e.Hasta };
         var primero = await _analitica.DashboardAsync(filtro);
 
-        _e.Compra("carla", _e.Db.Eventos.First(), 1, new DateTime(2026, 11, 6, 10, 0, 0));
-        var segundo = await _analitica.DashboardAsync(filtro);
+        var repetido = await _analitica.DashboardAsync(filtro);
+        Assert.Equal(primero.CalculadoEn, repetido.CalculadoEn);   // sin cambios: sale de la caché
 
-        Assert.Equal(primero.Ingresos, segundo.Ingresos);
-        Assert.Equal(primero.CalculadoEn, segundo.CalculadoEn);
+        _e.Compra("carla", _e.Db.Eventos.First(), 1, new DateTime(2026, 11, 6, 10, 0, 0));
+        var despues = await _analitica.DashboardAsync(filtro);
+
+        Assert.Equal(primero.Ingresos + 50m, despues.Ingresos);
+        Assert.Contains(despues.UltimasCompras, c => c.Fecha == new DateTime(2026, 11, 6, 10, 0, 0) && c.Evento == "Rock");
+    }
+
+    [Fact]
+    public async Task Muestra_las_ultimas_compras_del_periodo_con_codigo_anonimo()
+    {
+        Escenario();
+
+        var d = await _analitica.DashboardAsync(new FiltroAnalitica { Desde = _e.Desde, Hasta = _e.Hasta });
+
+        Assert.Equal(new[] { ("Hamlet", 3, 240m), ("Rock", 2, 100m), ("Rock", 4, 200m) }, d.UltimasCompras.Select(c => (c.Evento, c.Entradas, c.Total)));
+        Assert.Equal(ClienteAnalitica.CodigoDe("carla"), d.UltimasCompras[0].Cliente);
+        Assert.DoesNotContain(d.UltimasCompras, c => c.Cliente.Contains("carla"));
+    }
+
+    [Fact]
+    public async Task La_ocupacion_incluye_eventos_futuros_que_vendieron_en_el_periodo()
+    {
+        // Compra en noviembre para un evento de enero: antes no contaba en la ocupación de noviembre
+        var futuro = _e.Evento("Año Nuevo", 1, new DateTime(2027, 1, 10, 22, 0, 0), capacidad: 20, precio: 40);
+        _e.Compra("ana", futuro, 5, new DateTime(2026, 11, 8, 12, 0, 0));
+
+        var d = await _analitica.DashboardAsync(new FiltroAnalitica { Desde = _e.Desde, Hasta = _e.Hasta });
+
+        Assert.Equal(1, d.EventosConsiderados);
+        Assert.Equal(25.0, d.Ocupacion);   // 5 de 20 lugares
+        Assert.Equal(0, d.EventosRealizados);
+        Assert.Null(d.Asistencia);
+    }
+
+    [Theory]
+    [InlineData("hoy", "2026-10-27", "2026-10-27")]
+    [InlineData("7d", "2026-10-21", "2026-10-27")]
+    [InlineData("30d", "2026-09-28", "2026-10-27")]
+    [InlineData("mes", "2026-10-01", "2026-10-27")]
+    [InlineData("mespasado", "2026-09-01", "2026-09-30")]
+    [InlineData("anio", "2026-01-01", "2026-10-27")]
+    [InlineData(null, "2026-10-01", "2026-10-27")]
+    public void Los_periodos_rapidos_dan_fechas_claras(string? rango, string desde, string hasta)
+    {
+        var (f, r) = FiltroAnalitica.DeRango(rango, null, null, null, new DateTime(2026, 10, 27));
+        Assert.Equal((DateTime.Parse(desde), DateTime.Parse(hasta)), (f.Desde, f.Hasta));
+        Assert.Equal(rango ?? "mes", r);
+
+        var (p, rp) = FiltroAnalitica.DeRango(null, new DateTime(2026, 5, 1), new DateTime(2026, 5, 15), 2, new DateTime(2026, 10, 27));
+        Assert.Equal(("personalizado", new DateTime(2026, 5, 1), 2), (rp, p.Desde, p.CategoriaId));
     }
 
     // RNF02: carga en menos de 3 segundos (sin caché, con miles de compras)
@@ -215,6 +263,7 @@ public class HU21DashboardVistaTests : IClassFixture<AppDePrueba>
 
         var admin = _app.Cliente();
         await IniciarSesionAsync(admin, "admin@test.com", "Admin123!");
+        await admin.GetAsync("/Analitica");   // calentamiento: la primera visita compila la vista (no es lo que ve el usuario después)
         var reloj = Stopwatch.StartNew();
         var html = await TextoAsync(await admin.GetAsync("/Analitica?desde=2026-11-01&hasta=2026-11-30"));
         reloj.Stop();
@@ -222,6 +271,16 @@ public class HU21DashboardVistaTests : IClassFixture<AppDePrueba>
         foreach (var indicador in new[] { "Ingresos", "Entradas vendidas", "Ticket promedio", "Ocupación", "Asistencia", "Comisiones" })
             Assert.Contains($"<span class=\"kpi-etiqueta\">{indicador}</span>", html);
         Assert.Contains("chart.js@4.4.1", html);
+        Assert.Contains("🧾 Últimas compras", html);
+        Assert.Contains("Mostrando <b>personalizado</b>: compras pagadas del <b>01/11/2026</b> al <b>30/11/2026</b>", html);
+
+        // Datos en vivo (los pide la página cada 20 s): solo el administrador
+        var datos = await admin.GetAsync("/Analitica/Datos?rango=mes");
+        Assert.Equal("application/json", datos.Content.Headers.ContentType!.MediaType);
+        var json = System.Text.Json.JsonDocument.Parse(await datos.Content.ReadAsStringAsync()).RootElement;
+        foreach (var campo in new[] { "ingresos", "entradas", "ticket", "ocupacion", "asistencia", "comisiones", "semanas", "categorias", "ultimas" })
+            Assert.True(json.TryGetProperty(campo, out _), campo);
+        Assert.StartsWith("/Auth/AccesoDenegado", (await organizador.GetAsync("/Analitica/Datos")).Headers.Location!.PathAndQuery);
         Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(3));
 
         var csv = await admin.GetAsync("/Analitica/Exportar?desde=2026-11-01&hasta=2026-11-30");

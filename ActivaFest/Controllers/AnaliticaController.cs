@@ -32,22 +32,44 @@ namespace ActivaFest.Controllers
             _llm = llm;
         }
 
-        private static FiltroAnalitica Filtro(DateTime? desde, DateTime? hasta, int? categoriaId)
-        {
-            var mes = FiltroAnalitica.MesActual(DateTime.Today);
-            return new FiltroAnalitica { Desde = desde ?? mes.Desde, Hasta = hasta ?? mes.Hasta, CategoriaId = categoriaId };
-        }
+        // Período: uno rápido (hoy, últimos 7 días, este mes…) o personalizado con fechas. Por defecto, este mes hasta hoy.
+        private static FiltroAnalitica Filtro(string? rango, DateTime? desde, DateTime? hasta, int? categoriaId) =>
+            FiltroAnalitica.DeRango(rango, desde, hasta, categoriaId, DateTime.Today).Filtro;
 
-        public async Task<IActionResult> Index(DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
+        public async Task<IActionResult> Index(string? rango, DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
         {
             ViewBag.Categorias = await _catalogo.ObtenerCategoriasAsync(ct);
-            return View(await _analitica.DashboardAsync(Filtro(desde, hasta, categoriaId), ct));
+            ViewBag.Rango = FiltroAnalitica.DeRango(rango, desde, hasta, categoriaId, DateTime.Today).Rango;
+            // HU34: alcance de los eventos gratuitos en el mismo período (visitas, «Me interesa» y tarifas cobradas)
+            var filtro = Filtro(rango, desde, hasta, categoriaId);
+            ViewBag.Gratuitos = await HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>()
+                .ResumenAsync(filtro.Desde, filtro.Hasta, ct);
+            return View(await _analitica.DashboardAsync(filtro, ct));
+        }
+
+        // Datos del dashboard en JSON: la página los vuelve a pedir cada pocos segundos (actualización en tiempo real)
+        public async Task<IActionResult> Datos(string? rango, DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
+        {
+            var d = await _analitica.DashboardAsync(Filtro(rango, desde, hasta, categoriaId), ct);
+            return Json(new
+            {
+                calculadoEn = d.CalculadoEn,
+                ingresos = d.Ingresos, ingresosVariacion = DashboardAnalitica.Variacion(d.Ingresos, d.IngresosAnterior),
+                entradas = d.EntradasVendidas, entradasVariacion = DashboardAnalitica.Variacion(d.EntradasVendidas, d.EntradasAnterior),
+                ticket = d.TicketPromedio, compras = d.Compras,
+                ocupacion = d.Ocupacion, vendidasEventos = d.VendidasEventos, aforoEventos = d.AforoEventos, eventos = d.EventosConsiderados,
+                asistencia = d.Asistencia, realizados = d.EventosRealizados,
+                comisiones = d.Comisiones, conversion = d.Conversion, activos = d.UsuariosActivos,
+                semanas = d.IngresosPorSemana.Select(s => new { etiqueta = s.Etiqueta, ingresos = s.Ingresos }),
+                categorias = d.VentasPorCategoria.Select(c => new { nombre = c.Categoria, entradas = c.Entradas, ingresos = c.Ingresos, color = c.Color }),
+                ultimas = d.UltimasCompras.Select(c => new { fecha = c.Fecha.ToString("dd/MM HH:mm"), evento = c.Evento, cliente = c.Cliente, entradas = c.Entradas, total = c.Total })
+            });
         }
 
         // CSV para Excel en español: separador ";", coma decimal y BOM UTF-8
-        public async Task<IActionResult> Exportar(DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
+        public async Task<IActionResult> Exportar(string? rango, DateTime? desde, DateTime? hasta, int? categoriaId, CancellationToken ct)
         {
-            var d = await _analitica.DashboardAsync(Filtro(desde, hasta, categoriaId), ct);
+            var d = await _analitica.DashboardAsync(Filtro(rango, desde, hasta, categoriaId), ct);
             string Num(decimal v) => v.ToString("0.00", CultureInfo.InvariantCulture).Replace('.', ',');
             string Pct(double? v) => v?.ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',') ?? "";
 

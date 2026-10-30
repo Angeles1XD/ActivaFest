@@ -1,25 +1,49 @@
 // =============================
-// 📊 GRÁFICOS DEL DASHBOARD DEL ADMINISTRADOR (HU21, Chart.js)
+// 📊 DASHBOARD DEL ADMINISTRADOR (HU21): gráficos, filtro de período y actualización en vivo
 // =============================
+// Cada 20 segundos (solo con la pestaña visible) vuelve a pedir los datos a /Analitica/Datos y actualiza
+// indicadores, gráficos y últimas compras sin recargar la página (no se pierde lo escrito en el panel de la IA).
 (function () {
     'use strict';
 
+    const raiz = document.getElementById('dashboard');
     const fuente = document.getElementById('datosDashboard');
-    if (!fuente || typeof Chart === 'undefined') return;
+    if (!raiz || !fuente) return;
 
+    const INTERVALO = 20000;
+    const soles = v => 'S/ ' + Number(v).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const entero = v => Number(v).toLocaleString('es-PE');
+    const pct = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' %';
+
+    // ---------- Filtro: el período rápido y las fechas personalizadas ----------
+    const formulario = document.getElementById('filtrosDashboard');
+    const rango = document.getElementById('rango');
+    const fechas = formulario.querySelectorAll('.filtro-fecha input');
+    function mostrarFechas() {
+        const personalizado = rango.value === 'personalizado';
+        formulario.querySelectorAll('.filtro-fecha').forEach(f => f.classList.toggle('inactivo', !personalizado));
+        fechas.forEach(i => { i.disabled = !personalizado; });
+    }
+    rango.addEventListener('change', function () {
+        mostrarFechas();
+        if (rango.value !== 'personalizado') formulario.submit();   // los períodos rápidos se aplican al elegirlos
+    });
+    formulario.querySelector('#categoriaId').addEventListener('change', () => formulario.submit());
+    mostrarFechas();
+
+    // ---------- Gráficos ----------
     const datos = JSON.parse(fuente.textContent);
     const estilo = getComputedStyle(document.documentElement);
     const color = (n, d) => (estilo.getPropertyValue(n) || d).trim();
     const MORADO = color('--morado', '#8b5cf6');
-    const soles = v => 'S/ ' + Number(v).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let graficoSemanas = null, graficoCategorias = null;
 
-    Chart.defaults.color = color('--texto-2', '#a1a1aa');
-    Chart.defaults.font.family = color('--fuente', 'Outfit, sans-serif');
-    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = color('--texto-2', '#a1a1aa');
+        Chart.defaults.font.family = color('--fuente', 'Outfit, sans-serif');
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
 
-    const semanas = document.getElementById('graficoSemanas');
-    if (semanas) {
-        new Chart(semanas, {
+        graficoSemanas = new Chart(document.getElementById('graficoSemanas'), {
             type: 'line',
             data: {
                 labels: datos.semanas.map(s => s.etiqueta),
@@ -31,22 +55,110 @@
                 scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: v => 'S/ ' + v } } }
             }
         });
-    }
 
-    const categorias = document.getElementById('graficoCategorias');
-    if (categorias) {
-        new Chart(categorias, {
+        graficoCategorias = new Chart(document.getElementById('graficoCategorias'), {
             type: 'bar',
-            data: {
-                labels: datos.categorias.map(c => c.nombre),
-                datasets: [{ label: 'Entradas', data: datos.categorias.map(c => c.entradas), backgroundColor: datos.categorias.map(c => c.color || MORADO), borderRadius: 4 }]
-            },
+            data: { labels: [], datasets: [{ label: 'Entradas', data: [], backgroundColor: [], borderRadius: 4 }] },
             options: {
                 indexAxis: 'y',
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: c => 'Ingresos: ' + soles(datos.categorias[c.dataIndex].ingresos) } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: c => 'Ingresos: ' + soles(graficoCategorias.$ingresos[c.dataIndex]) } } },
                 scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
             }
         });
+        pintarCategorias(datos.categorias);
     }
+
+    function pintarCategorias(categorias) {
+        document.getElementById('sinVentasCategoria').hidden = categorias.length > 0;
+        document.getElementById('cajaCategorias').hidden = categorias.length === 0;
+        if (!graficoCategorias) return;
+        graficoCategorias.data.labels = categorias.map(c => c.nombre);
+        graficoCategorias.data.datasets[0].data = categorias.map(c => c.entradas);
+        graficoCategorias.data.datasets[0].backgroundColor = categorias.map(c => c.color || MORADO);
+        graficoCategorias.$ingresos = categorias.map(c => c.ingresos);
+        graficoCategorias.update();
+    }
+
+    // ---------- Actualización en vivo ----------
+    const kpi = clave => raiz.querySelector(`[data-kpi="${clave}"]`);
+    const nota = clave => raiz.querySelector(`[data-nota="${clave}"]`);
+
+    function variacion(elemento, v) {
+        elemento.classList.toggle('sube', v !== null && v >= 0);
+        elemento.classList.toggle('baja', v !== null && v < 0);
+        elemento.textContent = v === null ? 'sin ventas en el período anterior'
+            : (v >= 0 ? '▲ +' : '▼ ') + Number(v).toLocaleString('es-PE', { maximumFractionDigits: 1 }) + ' % vs. período anterior';
+    }
+
+    function destacar(elemento, texto) {
+        if (elemento.textContent === texto) return;
+        elemento.textContent = texto;
+        elemento.classList.remove('cambio');
+        void elemento.offsetWidth;            // reinicia la animación
+        elemento.classList.add('cambio');
+    }
+
+    function pintar(d) {
+        destacar(kpi('ingresos'), soles(d.ingresos));
+        variacion(nota('ingresos'), d.ingresosVariacion);
+        destacar(kpi('entradas'), entero(d.entradas));
+        variacion(nota('entradas'), d.entradasVariacion);
+        destacar(kpi('ticket'), soles(d.ticket));
+        nota('ticket').textContent = entero(d.compras) + (d.compras === 1 ? ' compra' : ' compras');
+        destacar(kpi('ocupacion'), pct(d.ocupacion));
+        nota('ocupacion').textContent = `${entero(d.vendidasEventos)} de ${entero(d.aforoEventos)} lugares · ${d.eventos} ${d.eventos === 1 ? 'evento' : 'eventos'}`;
+        destacar(kpi('asistencia'), pct(d.asistencia));
+        nota('asistencia').textContent = d.realizados === 0 ? 'aún no se realiza ningún evento' : 'entradas validadas en puerta';
+        destacar(kpi('comisiones'), soles(d.comisiones));
+        destacar(kpi('conversion'), pct(d.conversion));
+        destacar(kpi('activos'), entero(d.activos));
+
+        if (graficoSemanas) {
+            graficoSemanas.data.labels = d.semanas.map(s => s.etiqueta);
+            graficoSemanas.data.datasets[0].data = d.semanas.map(s => s.ingresos);
+            graficoSemanas.update();
+        }
+        pintarCategorias(d.categorias);
+
+        const cuerpo = document.querySelector('#tablaUltimas tbody');
+        cuerpo.replaceChildren();
+        if (d.ultimas.length === 0) {
+            const fila = cuerpo.insertRow();
+            const celda = fila.insertCell();
+            celda.colSpan = 5;
+            celda.className = 'texto-tenue';
+            celda.textContent = 'Aún no hay compras pagadas en este período.';
+        }
+        d.ultimas.forEach(c => {
+            const fila = cuerpo.insertRow();
+            [c.fecha, c.evento, 'Cliente ' + c.cliente, entero(c.entradas), soles(c.total)].forEach((v, i) => {
+                const celda = fila.insertCell();
+                celda.textContent = v;           // textContent: los datos nunca se interpretan como HTML
+                celda.className = i === 1 ? '' : i >= 3 ? 'derecha num' : 'num';
+            });
+        });
+
+        actualizado.dataset.calculado = d.calculadoEn;
+        reloj();
+    }
+
+    const actualizado = document.getElementById('actualizado');
+    function reloj() {
+        const segundos = Math.max(0, Math.round((Date.now() - new Date(actualizado.dataset.calculado).getTime()) / 1000));
+        actualizado.textContent = segundos < 10 ? 'actualizado ahora' : segundos < 60 ? `actualizado hace ${segundos} s` : `actualizado hace ${Math.floor(segundos / 60)} min`;
+    }
+
+    async function refrescar() {
+        if (document.visibilityState !== 'visible') return;
+        try {
+            const r = await fetch(raiz.dataset.url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (r.ok) pintar(await r.json());
+        } catch (e) { /* sin conexión: se reintenta en el siguiente ciclo */ }
+    }
+
+    setInterval(refrescar, INTERVALO);
+    setInterval(reloj, 5000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refrescar(); });
+    reloj();
 })();

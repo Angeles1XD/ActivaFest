@@ -65,6 +65,12 @@ namespace ActivaFest.Models
         // Visitas a la ficha del evento (RF11: visualizaciones en el panel del organizador)
         public int Visitas { get; set; }
 
+        // HU34: entrada libre (todas las zonas con precio 0). No se venden entradas ni se pide personal de control.
+        public bool EsGratuito { get; set; }
+
+        // HU34: el organizador aún no pagó la tarifa de publicación; hasta entonces el administrador no lo modera
+        public bool PendientePagoPublicacion { get; set; }
+
         // =============================
         // 🛡️ MODERACIÓN (HU10)
         // =============================

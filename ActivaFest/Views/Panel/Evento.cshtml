@@ -53,6 +53,13 @@
         </div>
     </header>
 
+    @if (ev.EsGratuito)
+    {
+        @* HU34: evento de entrada libre: su alcance se mide con visitas y «Me interesa», no con ventas *@
+        <partial name="_PanelGratuito" model="ev" />
+    }
+    else
+    {
     <!-- ===== Indicadores (stat tiles) ===== -->
     <section class="fila-kpi" aria-label="Indicadores del evento">
         <div class="kpi kpi-hero">
@@ -206,10 +213,14 @@
             </div>
         }
     </section>
+    }
 </div>
 
 @section Scripts {
+    @if (!ev.EsGratuito)
+    {
     <script type="application/json" id="datosPanel">@Html.Raw(datosGraficos)</script>
     <partial name="_ChartJs" />
     <script src="~/js/panel.js" asp-append-version="true"></script>
+    }
 }

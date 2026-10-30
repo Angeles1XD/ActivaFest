@@ -912,3 +912,71 @@ a.boton-rol {
 .estado-llm.llm-alerta { border-left-color: #f59e0b; }
 .estado-llm code { padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, .08); }
 .estado-llm ol { margin: 8px 0; padding-left: 20px; }
+
+/* ===== HU21: dashboard en vivo y filtro de período ===== */
+.en-vivo { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); animation: latido 2s infinite; vertical-align: 1px; }
+@keyframes latido { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); } 70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+.filtros-dashboard .filtro-fecha.inactivo { opacity: .45; }
+.resumen-filtro { margin: -4px 0 16px; font-size: 14px; color: var(--viz-texto-2, #c4c4d4); }
+.como-se-calcula { margin: 8px 0 16px; font-size: 13px; color: var(--viz-texto-3, #a1a1b5); }
+.como-se-calcula summary { cursor: pointer; }
+.como-se-calcula ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.kpi-valor.cambio { animation: cambio 1.2s ease-out; }
+@keyframes cambio { 0% { color: #86efac; } 100% { color: inherit; } }
+.ultimas-compras { margin-top: 20px; }
+@media (prefers-reduced-motion: reduce) { .en-vivo, .kpi-valor.cambio { animation: none; } }
+
+/* ===== HU19: buscador para asignar personal de control ===== */
+.bloque-asignacion { margin-bottom: 24px; }
+.bloque-asignacion h2 { font-size: 18px; margin-bottom: 10px; }
+.fila-asignacion { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.fila-asignacion form { margin: 0; flex: 0 0 auto; }
+.buscador-asignacion { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.buscador-asignacion input { flex: 1 1 260px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .15); background: rgba(15, 23, 42, .6); color: inherit; font: inherit; }
+.chip-asignado { white-space: nowrap; font-size: 13px; color: #86efac; }
+.pagina-entradas .paginacion { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 16px 0; }
+.pagina-entradas .paginacion a { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .15); color: inherit; text-decoration: none; }
+
+/* ===== HU31 / HU32: solicitudes al administrador y contacto ===== */
+.solicitud-columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start; }
+.lista-requisitos, .pasos-personal { padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.form-solicitud { display: grid; gap: 14px; }
+.form-solicitud .campo { display: grid; gap: 6px; }
+.form-solicitud input:not([type=checkbox]):not([type=radio]), .form-solicitud select, .form-solicitud textarea {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .15); background: rgba(15, 23, 42, .6); color: inherit; font: inherit;
+}
+.form-solicitud fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 14px; }
+.form-solicitud .opcion { display: flex; align-items: center; gap: 6px; }
+.estado-solicitud { padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; background: rgba(255, 255, 255, .05); }
+.estado-solicitud.estado-pendiente { border-left: 4px solid #f59e0b; }
+.estado-solicitud.estado-rechazada { border-left: 4px solid #ef4444; }
+.bloque-solicitudes { margin-bottom: 20px; }
+.solicitud { padding: 14px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.datos-solicitud { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 8px 0; }
+.datos-solicitud dt { font-size: 12px; color: var(--texto-3, #a1a1b5); }
+.datos-solicitud dd { margin: 0; }
+.descripcion-solicitud { white-space: pre-line; color: var(--texto-2, #c4c4d4); }
+.acciones-solicitud { display: flex; flex-wrap: wrap; gap: 10px; }
+.form-en-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.form-en-linea select, .form-en-linea input[type=text] { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .15); background: rgba(15, 23, 42, .6); color: inherit; font: inherit; }
+.lista-solicitudes { list-style: none; padding: 0; display: grid; gap: 12px; }
+.contacto-opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.contacto-opcion { display: grid; gap: 8px; align-content: start; }
+.btn-whatsapp { background: #25d366; color: #052e16; font-weight: 700; padding: 10px 16px; border-radius: 10px; text-decoration: none; text-align: center; }
+
+/* HU32: revisar al personal de control */
+.estado-personal { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 4px; }
+.estado-personal li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 14px; }
+.cuentas-solicitadas { list-style: none; padding: 0; display: grid; gap: 6px; margin: 0 0 10px; }
+.cuentas-solicitadas li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.chip-alerta { white-space: nowrap; font-size: 13px; color: #fca5a5; }
+
+/* ⭐ HU33: aprobación automática y reputación del personal */
+.aviso-automatico { font-size: 13px; color: #c4b5fd; background: rgba(139, 92, 246, .1); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.cuentas-solicitadas input[type="checkbox"] { width: 18px; height: 18px; accent-color: #ff006e; }
+.reputacion-grande { font-size: 22px; font-weight: 700; margin: 8px 0 12px; }
+.distribucion-estrellas { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+.distribucion-estrellas li { display: grid; grid-template-columns: 40px 1fr 32px; align-items: center; gap: 10px; font-size: 14px; }
+.distribucion-estrellas .barra { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.distribucion-estrellas .barra span { display: block; height: 100%; background: #fbbf24; border-radius: 999px; }
+.opinion-reporte { border-left: 3px solid #fca5a5; padding-left: 10px; }

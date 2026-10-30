@@ -1,8 +1,11 @@
+@inject ActivaFest.Services.Organizadores.ISolicitudOrganizadorService SolicitudesOrg
+@inject ActivaFest.Services.Organizadores.ISolicitudPersonalService SolicitudesPer
 @model List<Evento>
 @{
     ViewData["Title"] = "Moderación de eventos";
     var actual = (EstadoEvento)ViewBag.EstadoActual;
     var conteos = (Dictionary<EstadoEvento, int>)ViewBag.Conteos;
+    var pendientesSolicitudes = await SolicitudesOrg.PendientesAsync() + await SolicitudesPer.PendientesAsync();
 }
 
 <header class="cat-encabezado catalogo-encabezado">
@@ -15,6 +18,7 @@
         <a asp-controller="Analitica" asp-action="Index" class="btn-gris enlace-boton">📊 Dashboard</a>
         <a asp-controller="Comisiones" asp-action="Index" class="btn-gris enlace-boton">💰 Comisiones</a>
         <a asp-controller="Promociones" asp-action="Index" class="btn-gris enlace-boton">🎁 Promociones</a>
+        <a asp-controller="Solicitudes" asp-action="Index" class="btn-gris enlace-boton">📥 Solicitudes@(pendientesSolicitudes > 0 ? $" ({pendientesSolicitudes})" : "")</a>
         <a asp-controller="Paquetes" asp-action="Index" class="btn-gris enlace-boton">⭐ Paquetes</a>
         <a asp-controller="Usuarios" asp-action="Index" class="btn-gris enlace-boton">👥 Usuarios</a>
     </div>
@@ -50,7 +54,11 @@
         <p>📍 @item.Ubicacion</p>
         <p>📅 @item.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
         <p>@item.Categoria?.Icono @item.Categoria?.Nombre</p>
-        <p>👥 Aforo: @item.Aforo</p>
+        <p>👥 Aforo: @item.Aforo@(item.EsGratuito ? " · 🎉 Entrada libre" : "")</p>
+        @if (item.PendientePagoPublicacion)
+        {
+            <p class="aviso-vencido" data-dato="esperando-pago">💳 Esperando el pago de la publicación: se podrá aprobar cuando el organizador pague.</p>
+        }
         <p class="texto-suave">
             Organizador: @(item.Organizador?.NombreCompleto ?? "—") (@(item.Organizador?.Email ?? "sin correo"))
             · Enviado: @item.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
@@ -68,7 +76,7 @@
 
         <div class="acciones-moderacion">
             @* Solo los pendientes se moderan (diagrama de estados del evento) *@
-            @if (item.Estado == EstadoEvento.Pendiente && !finalizado)
+            @if (item.Estado == EstadoEvento.Pendiente && !finalizado && !item.PendientePagoPublicacion)
             {
                 <form asp-action="Aprobar" asp-route-id="@item.Id" method="post">
                     <button type="submit" class="btn-rosa">✔ Aprobar</button>

@@ -2,6 +2,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ActivaFest.Models
 {
+    // Casilla obligatoria (consentimiento): se valida en el servidor; en el navegador la exige el atributo "required"
+    public class DebeEstarMarcadoAttribute : ValidationAttribute
+    {
+        public override bool IsValid(object? value) => value is true;
+    }
+
     public class LoginViewModel
     {
         [Required(ErrorMessage = "Ingresa tu correo.")]
@@ -44,12 +50,11 @@ namespace ActivaFest.Models
         [Display(Name = "Confirmar contraseña")]
         public string ConfirmarPassword { get; set; } = "";
 
-        [Required]
-        [Display(Name = "Tipo de cuenta")]
-        public string Rol { get; set; } = Roles.Asistente;
+        // HU31: ya no se elige el tipo de cuenta. Todas nacen como Usuario; para crear eventos se solicita al administrador.
 
         // Obligatorio (RNF07): sin consentimiento no se crea la cuenta
-        [Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar la política de privacidad para crear tu cuenta.")]
+        // No usar [Range(true, true)]: su validación en el navegador (jQuery) rechaza la casilla aunque esté marcada
+        [DebeEstarMarcado(ErrorMessage = "Debes aceptar la política de privacidad para crear tu cuenta.")]
         public bool AceptaTratamientoDatos { get; set; }
 
         // Opcional y separado del anterior

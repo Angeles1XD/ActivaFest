@@ -105,6 +105,14 @@ builder.Services.AddScoped<ActivaFest.Services.Comisiones.IComisionService, Acti
 // 📊 Analítica del administrador (HU21, HU22, HU29)
 builder.Services.AddScoped<ActivaFest.Services.Analitica.IAnaliticaService, ActivaFest.Services.Analitica.AnaliticaService>();
 builder.Services.AddScoped<ActivaFest.Services.Analitica.IAsistenteAnaliticoService, ActivaFest.Services.Analitica.AsistenteAnaliticoService>();
+builder.Services.AddScoped<ActivaFest.Services.Organizadores.ISolicitudOrganizadorService, ActivaFest.Services.Organizadores.SolicitudOrganizadorService>();
+builder.Services.AddScoped<ActivaFest.Services.Organizadores.ISolicitudPersonalService, ActivaFest.Services.Organizadores.SolicitudPersonalService>();
+builder.Services.Configure<ActivaFest.Controllers.ContactoOptions>(builder.Configuration.GetSection("Contacto"));
+builder.Services.AddHostedService<ActivaFest.Services.Organizadores.VencimientoOrganizadoresService>();
+builder.Services.AddScoped<ActivaFest.Services.Acceso.IReputacionPersonalService, ActivaFest.Services.Acceso.ReputacionPersonalService>();
+builder.Services.AddHostedService<ActivaFest.Services.Organizadores.AutomatizacionPersonalService>();
+builder.Services.Configure<ActivaFest.Models.EventosGratuitosOptions>(builder.Configuration.GetSection("EventosGratuitos"));
+builder.Services.AddScoped<ActivaFest.Services.Eventos.IEventoGratuitoService, ActivaFest.Services.Eventos.EventoGratuitoService>();
 
 // =============================
 // 🛒 COMPRAS, PAGOS Y ENTRADAS QR (HU06, HU07, HU11)
@@ -141,7 +149,7 @@ builder.Services.AddScoped<IPasarelaPago>(sp =>
 // =============================
 // 🔥 MVC
 // =============================
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(ActivaFest.Models.MensajesValidacionEnEspanol.Configurar);
 
 // =============================
 // 🔥 CACHE EN MEMORIA (para tu Index)

@@ -47,9 +47,6 @@ namespace ActivaFest.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Registro(RegistroViewModel model)
         {
-            if (!Roles.Registrables.Contains(model.Rol))
-                ModelState.AddModelError(nameof(model.Rol), "Tipo de cuenta no válido.");
-
             if (!ModelState.IsValid)
                 return View(model);
 
@@ -71,12 +68,13 @@ namespace ActivaFest.Controllers
                 return View(model);
             }
 
-            await _userManager.AddToRoleAsync(usuario, model.Rol);
-            _logger.LogInformation("Nuevo usuario registrado: {Email} ({Rol})", usuario.Email, model.Rol);
+            // HU31: toda cuenta nueva es Usuario; para organizar eventos se solicita al administrador
+            await _userManager.AddToRoleAsync(usuario, Roles.Asistente);
+            _logger.LogInformation("Nuevo usuario registrado: {Email}", usuario.Email);
 
             var urlLogin = Url.Action(nameof(Login), "Auth", null, Request.Scheme)!;
             await _email.EnviarAsync(usuario.Email!, "Bienvenido a ActivaFest",
-                EmailTemplates.Bienvenida(usuario.NombreCompleto, Roles.NombreVisible(model.Rol), urlLogin));
+                EmailTemplates.Bienvenida(usuario.NombreCompleto, Roles.NombreVisible(Roles.Asistente), urlLogin));
 
             await _signInManager.SignInAsync(usuario, isPersistent: false);
             TempData["Mensaje"] = $"¡Bienvenido/a, {usuario.NombreCompleto}! Tu cuenta fue creada.";

@@ -236,6 +236,11 @@ namespace ActivaFest.Controllers
                     var destacados = HttpContext.RequestServices.GetRequiredService<Services.Publicidad.IDestacadoService>();
                     await destacados.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, ct);
                 }
+                else if (pago.CodigoOrden.StartsWith(PagoPublicacion.PrefijoCodigo, StringComparison.Ordinal))
+                {
+                    var gratuitos = HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>();
+                    await gratuitos.ConfirmarPagoAsync(pago.CodigoOrden, _pasarela.Nombre, pago.Referencia, pago.Monto, ct);
+                }
                 else
                 {
                     var urlEntradas = $"{Request.Scheme}://{Request.Host}{Url.Action("Index", "Entradas")}";
@@ -243,7 +248,8 @@ namespace ActivaFest.Controllers
                 }
             }
             else if (pago is { CodigoOrden: not null } && EsRechazo(pago.Estado)
-                     && !pago.CodigoOrden.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal))
+                     && !pago.CodigoOrden.StartsWith(ContratoDestacado.PrefijoCodigo, StringComparison.Ordinal)
+                     && !pago.CodigoOrden.StartsWith(PagoPublicacion.PrefijoCodigo, StringComparison.Ordinal))
             {
                 await _compras.RechazarPagoAsync(pago.CodigoOrden, ct);
             }

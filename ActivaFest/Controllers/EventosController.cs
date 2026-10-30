@@ -99,12 +99,34 @@ namespace ActivaFest.Controllers
 
             ViewBag.PuedeEditar = esDuenio || User.IsInRole(Roles.Administrador);
 
+            // HU34: en los eventos gratuitos se muestra cuántos marcaron «Me interesa»
+            if (evento.EsGratuito)
+            {
+                var gratuitos = HttpContext.RequestServices.GetRequiredService<Services.Eventos.IEventoGratuitoService>();
+                var (interesados, meInteresa) = await gratuitos.InteresAsync(id, _userManager.GetUserId(User), ct);
+                ViewBag.Interesados = interesados;
+                ViewBag.MeInteresa = meInteresa;
+            }
+
             // HU25: plano del recinto generado desde la plantilla (con los asientos numerados si es teatro)
             var asientos = evento.PlantillaPlano == PlantillaPlano.Teatro
                 ? await _context.Asientos.AsNoTracking().Where(a => a.TipoEntrada!.EventoId == id).ToListAsync(ct)
                 : new List<Asiento>();
             ViewBag.PlanoSvg = Services.Plano.PlanoService.SvgDeEvento(evento, asientos);
             return View(evento);
+        }
+
+        // HU34: «Me interesa» en un evento gratuito (marca o desmarca)
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MeInteresa(int id, [FromServices] Services.Eventos.IEventoGratuitoService gratuitos, CancellationToken ct)
+        {
+            var r = await gratuitos.AlternarInteresAsync(_userManager.GetUserId(User)!, id, ct);
+            if (r == null)
+                return NotFound();
+            TempData["Mensaje"] = r.Value ? "¡Listo! Marcaste que te interesa este evento." : "Quitaste tu «Me interesa».";
+            return Redirect(Url.Action(nameof(Detalle), new { id }) + "#interes");
         }
 
         // =============================
@@ -122,7 +144,7 @@ namespace ActivaFest.Controllers
         [Authorize(Roles = RolesPublicadores)]
         [RequestSizeLimit(LimiteSubida)]
         [RequestFormLimits(MultipartBodyLengthLimit = LimiteSubida)]
-        public async Task<IActionResult> Crear(EventoFormViewModel model, CancellationToken ct)
+        public async Task<IActionResult> Crear(EventoFormViewModel model, [FromServices] Services.Eventos.IEventoGratuitoService gratuitos, CancellationToken ct)
         {
             var fotos = model.Fotos.Where(f => f.Length > 0).ToList();
 
@@ -141,8 +163,14 @@ namespace ActivaFest.Controllers
             if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
                 ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
 
+            // Las fotos de un envío anterior con errores cuentan solo si las subió este mismo usuario
+            FiltrarArchivosSubidos(model);
+            if (fotos.Count + model.FotosSubidas.Count < EventoFormViewModel.MinFotos && ModelState.IsValid)
+                ModelState.AddModelError(nameof(model.Fotos), $"Sube al menos {EventoFormViewModel.MinFotos} fotos del recinto.");
+
             if (!ModelState.IsValid)
             {
+                await ConservarArchivosAsync(model, fotos, planoOficial, ct);
                 await CargarCategoriasAsync(ct);
                 return View(model);
             }
@@ -171,6 +199,9 @@ namespace ActivaFest.Controllers
             };
             // HU25: el aforo del evento es siempre la suma de sus zonas; en teatro se generan los asientos numerados
             evento.Aforo = evento.TiposEntrada.Sum(t => t.Capacidad);
+            // HU34: entrada libre si todas las zonas cuestan 0; si el aforo pasa el tramo sin costo, se paga la publicación
+            evento.EsGratuito = evento.TiposEntrada.All(t => t.Precio == 0);
+            evento.PendientePagoPublicacion = evento.EsGratuito && gratuitos.TarifaPara(evento.Aforo) > 0;
             if (evento.PlantillaPlano == PlantillaPlano.Teatro)
                 foreach (var asiento in Services.Plano.PlanoService.GenerarAsientos(evento.TiposEntrada.ToList()))
                     asiento.TipoEntrada!.Asientos.Add(asiento);
@@ -179,17 +210,25 @@ namespace ActivaFest.Controllers
             var rutasGuardadas = new List<string>();
             try
             {
-                for (var i = 0; i < fotos.Count; i++)
+                var orden = 0;
+                foreach (var ruta in model.FotosSubidas)
+                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
+
+                foreach (var foto in fotos)
                 {
-                    var ruta = await _imagenes.GuardarAsync(fotos[i], "eventos", ct);
+                    var ruta = await _imagenes.GuardarAsync(foto, "eventos", ct);
                     rutasGuardadas.Add(ruta);
-                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = i });
+                    evento.Imagenes.Add(new EventoImagen { Ruta = ruta, Orden = orden++ });
                 }
 
                 if (planoOficial != null)
                 {
                     evento.PlanoOficial = await _imagenes.GuardarAsync(planoOficial, "planos", ct);
                     rutasGuardadas.Add(evento.PlanoOficial);
+                }
+                else if (model.PlanoSubido != null)
+                {
+                    evento.PlanoOficial = model.PlanoSubido;
                 }
 
                 _context.Eventos.Add(evento);
@@ -207,7 +246,19 @@ namespace ActivaFest.Controllers
                 return View(model);
             }
 
+            OlvidarArchivosSubidos(model);
             HttpContext.Session.SetString("UltimoEvento", evento.Titulo);
+
+            // HU34: un evento gratuito con aforo mayor al tramo sin costo pasa a revisión cuando se paga la publicación
+            if (evento.PendientePagoPublicacion)
+            {
+                var tarifa = gratuitos.TarifaPara(evento.Aforo);
+                if (usuario?.Email != null)
+                    await _email.EnviarAsync(usuario.Email, $"Falta pagar la publicación: {evento.Titulo}",
+                        EmailTemplates.PublicacionPorPagar(evento, tarifa, Url.Action("Pagar", "Publicacion", new { id = evento.Id }, Request.Scheme)!));
+                TempData["Mensaje"] = $"Tu evento gratuito quedó registrado. Paga la tarifa de publicación (S/ {tarifa:0.00}) para enviarlo a revisión.";
+                return RedirectToAction("Pagar", "Publicacion", new { id = evento.Id });
+            }
 
             if (usuario?.Email != null)
             {
@@ -280,6 +331,8 @@ namespace ActivaFest.Controllers
             if (model.CategoriaId.HasValue && !await _context.Categorias.AnyAsync(c => c.Id == model.CategoriaId, ct))
                 ModelState.AddModelError(nameof(model.CategoriaId), "Categoría no válida.");
 
+            FiltrarArchivosSubidos(model);
+
             if (ModelState.IsValid)
             {
                 var url = Url.Action(nameof(Detalle), "Eventos", new { id }, Request.Scheme)!;
@@ -287,6 +340,7 @@ namespace ActivaFest.Controllers
 
                 if (resultado.Exito)
                 {
+                    OlvidarArchivosSubidos(model);
                     TempData["Mensaje"] = evento.Estado == EstadoEvento.Aprobado
                         ? "Cambios guardados." + (resultado.CompradoresNotificados > 0
                             ? $" Avisamos por correo a {resultado.CompradoresNotificados} {(resultado.CompradoresNotificados == 1 ? "comprador" : "compradores")}."
@@ -299,7 +353,9 @@ namespace ActivaFest.Controllers
                     ModelState.AddModelError(string.Empty, error);
             }
 
-            // Se vuelve a mostrar el formulario con las fotos actuales y lo comprometido por zona
+            // Se vuelve a mostrar el formulario con las fotos actuales y lo comprometido por zona;
+            // las fotos nuevas que eligió se guardan para que no tenga que volver a subirlas
+            await ConservarArchivosAsync(model, model.Fotos, model.PlanoOficialArchivo, ct);
             model.Id = id;
             model.ImagenesActuales = evento.Imagenes.OrderBy(i => i.Orden).ToList();
             model.ImagenesActualesIds = evento.Imagenes.Select(i => i.Id).ToList();
@@ -376,6 +432,64 @@ namespace ActivaFest.Controllers
                 return BadRequest();
 
             return Content(Services.Plano.PlanoService.SvgVistaPrevia(plantilla, tiposEntrada), "image/svg+xml; charset=utf-8");
+        }
+
+        // =============================
+        // 🖼️ FOTOS YA SUBIDAS EN UN ENVÍO CON ERRORES
+        // =============================
+        // El navegador vacía el campo de archivos al volver a mostrar el formulario, así que las fotos válidas
+        // se guardan y sus rutas viajan en el formulario. La sesión recuerda cuáles subió este usuario,
+        // para que nadie pueda colar rutas de otras imágenes.
+        private const string ClaveArchivosSubidos = "ArchivosSubidos";
+
+        private HashSet<string> ArchivosSubidos() =>
+            (HttpContext.Session.GetString(ClaveArchivosSubidos) ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+
+        private void GuardarArchivosSubidos(HashSet<string> rutas) =>
+            HttpContext.Session.SetString(ClaveArchivosSubidos, string.Join('|', rutas));
+
+        private void FiltrarArchivosSubidos(EventoFormViewModel model)
+        {
+            var permitidos = ArchivosSubidos();
+            model.FotosSubidas = model.FotosSubidas.Where(permitidos.Contains).Distinct().Take(EventoFormViewModel.MaxFotos).ToList();
+            if (model.PlanoSubido != null && !permitidos.Contains(model.PlanoSubido))
+                model.PlanoSubido = null;
+        }
+
+        private void OlvidarArchivosSubidos(EventoFormViewModel model)
+        {
+            var permitidos = ArchivosSubidos();
+            permitidos.ExceptWith(model.FotosSubidas);
+            if (model.PlanoSubido != null)
+                permitidos.Remove(model.PlanoSubido);
+            GuardarArchivosSubidos(permitidos);
+        }
+
+        private async Task ConservarArchivosAsync(EventoFormViewModel model, IEnumerable<IFormFile> fotos, IFormFile? plano, CancellationToken ct)
+        {
+            var permitidos = ArchivosSubidos();
+            var conservadas = model.ImagenesActualesIds.Except(model.ImagenesEliminar).Count();
+
+            foreach (var foto in fotos.Where(f => f.Length > 0 && ValidadorImagenes.Validar(f) == null))
+            {
+                if (conservadas + model.FotosSubidas.Count >= EventoFormViewModel.MaxFotos)
+                    break;
+                var ruta = await _imagenes.GuardarAsync(foto, "eventos", ct);
+                model.FotosSubidas.Add(ruta);
+                permitidos.Add(ruta);
+            }
+
+            if (plano is { Length: > 0 } && ValidadorImagenes.Validar(plano) == null)
+            {
+                model.PlanoSubido = await _imagenes.GuardarAsync(plano, "planos", ct);
+                permitidos.Add(model.PlanoSubido);
+            }
+
+            GuardarArchivosSubidos(permitidos);
+
+            // El formulario se dibuja con las rutas guardadas, no con lo que llegó en el envío
+            ModelState.Remove(nameof(model.FotosSubidas));
+            ModelState.Remove(nameof(model.PlanoSubido));
         }
 
         private Task<Evento?> CargarEventoEditableAsync(int id, CancellationToken ct)
